@@ -1,0 +1,23 @@
+{
+  "name": "partiiproject",
+  "version": "1.0.0",
+  "main": "benchmark.js",
+  "scripts": {
+    "start": "node benchmark.js --expose-wasm",
+    "build:js": "babel src -d out",
+    "build:wat": "wat2wasm src/wat/fibonacci.wat -o out/wasm/fibonacci.wasm",
+    "test": "jest"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/cli": "^7.6.4",
+    "@babel/core": "^7.6.4",
+    "@babel/preset-env": "^7.6.3",
+    "@types/jest": "^24.0.19",
+    "babel-jest": "^24.9.0",
+    "benchmark": "^2.1.4",
+    "jest": "^24.9.0",
+    "prettier": "^1.18.2",
+    "wat2wasm": "^1.0.2"
+  }
+}
