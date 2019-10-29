@@ -1,8 +1,8 @@
 module Wasm
 
-type Name = string
-
 type Vec<'t> = list<'t>
+
+type Name = string
 
 type ValType =
     | I32
@@ -72,7 +72,7 @@ type Instr =
     | GlobalGet of GlobalIdx
     | GlobalSet of GlobalIdx
     // Memory
-    | I32Load
+    | I32Load of MemArg
     | I64Load of MemArg
     | F32Load of MemArg
     | F64Load of MemArg
@@ -98,8 +98,8 @@ type Instr =
     | MemorySize
     | MemoryGrow
     // Numeric const
-    | I32Const of uint32
-    | I64Const of uint64
+    | I32Const of int32
+    | I64Const of int64
     | F32Const of float32
     | F64Const of float
     // Numeric
@@ -107,24 +107,24 @@ type Instr =
     | I32Eq
     | I32Ne
     | I32LtS
-    | I32GtS
     | I32LtU
+    | I32GtS
     | I32GtU
     | I32LeS
-    | I32GeS
     | I32LeU
+    | I32GeS
     | I32GeU
 
     | I64Eqz
     | I64Eq
     | I64Ne
     | I64LtS
-    | I64GtS
     | I64LtU
+    | I64GtS
     | I64GtU
     | I64LeS
-    | I64GeS
     | I64LeU
+    | I64GeS
     | I64GeU
 
     | F32Eq
@@ -212,7 +212,7 @@ type Instr =
     | I32WrapI64
     | I32TrucF32S
     | I32TruncF32U
-    | I32TrncF64S
+    | I32TruncF64S
     | I32TructF64U
     | I64ExtendI32S
     | I64ExtendI32U
@@ -252,7 +252,7 @@ type ImportDesc =
 type Import =
     { modulename: Name
       nm: Name
-      desc: ImportDesc }
+      importdesc: ImportDesc }
 
 type ImportSec = Vec<Import>
 
@@ -280,7 +280,7 @@ type ExportDesc =
 
 type Export =
     { nm: Name
-      desc: ExportDesc }
+      exportdesc: ExportDesc }
 
 type ExportSec = Vec<Export>
 
@@ -292,13 +292,13 @@ type StartSec = Start
 type Elem =
     { table: TableIdx
       offset: Expr
-      Init: Vec<FuncIdx> }
+      init: Vec<FuncIdx> }
 
 type ElemSec = Vec<Elem>
 
-type Locals = uint32 * ValType
+type Local = ValType
 
-type Func = Vec<Locals> * Expr
+type Func = Vec<Local> * Expr
 
 type Code = Func
 
