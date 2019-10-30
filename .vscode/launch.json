@@ -5,11 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch (console)",
+            "name": ".NET Core Launch (Compiler)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/compiler/bin/Debug/netcoreapp3.0/Compiler.dll",
+            "program": "${workspaceFolder}/Compiler/bin/Debug/netcoreapp3.0/Compiler.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
