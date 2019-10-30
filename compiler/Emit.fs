@@ -38,7 +38,12 @@ let emitVec f x =
 
 let emitName (x:string) = 
     let utf8 = System.Text.UTF8Encoding()
-    x |> Seq.map(string) |> Seq.toList |> emitVec (utf8.GetBytes >> Array.toList)
+    let length = x |> String.length |> uint32
+    let bytes = utf8.GetBytes x
+    [
+        length |> emitInt32U
+        bytes |> Array.toList
+    ] |> List.concat
 
 let emitValType = 
     function
@@ -152,13 +157,13 @@ let rec emitInstr instr =
     | I64Store16 m -> [0x3Duy; yield! emitMemArg m]
     | I64Store32 m -> [0x3Euy; yield! emitMemArg m]
     | MemorySize -> [0x3Fuy; 0x00uy]
-    | MemoryGrow -> [0x3Fuy; 0x00uy]
+    | MemoryGrow -> [0x40uy; 0x00uy]
     // Numeric const
-    | I32Const x -> emitInt32S x
-    | I64Const x -> emitInt64S x
-    | F32Const x -> emitFloat32 x
-    | F64Const x -> emitFloat64 x
-    // Numeric
+    | I32Const x -> [0x41uy; yield! emitInt32S x]
+    | I64Const x -> [0x42uy; yield! emitInt64S x]
+    | F32Const x -> [0x43uy; yield! emitFloat32 x]
+    | F64Const x -> [0x44uy; yield! emitFloat64 x]
+    // Numeric    
     | I32Eqz -> [0x45uy]
     | I32Eq -> [0x46uy]
     | I32Ne -> [0x47uy]
@@ -393,19 +398,20 @@ let emitLocal (n, t) =
         [emitValType t]
     ] |> List.concat
 
-let rec emitLocals = function
-    |[] -> []
+let rec emitLocals acc = function
+    |[] -> 
+        [
+            acc |> List.length |> uint32 |> emitInt32U
+            acc |> List.rev |> List.collect emitLocal
+        ] |> List.concat
     |t::ts ->
         let n = ts |> List.takeWhile ((=) t) |> List.length |> (+) 1 
-        [
-            emitLocal (n |> uint32, t)
-            t::ts |> List.skip n |> emitLocals
-        ] |> List.concat
+        t::ts |> List.skip n |> emitLocals ((n |> uint32, t)::acc)
 
 
 let emitFunc (locals, expr) =
     [
-        emitLocals locals
+        emitLocals [] locals
         emitExpr expr
     ] |> List.concat
 
@@ -451,7 +457,7 @@ let emitWasmModule sections =
     let magic = [0x00uy; 0x61uy; 0x73uy; 0x6Duy]
     let version = [0x01uy; 0x00uy; 0x00uy; 0x00uy]
     [
-        [magic]
-        [version]        
-        sections |> List.map emitSection
+        magic
+        version        
+        sections |> List.collect emitSection
     ] |> List.concat
