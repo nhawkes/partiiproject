@@ -1,56 +1,45 @@
 ﻿// Learn more about F# at http://fsharp.org
 
 open System
-open Wasm
-open Emit
+open Stg
 
-let wasmModule = [
-    TypeSec [
-       [I32], [I32] 
-    ]
-    FuncSec [
-        0u
-    ]
-    ExportSec [
-        {nm="fibonacci"; exportdesc=ExportFunc 0u}
-    ]
-    CodeSec [
-        [],
-        [
-            LocalGet 0u
-            I32Const 0
-            I32Eq
-            IfElse ([I32],
-                [I32Const 1],                    
-                [
-                    LocalGet 0u
-                    I32Const 1
-                    I32Eq
-                    IfElse ([I32],
-                        [I32Const 1],
-                        [
-                            LocalGet 0u
-                            I32Const 1
-                            I32Sub
-                            Call 0u
-
-                            LocalGet 0u
-                            I32Const 2
-                            I32Sub
-                            Call 0u
-
-                            I32Add
-                        ]                            
+let stgModule : Program =
+    [
+        "fibonacci", ((["x"],[],["a";"b"]),
+            Case(
+                Prim[AVar "x"], 
+                "x",
+                PAlts (
+                    [Wasm.I32Const 0, Prim [ALit (Wasm.I32Const 1)]], 
+                    Case(
+                        Prim[AVar "x"],
+                        "x",
+                        PAlts (
+                            [Wasm.I32Const 1, Prim [ALit (Wasm.I32Const 1)]], 
+                            Case(
+                                Prim[AVar "fibonacci"; ALit Wasm.I32Sub; ALit (Wasm.I32Const 1); AVar "x"],
+                                "a",
+                                PAlts(
+                                    [],
+                                    Case(
+                                        Prim[AVar "fibonacci"; ALit (Wasm.I32Sub); ALit (Wasm.I32Const 2); AVar("x")],
+                                        "b",
+                                        PAlts([], 
+                                            Prim [ALit Wasm.I32Add; AVar "a"; AVar "b"]))
+                                    )                
+                            )
+                        )
                     )
-                ]
+                )
             )
-        ]
+        )
+    
     ]
 
-]
 
 [<EntryPoint>]
 let main argv =
-    let bytes = emitWasmModule wasmModule |> List.toArray
-    IO.File.WriteAllBytes("./compiler/benchmark/out/wasm/fibonacci.wasm", bytes)
+    let wasmModule = stgModule |> WasmGen.genProgram
+    let bytes = Emit.emitWasmModule wasmModule |> List.toArray
+    IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
     0

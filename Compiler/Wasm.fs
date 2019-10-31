@@ -298,7 +298,7 @@ type ElemSec = Vec<Elem>
 
 type Local = ValType
 
-type Func = Vec<Local> * Expr
+type Func = Local list * Expr
 
 type Code = Func
 

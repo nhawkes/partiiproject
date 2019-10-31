@@ -1,30 +1,37 @@
 module Stg
 
-type Constr = Constr of int
-type Var = Var of int
+type Constr = int
+
+type Var = string
+
+type Args = Var list
+type Free = Var list
+type Locals = Var list
 
 type Atom =
-    |Var of Var
-    |Literal of Wasm.Instr
+    | AVar of Var
+    | ALit of Wasm.Instr
 
 type Expr =
-    |Let of Binds * Expr
-    |Case of Bind * Alts * Expr
-    |Var of Var * Atom list
-    |Constr of Constr * Atom list
-    |Prim of Wasm.Instr * Atom list
+    | Let of Binds * Expr
+    | Case of Expr * Var * Alts
+    | App of Var * Atom list
+    | Constr of Constr * Atom list
+    | Prim of Atom list
+
 and Binds =
-    |Rec of Bind list
-    |NonRec of Bind list
-and Bind = Var * Expr
+    | Rec of Bind list
+    | NonRec of Bind list
+
+and Bind = Var * LambdaForm
+
+and Default = Expr
+
 and Alts =
-    |AAlts of ((Constr * Var list) * Expr) list
-    |PAlts of (Wasm.Instr * Expr) list
-and LambdaForm =
-    Args * Free * Expr
-and Args = Var list
-and Free = Var list
-and Program = Bind list        
+    | AAlts of AAlts * Default
+    | PAlts of PAlts * Default
+and AAlts = ((Constr * Var list) * Expr) list
+and PAlts = (Wasm.Instr * Expr) list
+and LambdaForm = (Args * Free * Locals) * Expr
 
-
-
+type Program = Bind list
