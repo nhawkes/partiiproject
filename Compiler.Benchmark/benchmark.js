@@ -1,18 +1,22 @@
 const { fibonacci } = require('./out/js/fibonacci');
 const fs = require('fs')
-const bufferSource = fs.readFileSync('./out/wasm/fibonacci.wasm')
-const promise = WebAssembly.instantiate(new Uint8Array(bufferSource));
+const bufferSourceBaseline = fs.readFileSync('./out/wasm/baseline.wasm')
+const promiseBaseline = WebAssembly.instantiate(new Uint8Array(bufferSourceBaseline));
+const bufferSourceCompiler = fs.readFileSync('./out/wasm/fibonacci.wasm')
+const promiseCompiler = WebAssembly.instantiate(new Uint8Array(bufferSourceCompiler));
 var Benchmark = require('benchmark');
 var suite = new Benchmark.Suite;
 
-
-promise.then(lib =>
+Promise.all([promiseBaseline, promiseCompiler]).then(([libBaseline, libCompiler]) =>
     suite
         .add('JS#fibonacci', function () {
             fibonacci(20)
         })
         .add('Wasm#fibonacci', async function () {
-            lib.instance.exports.fibonacci(20)
+            libBaseline.instance.exports.fibonacci(20)
+        })
+        .add('Compiler#fibonacci', async function () {
+            libCompiler.instance.exports.fibonacci(20)
         })
         .on('cycle', function (event) {
             console.log(String(event.target));

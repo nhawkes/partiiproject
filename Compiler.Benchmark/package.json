@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node benchmark.js --expose-wasm",
     "build:js": "babel src -d out",
-    "build:wat": "wat2wasm src/wat/fibonacci.wat -o out/wasm/fibonacci.wasm",
+    "build:wat": "wat2wasm src/wat/fibonacci.wat -o out/wasm/baseline.wasm",
     "test": "jest"
   },
   "license": "MIT",
