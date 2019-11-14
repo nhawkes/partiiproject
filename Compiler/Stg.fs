@@ -1,37 +1,40 @@
 module Stg
 
-type Constr = int
+type Constr<'b> = 'b
 
-type Var = string
+type Args<'b> = 'b list
+type Free<'b> = 'b list
+type Locals<'b> = 'b list
 
-type Args = Var list
-type Free = Var list
-type Locals = Var list
-
-type Atom =
-    | AVar of Var
+type Atom<'b> =
+    | AVar of 'b
     | ALit of Wasm.Instr
 
-type Expr =
-    | Let of Binds * Expr
-    | Case of Expr * Var * Alts
-    | App of Var * Atom list
-    | Constr of Constr * Atom list
-    | Prim of Atom list
+type Expr<'b> =
+    | Let of Binds<'b> * Expr<'b>
+    | Case of Expr<'b> * 'b * Alts<'b>
+    | App of 'b * Atom<'b> list
+    | Constr of Constr<'b> * Atom<'b> list
+    | Prim of Atom<'b> list
 
-and Binds =
-    | Rec of Bind list
-    | NonRec of Bind list
+and Binds<'b> =
+    | Rec of Bind<'b> list
+    | NonRec of Bind<'b> list
 
-and Bind = Var * LambdaForm
+and Bind<'b> = 'b * LambdaForm<'b>
 
-and Default = Expr
+and Default<'b> = Expr<'b>
 
-and Alts =
-    | AAlts of AAlts * Default
-    | PAlts of PAlts * Default
-and AAlts = ((Constr * Var list) * Expr) list
-and PAlts = (Wasm.Instr * Expr) list
-and LambdaForm = (Args * Free * Locals) * Expr
+and Alts<'b> =
+    | AAlts of AAlts<'b> * Default<'b>
+    | PAlts of PAlts<'b> * Default<'b>
+and AAlts<'b> = ((Constr<'b> * 'b list) * Expr<'b>) list
+and PAlts<'b> = (Wasm.Instr * Expr<'b>) list
+and LambdaForm<'b> = (Args<'b> * Free<'b> * Locals<'b>) * Expr<'b>
 
-type Program = Bind list
+type TopLevel<'b> =
+    |TopLam of LambdaForm<'b>
+    |TopConstr of 'b list
+
+type TopBind<'b> = 'b * TopLevel<'b>
+type Program<'b> = TopBind<'b> list
