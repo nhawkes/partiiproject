@@ -1,7 +1,5 @@
 module Wasm
 
-type Vec<'t> = list<'t>
-
 type Name = string
 
 type ValType =
@@ -12,7 +10,7 @@ type ValType =
 
 type BlockType = ValType list
 
-type FuncType = Vec<ValType> * Vec<ValType>
+type FuncType = ValType list * ValType list
 
 type Limits =
     | Min of uint32
@@ -237,11 +235,11 @@ type Instr =
 
 type Expr = Instr list
 
-type Custom = Name * Vec<byte>
+type Custom = Name * byte list
 
 type CustomSec = Custom
 
-type TypeSec = Vec<FuncType>
+type TypeSec = FuncType list
 
 type ImportDesc =
     | ImportFunc of TypeIdx
@@ -254,23 +252,23 @@ type Import =
       nm: Name
       importdesc: ImportDesc }
 
-type ImportSec = Vec<Import>
+type ImportSec = Import list
 
-type FuncSec = Vec<TypeIdx>
+type FuncSec = TypeIdx list
 
 type Table = TableType
 
-type TableSec = Vec<Table>
+type TableSec = Table list
 
 type Mem = MemType
 
-type MemSec = Vec<Mem>
+type MemSec = Mem list
 
 type Global =
     { gt: GlobalType
       init: Expr }
 
-type GlobalSec = Vec<Global>
+type GlobalSec = Global list
 
 type ExportDesc =
     | ExportFunc of FuncIdx
@@ -282,7 +280,7 @@ type Export =
     { nm: Name
       exportdesc: ExportDesc }
 
-type ExportSec = Vec<Export>
+type ExportSec = Export list
 
 type Start =
     { func: FuncIdx }
@@ -292,9 +290,9 @@ type StartSec = Start
 type Elem =
     { table: TableIdx
       offset: Expr
-      init: Vec<FuncIdx> }
+      init: FuncIdx list }
 
-type ElemSec = Vec<Elem>
+type ElemSec = Elem list
 
 type Local = ValType
 
@@ -302,14 +300,14 @@ type Func = Local list * Expr
 
 type Code = Func
 
-type CodeSec = Vec<Code>
+type CodeSec = Code list
 
 type Data =
     { data: MemIdx
       offset: Expr
       init: byte array }
 
-type DataSec = Vec<Data>
+type DataSec = Data list
 
 type Section =
     | CustomSec of CustomSec

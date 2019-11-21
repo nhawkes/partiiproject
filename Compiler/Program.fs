@@ -7,12 +7,12 @@ open WasmGen
 let stgModule : Program<Var> =
     [
         (UserVar "Int", TopConstr [UserVar "I"])
-        (UserVar "add"), TopLam (([(UserVar "x_boxed");(UserVar "y_boxed")],[],[(UserVar "x");(UserVar "y");(UserVar "r")]),
+        (UserVar "add"), TopLam (([(UserVar "x_boxed");(UserVar "y_boxed")],[],[(UserVar "x");(UserVar "y");(UserVar "r")],[]),            
             Case(
                 App((UserVar "x_boxed"), []),
                 (UserVar "x_boxed"),
-                AAlts (
-                    [(UserVar "Int", [(UserVar "x")]),
+                AAlts (                       
+                    [  (UserVar "Int", [(UserVar "x")]),
                         Case(
                             App((UserVar "y_boxed"), []),
                             (UserVar "x_boxed"),
@@ -30,9 +30,9 @@ let stgModule : Program<Var> =
                     ],
                     Prim [ALit Wasm.Unreachable]
                 )
-            )
+            ) 
         )
-        (UserVar "subtract"), TopLam (([(UserVar "x_boxed");(UserVar "y_boxed")],[],[(UserVar "x");(UserVar "y");(UserVar "r")]),
+        (UserVar "subtract"), TopLam (([(UserVar "x_boxed");(UserVar "y_boxed")],[],[(UserVar "x");(UserVar "y");(UserVar "r")],[]),
             Case(
                 App((UserVar "x_boxed"), []),
                 (UserVar "x_boxed"),
@@ -57,11 +57,17 @@ let stgModule : Program<Var> =
                 )
             )            
         )
-        (UserVar "fibonacci_boxed"), TopLam (([(UserVar "x")],[],[(UserVar "x_boxed")]),
-            Let(NonRec[(UserVar "x_boxed"), (([],[(UserVar "x")],[]), Constr(UserVar "Int", [AVar (UserVar "x")]))],
-                Prim[AVar (UserVar "fibonacci");  AVar((UserVar "x_boxed"))])
+        (UserVar "fibonacci_boxed"), TopLam (
+            (
+                [(UserVar "x")],
+                [],
+                [],
+                [Lifted(UserVar "x_thunk", (([],[(UserVar "x")],[],[]), Constr(UserVar "Int", [AVar (UserVar "x")])))]
+            ),
+            Let(NonRec[(UserVar "x_thunk")], Prim[AVar (UserVar "fibonacci");  AVar((UserVar "x_thunk"))])
+        
         )
-        (UserVar "fibonacci"), TopLam (([(UserVar "x_boxed")],[],[(UserVar "x_minus_one");(UserVar "x_minus_two");(UserVar "a");(UserVar "b")]),
+        (UserVar "fibonacci"), TopLam (([(UserVar "x_boxed")],[],[(UserVar "x_minus_one");(UserVar "x_minus_two");(UserVar "a");(UserVar "b"); (UserVar "x")],[]),
             Case(
                 App((UserVar "x_boxed"),[]),
                 (UserVar "x_boxed"),
@@ -76,12 +82,12 @@ let stgModule : Program<Var> =
                                     Wasm.I32Const 1, Constr (UserVar "Int", [ALit (Wasm.I32Const 1)])
                                 ],
                                 Case(
-                                    App((UserVar "minus"), [AVar (UserVar "x"); ALit (Wasm.I32Const 1)]),
+                                    Prim[AVar(UserVar "subtract"); AVar (UserVar "x"); ALit (Wasm.I32Const 1)],
                                     (UserVar "x_minus_one"),
                                     PAlts(
                                         [],
                                         Case(
-                                            App((UserVar "minus"), [AVar (UserVar "x"); ALit (Wasm.I32Const 2)]),
+                                            Prim[AVar(UserVar "subtract"); AVar (UserVar "x"); ALit (Wasm.I32Const 2)],
                                             (UserVar "x_minus_two"),
                                             PAlts(
                                                 [],                                            
@@ -94,7 +100,7 @@ let stgModule : Program<Var> =
                                                             Prim[AVar (UserVar "fibonacci");  AVar (UserVar "x_minus_two")],
                                                             (UserVar "b"),
                                                             PAlts([], 
-                                                                App((UserVar "add"), [AVar (UserVar "a"); AVar (UserVar "b")]))
+                                                                Prim[AVar(UserVar "add"); AVar (UserVar "a"); AVar (UserVar "b")])
                                                        )        
                                                     )     
                                                 )                                                      

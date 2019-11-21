@@ -18,8 +18,8 @@ type Expr<'b> =
     | Prim of Atom<'b> list
 
 and Binds<'b> =
-    | Rec of Bind<'b> list
-    | NonRec of Bind<'b> list
+    | Rec of 'b list
+    | NonRec of 'b list
 
 and Bind<'b> = 'b * LambdaForm<'b>
 
@@ -30,7 +30,9 @@ and Alts<'b> =
     | PAlts of PAlts<'b> * Default<'b>
 and AAlts<'b> = ((Constr<'b> * 'b list) * Expr<'b>) list
 and PAlts<'b> = (Wasm.Instr * Expr<'b>) list
-and LambdaForm<'b> = (Args<'b> * Free<'b> * Locals<'b>) * Expr<'b>
+and LambdaForm<'b> = (Args<'b> * Free<'b> * Locals<'b> * Lets<'b>) * Expr<'b>
+and Lifted<'b> = Lifted of Bind<'b>
+and Lets<'b> = Lifted<'b> list
 
 type TopLevel<'b> =
     |TopLam of LambdaForm<'b>

@@ -32,7 +32,7 @@ let emitFloat64 (x:float) = x |> System.BitConverter.GetBytes |> Array.toList
 let emitVec f x =
     [
         x |> List.length |> uint32 |> emitInt32U
-        x |> List.rev |> List.collect f
+        x |> List.collect f
     ] |> List.concat
     
 
@@ -122,7 +122,7 @@ let rec emitInstr instr =
     | BrTable (ls, ln) -> [0x0Cuy; yield! emitVec emitLabelIdx ls; yield! emitLabelIdx ln]
     | Return -> [0x0Fuy]
     | Call (x) -> [0x10uy; yield! emitFuncIdx x]
-    | CallIndirect (x) -> [0x0Buy; yield! emitTypeIdx x; 0x00uy]
+    | CallIndirect (x) -> [0x11uy; yield! emitTypeIdx x; 0x00uy]
     // Parametric
     | Drop -> [0x1Auy]
     | Select -> [0x1Buy]
@@ -310,7 +310,7 @@ let emitSec n f x =
         b
     ] |> List.concat
 
-let emitCustom (name, bytes:Vec<byte>) = 
+let emitCustom (name, bytes) = 
     [
         emitName name
         emitVec List.singleton bytes 
