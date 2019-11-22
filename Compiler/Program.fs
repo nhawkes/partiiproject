@@ -44,7 +44,7 @@ let stgModule : Program<Var> =
                             AAlts (
                                 [(UserVar "Int",[(UserVar "y")]),
                                     Case(
-                                        Prim [ALit Wasm.I32Sub; AVar (UserVar "y"); AVar (UserVar "x")],
+                                        Prim [ALit Wasm.I32Sub; AVar (UserVar "x"); AVar (UserVar "y"); ],
                                         (UserVar "r"),
                                         PAlts([], 
                                             Constr (UserVar "Int", [AVar (UserVar "r")])))                                    
@@ -57,17 +57,25 @@ let stgModule : Program<Var> =
                 )
             )            
         )
-        (UserVar "fibonacci_boxed"), TopLam (
-            (
-                [(UserVar "x")],
-                [],
-                [],
-                [Lifted(UserVar "x_thunk", (([],[(UserVar "x")],[],[]), Constr(UserVar "Int", [AVar (UserVar "x")])))]
-            ),
-            Let(NonRec[(UserVar "x_thunk")], Prim[AVar (UserVar "fibonacci");  AVar((UserVar "x_thunk"))])
-        
+        (UserVar "fibonacci"),  TopLam (([(UserVar "x")],[],[(UserVar "x_boxed"); (UserVar "result"); (UserVar "return")],[]),
+            Case(
+                Constr(UserVar "Int", [AVar (UserVar "x")]), 
+                (UserVar "x_boxed"),
+                PAlts ([],
+                    Case(
+                        Prim[AVar (UserVar "fibonacci_boxed");  AVar((UserVar "x_boxed"))],
+                        (UserVar "result"),
+                        AAlts(
+                            [(UserVar "Int", [(UserVar "return")]),
+                                Prim [AVar (UserVar "return")]
+                            ],
+                            Prim [ALit Wasm.Unreachable]
+                        )
+                    )
+                )
+            )               
         )
-        (UserVar "fibonacci"), TopLam (([(UserVar "x_boxed")],[],[(UserVar "x_minus_one");(UserVar "x_minus_two");(UserVar "a");(UserVar "b"); (UserVar "x")],[]),
+        (UserVar "fibonacci_boxed"), TopLam (([(UserVar "x_boxed")],[],[(UserVar "one"); (UserVar "two"); (UserVar "x_minus_one");(UserVar "x_minus_two");(UserVar "a");(UserVar "b"); (UserVar "x")],[]),
             Case(
                 App((UserVar "x_boxed"),[]),
                 (UserVar "x_boxed"),
@@ -82,31 +90,45 @@ let stgModule : Program<Var> =
                                     Wasm.I32Const 1, Constr (UserVar "Int", [ALit (Wasm.I32Const 1)])
                                 ],
                                 Case(
-                                    Prim[AVar(UserVar "subtract"); AVar (UserVar "x"); ALit (Wasm.I32Const 1)],
-                                    (UserVar "x_minus_one"),
+                                    Constr (UserVar "Int", [ALit (Wasm.I32Const 1)]),
+                                    (UserVar "one"),
                                     PAlts(
                                         [],
                                         Case(
-                                            Prim[AVar(UserVar "subtract"); AVar (UserVar "x"); ALit (Wasm.I32Const 2)],
-                                            (UserVar "x_minus_two"),
+                                            Constr (UserVar "Int", [ALit (Wasm.I32Const 2)]),
+                                            (UserVar "two"),
                                             PAlts(
-                                                [],                                            
+                                                [],
                                                 Case(
-                                                    Prim[AVar (UserVar "fibonacci"); AVar (UserVar "x_minus_one")],
-                                                    (UserVar "a"),
+                                                    Prim[AVar(UserVar "subtract"); AVar (UserVar "x_boxed");  AVar (UserVar "one")],
+                                                    (UserVar "x_minus_one"),
                                                     PAlts(
                                                         [],
                                                         Case(
-                                                            Prim[AVar (UserVar "fibonacci");  AVar (UserVar "x_minus_two")],
-                                                            (UserVar "b"),
-                                                            PAlts([], 
-                                                                Prim[AVar(UserVar "add"); AVar (UserVar "a"); AVar (UserVar "b")])
-                                                       )        
-                                                    )     
-                                                )                                                      
+                                                            Prim[AVar(UserVar "subtract"); AVar (UserVar "x_boxed");  AVar (UserVar "two")],
+                                                            (UserVar "x_minus_two"),
+                                                            PAlts(
+                                                                [],                                            
+                                                                Case(
+                                                                    Prim[AVar (UserVar "fibonacci_boxed"); AVar (UserVar "x_minus_one")],
+                                                                    (UserVar "a"),
+                                                                    PAlts(
+                                                                        [],
+                                                                        Case(
+                                                                            Prim[AVar (UserVar "fibonacci_boxed");  AVar (UserVar "x_minus_two")],
+                                                                            (UserVar "b"),
+                                                                            PAlts([], 
+                                                                                Prim[AVar(UserVar "add"); AVar (UserVar "a"); AVar (UserVar "b")])
+                                                                       )        
+                                                                    )     
+                                                                )                                                      
+                                                            )
+                                                        )  
+                                                    )         
+                                                )
                                             )
-                                        )  
-                                    )              
+                                        )
+                                    )
                                 )
                             )
                         )

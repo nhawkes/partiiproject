@@ -23,12 +23,11 @@ type RuntimeFunction =
       functype: Wasm.FuncType
       indirect: bool
       func: Wasm.Func }
-type Func = 
-    {
-        name: Var
-        functype: Wasm.FuncType
-        indirect: bool
-    }
+
+type Func =
+    { name: Var
+      functype: Wasm.FuncType
+      indirect: bool }
 
 let stdFuncType = [ Wasm.I32 ], [ Wasm.I32 ]
 let heapTop = 0u
@@ -47,7 +46,7 @@ let getFunc env v =
 let getIndirectFunc env v =
     match env |> Map.find v with
     | IndirectFunc func -> func
-    | _ -> failwith "Error"    
+    | _ -> failwith "Error"
 
 let getLambda env v =
     match env |> Map.find v with
@@ -62,9 +61,10 @@ let genAtom tenv env =
             [ Wasm.LocalGet 0u
               Wasm.I32Load
                   { align = 0u
-                    offset = uint32 i } ]
+                    offset = 4u * uint32 i } ]
         | Some(Local i) -> [ Wasm.LocalGet i ]
         | Some(Func i) -> [ Wasm.Call i ]
+        | Some(Lambda(i, _, _, _)) -> [ Wasm.LocalGet i ]
         | Some(Unreachable) -> failwith "Error"
         | None -> failwith "Error"
     | ALit w -> [ w ]
@@ -79,30 +79,46 @@ let rec genExpr tenv env =
     | Constr(constr, atoms) -> genPrim tenv env (AVar constr :: atoms)
     | Prim(atoms) -> genPrim tenv env atoms
 
-and genLet tenv env binds e = genBinds tenv env binds
+and genLet tenv env binds e =
+    [ genBinds tenv env binds
+      genExpr tenv env e ]
+    |> List.concat
 
 and genBinds tenv env = function
     | NonRec [ x ] ->
         let (localidx, funcidx, args, frees) = getLambda env x
         let size = 1 + List.length args + List.length frees
-        [ Wasm.I32Const size
-          Wasm.Call(getFunc env Malloc)
-          Wasm.LocalSet localidx
-          Wasm.LocalGet localidx
-          Wasm.I32Const(int32 funcidx)
-          Wasm.I32Store
-              { align = 0u
-                offset = 1u } ]
+        let freeOffset = 1 + List.length args
+        let storeFrees = (frees |> List.mapi(fun i free -> 
+            [
+                [Wasm.LocalGet localidx]
+                genAtom tenv env (AVar free)
+                [Wasm.I32Store
+                  { align = 0u
+                    offset = 4u * uint32 (freeOffset+i) }]
+            ]) |> List.concat |> List.concat)
+        [
+            [ 
+                Wasm.I32Const (4 * size)
+                Wasm.Call(getFunc env Malloc)
+                Wasm.LocalSet localidx
+                Wasm.LocalGet localidx
+                Wasm.I32Const(int32 funcidx)
+                Wasm.I32Store
+                  { align = 0u
+                    offset = 0u } 
+            ]
+            storeFrees
+        ] |> List.concat
 
 and genApp tenv env v =
     [ genAtom tenv env (AVar v)
       genAtom tenv env (AVar v)
       [ Wasm.I32Load
           { align = 0u
-            offset = 0u } 
-        Wasm.CallIndirect (tenv |> Map.find stdFuncType) 
-      ]
-    ] |> List.concat
+            offset = 0u } ]
+      [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
+    |> List.concat
 
 and genCase tenv env (v: Var) e alts =
     let atom = AVar v
@@ -139,14 +155,14 @@ and genAAlts tenv env atom def =
                 [ genAtom tenv env atom
                   [ Wasm.I32Load
                       { align = 0u
-                        offset = 2u + uint32 (i) } ]
+                        offset = 4u * (2u + uint32 (i)) } ]
                   [ Wasm.LocalSet local ] ]
                 |> List.concat)
 
         [ genAtom tenv env atom
           [ Wasm.I32Load
               { align = 0u
-                offset = 1u }
+                offset = 4u * 1u }
             Wasm.I32Const(int funcIndex)
             Wasm.I32Eq
             Wasm.IfElse
@@ -165,21 +181,26 @@ and genPrim tenv env atoms =
 
 let rec genLetFuncs = function
     | Lifted(b, ((_, _, _, lets), _)) ->
-        [ [{name= b; functype=stdFuncType; indirect=true}] 
-          genLetsFuncs lets 
-        ] |> List.concat
+        [ [ { name = b
+              functype = stdFuncType
+              indirect = true } ]
+          genLetsFuncs lets ]
+        |> List.concat
 
 and genLetsFuncs = List.collect genLetFuncs
 
 let genTopLamFuncs b ((vars, e): LambdaForm<_>) =
     let (args, free, locals, lets) = vars
-    [
-      [{name= b; functype=(Wasm.I32 |> List.replicate (args |> List.length), [ Wasm.I32 ]); indirect=false}]
-      genLetsFuncs lets 
-    ] |> List.concat
+    [ [ { name = b
+          functype = (Wasm.I32 |> List.replicate (args |> List.length), [ Wasm.I32 ])
+          indirect = false } ]
+      genLetsFuncs lets ]
+    |> List.concat
 
-let genTopConstrFunc b vs = 
-    {name=b; functype= (Wasm.I32 |> List.replicate (vs |> List.length), [ Wasm.I32 ]); indirect=false}
+let genTopConstrFunc b vs =
+    { name = b
+      functype = (Wasm.I32 |> List.replicate (vs |> List.length), [ Wasm.I32 ])
+      indirect = false }
 
 let genTopLevelFuncs =
     function
@@ -187,7 +208,8 @@ let genTopLevelFuncs =
     | b, TopConstr vs -> [ genTopConstrFunc b vs ]
 
 let placeLocal local i = (local, Local i)
-let placeLet env (Lifted(b, ((args, free, _, _), _): LambdaForm<_>)) i = (b, Lambda(i, getIndirectFunc env b, args, free))
+let placeLet env (Lifted(b, ((args, free, _, _), _): LambdaForm<_>)) i =
+    (b, Lambda(i, getIndirectFunc env b, args, free))
 
 let localsEnv env locals lets =
     let wasmLocals =
@@ -228,55 +250,59 @@ let genTopBindCode tenv env ((vars, code): LambdaForm<_>) =
                   Seq.initInfinite (uint32 >> Local) |> Seq.zip (List.concat [ args; locals ]) ]
             |> Map.ofSeq
 
-        [ [ Wasm.I32 |> List.replicate (locals |> List.length), genExpr tenv newEnv code ]
+        [ [ Wasm.I32 |> List.replicate ((locals |> List.length) + (lets |> List.length)), genExpr tenv newEnv code ]
           genLetsCode tenv env lets ]
         |> List.concat
 
 let genTopConstrCode tenv env b vs =
-    let localidx = vs |> List.length |> uint32
-    let vsStores = vs |> List.mapi(fun i v -> 
-        [
-            Wasm.LocalGet (uint32 i)
-            Wasm.LocalGet localidx
-            Wasm.I32Store {align=0u; offset=uint32 (i+2)}
-        ]) 
-    [Wasm.I32],
-    [
-          [ Wasm.I32Const
-              (vs
-               |> List.length
-               |> (+) 2)
-            Wasm.Call(getFunc env Malloc) 
-            Wasm.LocalSet localidx
-          ]     
-          [
-              
-            Wasm.I32Const (getIndirectFunc env Identity |> int)
-            Wasm.LocalGet localidx
-            Wasm.I32Store {align=0u; offset=uint32 (0u)}
-          ]
-          [
-            Wasm.I32Const (getFunc env b |> int)
-            Wasm.LocalGet localidx
-            Wasm.I32Store {align=0u; offset=uint32 (1u)}]
-          vsStores |> List.concat                 
-    ] |> List.concat
-        
+    let localidx =
+        vs
+        |> List.length
+        |> uint32
+
+    let vsStores =
+        vs
+        |> List.mapi (fun i v ->
+            [ 
+              Wasm.LocalGet localidx
+              Wasm.LocalGet(uint32 i)
+              Wasm.I32Store
+                  { align = 0u
+                    offset = 4u * uint32 (i + 2)} ])
+
+    [ Wasm.I32 ],
+    [ [ Wasm.I32Const
+            (4 * (vs
+             |> List.length
+             |> (+) 2))
+        Wasm.Call(getFunc env Malloc)
+        Wasm.LocalSet localidx ]
+      [ Wasm.LocalGet localidx
+        Wasm.I32Const(getIndirectFunc env Identity |> int)        
+        Wasm.I32Store
+            { align = 0u
+              offset = 4u * uint32 (0u) } ]
+      [ 
+        Wasm.LocalGet localidx
+        Wasm.I32Const(getFunc env b |> int)
+        Wasm.I32Store
+            { align = 0u
+              offset = 4u * uint32 (1u) } ]
+      vsStores |> List.concat
+      [ Wasm.LocalGet localidx ] ]
+    |> List.concat
+
 let genTopLevelCode tenv env =
     function
     | _, TopLam lam -> genTopBindCode tenv env lam
-    | b, TopConstr(vs) -> [genTopConstrCode tenv env b vs]
-        
+    | b, TopConstr(vs) -> [ genTopConstrCode tenv env b vs ]
+
 
 let identity =
-    {
-        name= Identity
-        functype = stdFuncType
-        indirect = true
-        func = 
-            [],
-            [Wasm.LocalGet 0u]
-    }
+    { name = Identity
+      functype = stdFuncType
+      indirect = true
+      func = [], [ Wasm.LocalGet 0u ] }
 
 (*/ Memory layout:
 -1: Size
@@ -287,22 +313,28 @@ let identity =
 let malloc =
     { name = Malloc
       functype = [ Wasm.I32 ], [ Wasm.I32 ]
-      indirect=false
+      indirect = false
       func =
           [],
-          [ [ Wasm.GlobalGet heapTop
-              Wasm.I32Const 1
+          [ [
+              
+              // Load heapTop + 4
+              Wasm.GlobalGet heapTop
+              Wasm.I32Const 4
               Wasm.I32Add ]
 
+            // Save heapTop
             [ Wasm.GlobalGet heapTop ]
 
+            // Increment to save size at -1
             [ Wasm.GlobalGet heapTop
               Wasm.LocalGet 0u
-              Wasm.I32Const 1
+              Wasm.I32Const 4
               Wasm.I32Add
               Wasm.I32Add
               Wasm.GlobalSet heapTop ]
 
+            // Grow if needed
             [ Wasm.Loop
                 ([],
                  [ Wasm.GlobalGet heapTop
@@ -315,10 +347,14 @@ let malloc =
                    Wasm.MemoryGrow
                    Wasm.Drop ]) ]
 
+            // Load heapTop
             [ Wasm.LocalGet 0u
               Wasm.I32Store
                   { align = 0u
-                    offset = 0u } ] ]
+                    offset = 0u } ] 
+
+            // Return (old) heapTop + 4          
+          ]
           |> List.concat }
 
 
@@ -327,7 +363,11 @@ let genProgram (program: Program<_>) =
 
     let topLevelFuncs =
         List.concat
-            [ runtimeFuncs |> List.map (fun x -> {name=x.name; functype=x.functype; indirect=x.indirect})
+            [ runtimeFuncs
+              |> List.map (fun x ->
+                  { name = x.name
+                    functype = x.functype
+                    indirect = x.indirect })
               program |> List.collect (genTopLevelFuncs) ]
 
     let typeSec =
@@ -355,28 +395,28 @@ let genProgram (program: Program<_>) =
                       Wasm.Export.exportdesc = Wasm.ExportFunc(uint32 i) }
             | _ -> None)
 
-    
-    let indirectFuncs = 
-        topLevelFuncs |>
-        List.filter (fun x -> x.indirect)
 
-        
-    let indirectFuncsVars = indirectFuncs |> List.map(fun x -> x.name)
-    
+    let indirectFuncs = topLevelFuncs |> List.filter (fun x -> x.indirect)
+
+    let indirectFuncsVars = indirectFuncs |> List.map (fun x -> x.name)
+
     let funcenv =
         Seq.initInfinite (uint32 >> Func)
-        |> Seq.zip (topLevelFuncVars) 
+        |> Seq.zip (topLevelFuncVars)
         |> Map.ofSeq
 
-    let indirectElems = indirectFuncs |> List.map(fun x -> getFunc funcenv x.name)
-    let indirectElemsLen = indirectElems |> List.length |> uint32
+    let indirectElems = indirectFuncs |> List.map (fun x -> getFunc funcenv x.name)
+
+    let indirectElemsLen =
+        indirectElems
+        |> List.length
+        |> uint32
 
     let env =
-        Seq.concat [
-            funcenv |> Map.toSeq
-            Seq.initInfinite (uint32 >> IndirectFunc) 
-            |> Seq.zip (indirectFuncsVars)            
-        ] |> Map.ofSeq
+        Seq.concat
+            [ funcenv |> Map.toSeq
+              Seq.initInfinite (uint32 >> IndirectFunc) |> Seq.zip (indirectFuncsVars) ]
+        |> Map.ofSeq
 
     let codeSec =
         [ runtimeFuncs |> List.map (fun f -> f.func)
@@ -386,11 +426,14 @@ let genProgram (program: Program<_>) =
 
     [ Wasm.TypeSec typeSec
       Wasm.FuncSec(funcSec)
-      Wasm.TableSec [Wasm.Table (Wasm.FuncRef, Wasm.MinMax (indirectElemsLen, indirectElemsLen))]
+      Wasm.TableSec [ Wasm.Table(Wasm.FuncRef, Wasm.MinMax(indirectElemsLen, indirectElemsLen)) ]
       Wasm.MemSec [ Wasm.Min 1u ]
       Wasm.GlobalSec
           [ { gt = Wasm.I32, Wasm.Var
               init = [ Wasm.I32Const 0 ] } ]
       Wasm.ExportSec(exportSec)
-      Wasm.ElemSec [{table=0u; offset=[Wasm.I32Const 0]; init=indirectElems}]
+      Wasm.ElemSec
+          [ { table = 0u
+              offset = [ Wasm.I32Const 0 ]
+              init = indirectElems } ]
       Wasm.CodeSec(codeSec) ]

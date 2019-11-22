@@ -5,6 +5,7 @@ open Xunit
 open Emit
 open Wasm
 open Stg
+open WasmGen
 
 let wasmModule =
     [ TypeSec [ [ I32 ], [ I32 ] ]
@@ -37,37 +38,40 @@ let wasmModule =
                             I32Add ]) ]) ] ] ]
 
 
-let stgModule: Program<string> =
-    [ "Fibonacci",
-      (([ "x" ], [], [ "a"; "b" ]),
-       Case
-           (Prim [ AVar "x" ], "x",
-            PAlts
-                ([ I32Const 0, Prim [ ALit(I32Const 1) ] ],
-                 Case
-                     (Prim [ AVar "x" ], "x",
-                      PAlts
-                          ([ I32Const 1, Prim [ ALit(I32Const 1) ] ],
-                           Case
-                               (Prim
-                                   [ AVar "Fibonacci"
-                                     ALit I32Sub
-                                     ALit(I32Const 1)
-                                     AVar "x" ], "a",
-                                PAlts
-                                    ([],
-                                     Case
-                                         (Prim
-                                             [ AVar "Fibonacci"
-                                               ALit(I32Sub)
-                                               ALit(I32Const 2)
-                                               AVar("x") ], "b",
-                                          PAlts
-                                              ([],
-                                               Prim
-                                                   [ ALit I32Add
-                                                     AVar "a"
-                                                     AVar "b" ]))))))))) ]
+let stgModule: Program<Var> =
+    [ (UserVar "Fibonacci"),
+      TopLam
+          (([ (UserVar "x") ], [],
+            [ (UserVar "a")
+              (UserVar "b") ], []),
+           Case
+               (Prim [ AVar(UserVar "x") ], (UserVar "x"),
+                PAlts
+                    ([ I32Const 0, Prim [ ALit(I32Const 1) ] ],
+                     Case
+                         (Prim [ AVar(UserVar "x") ], (UserVar "x"),
+                          PAlts
+                              ([ I32Const 1, Prim [ ALit(I32Const 1) ] ],
+                               Case
+                                   (Prim
+                                       [ AVar(UserVar "Fibonacci")
+                                         ALit I32Sub
+                                         ALit(I32Const 1)
+                                         AVar(UserVar "x") ], (UserVar "a"),
+                                    PAlts
+                                        ([],
+                                         Case
+                                             (Prim
+                                                 [ AVar(UserVar "Fibonacci")
+                                                   ALit(I32Sub)
+                                                   ALit(I32Const 2)
+                                                   AVar((UserVar "x")) ], (UserVar "b"),
+                                              PAlts
+                                                  ([],
+                                                   Prim
+                                                       [ ALit I32Add
+                                                         AVar(UserVar "a")
+                                                         AVar(UserVar "b") ]))))))))) ]
 
 let arrayFromTuple =
     function
@@ -95,7 +99,7 @@ let ``WASM Fibinacci 7``() =
 [<Fact>]
 let Malloc() =
     let wasmModule =
-        [ TypeSec [ [], [ I32 ] ]
+        [ TypeSec [ WasmGen.malloc.functype ]
           FuncSec [ 0u ]
           MemSec [ Min 1u ]
           GlobalSec
@@ -106,12 +110,37 @@ let Malloc() =
                   exportdesc = ExportFunc 0u }
                 { nm = "Memory"
                   exportdesc = ExportMem 0u } ]
-          CodeSec [ [], WasmGen.malloc 13 ] ]
+          CodeSec [ WasmGen.malloc.func ] ]
 
     let mallocProgram = emitWasmModule wasmModule |> compile
     let memory = mallocProgram.Exports?Memory
-    let output = mallocProgram.Exports?Malloc ()
-    Assert.Equal("13", string(memory))
+    let output1 = mallocProgram.Exports?Malloc (12)
+    let output2 = mallocProgram.Exports?Malloc (12)
+    Assert.Equal(20, output2)
+
+[<Fact>]
+let ``Boxed Int``() =
+    let stgModule =
+        [ (UserVar "Int", TopConstr [ UserVar "I" ])
+          (UserVar "Get",
+           TopLam
+               (([ UserVar "i" ], [], [], []),
+                Prim
+                    [ ALit
+                        (Wasm.I32Load
+                            { align = 0u
+                              offset = 0u })
+                      ALit(Wasm.LocalGet 0u) ])) ]
+    let boxedIntProgram =
+        stgModule
+        |> WasmGen.genProgram
+        |> emitWasmModule
+        |> compile
+
+    let (output: Int32) = boxedIntProgram.Exports?Int (7)
+    let memory = [ 0 .. 8 ] |> List.map ((*) 4 >> boxedIntProgram.Exports?Get)
+    Assert.StrictEqual("[3; 0; 2; 7; 0; 0; 0; 0; 0]", sprintf "%A" memory)
+
 
 [<Fact>]
 let ``STG Fibinacci 7``() =
