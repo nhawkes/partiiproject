@@ -88,7 +88,7 @@ and genBinds tenv env = function
     | NonRec [ x ] ->
         let (localidx, funcidx, args, frees) = getLambda env x
         let size = 1 + List.length args + List.length frees
-        let freeOffset = 1 + List.length args
+        let freeOffset = 2 + List.length args
         let storeFrees = (frees |> List.mapi(fun i free -> 
             [
                 [Wasm.LocalGet localidx]
@@ -106,7 +106,13 @@ and genBinds tenv env = function
                 Wasm.I32Const(int32 funcidx)
                 Wasm.I32Store
                   { align = 0u
-                    offset = 0u } 
+                    offset = 4u * 0u } 
+                Wasm.LocalGet localidx
+                Wasm.I32Const(args |> List.length)
+                Wasm.I32Store
+                  { align = 0u
+                    offset = 4u * 1u } 
+               
             ]
             storeFrees
         ] |> List.concat
@@ -238,6 +244,14 @@ let rec genLetCode tenv env = function
 
 and genLetsCode tenv env = List.collect (genLetCode tenv env)
 
+
+(*/ Memory layout:
+-1: Size
+0: Function
+1: NextArgPointer
+2..arity: Args
+...: Free
+*)
 let genTopBindCode tenv env ((vars, code): LambdaForm<_>) =
     let (args, free, locals, lets) = vars
     if not (List.isEmpty free) then
@@ -304,7 +318,8 @@ let identity =
       indirect = true
       func = [], [ Wasm.LocalGet 0u ] }
 
-(*/ Memory layout:
+(*
+Memory layout:
 -1: Size
 0: Function
 1: Constr

@@ -57,23 +57,22 @@ let stgModule : Program<Var> =
                 )
             )            
         )
-        (UserVar "fibonacci"),  TopLam (([(UserVar "x")],[],[(UserVar "x_boxed"); (UserVar "result"); (UserVar "return")],[]),
-            Case(
-                Constr(UserVar "Int", [AVar (UserVar "x")]), 
-                (UserVar "x_boxed"),
-                PAlts ([],
-                    Case(
-                        Prim[AVar (UserVar "fibonacci_boxed");  AVar((UserVar "x_boxed"))],
-                        (UserVar "result"),
-                        AAlts(
-                            [(UserVar "Int", [(UserVar "return")]),
-                                Prim [AVar (UserVar "return")]
-                            ],
-                            Prim [ALit Wasm.Unreachable]
-                        )
+        (UserVar "fibonacci"),  TopLam (([(UserVar "x")],[],[(UserVar "result"); (UserVar "return")],[
+            Lifted(((UserVar "x_boxed")), (([], [UserVar "x"], [], []), Constr(UserVar "Int", [AVar (UserVar "x")])))
+        ]),
+            Let(NonRec [UserVar "x_boxed"], 
+                Case(
+                    Prim[AVar (UserVar "fibonacci_boxed");  AVar((UserVar "x_boxed"))],
+                    (UserVar "result"),
+                    AAlts(
+                        [(UserVar "Int", [(UserVar "return")]),
+                            Prim [AVar (UserVar "return")]
+                        ],
+                        Prim [ALit Wasm.Unreachable]
                     )
-                )
-            )               
+                
+                )       
+            )        
         )
         (UserVar "fibonacci_boxed"), TopLam (([(UserVar "x_boxed")],[],[(UserVar "one"); (UserVar "two"); (UserVar "x_minus_one");(UserVar "x_minus_two");(UserVar "a");(UserVar "b"); (UserVar "x")],[]),
             Case(
