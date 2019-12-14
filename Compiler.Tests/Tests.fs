@@ -189,7 +189,7 @@ let ``STG Boxed Fibinacci 7``() =
                         [(UserVar "Int",[(UserVar "x")]),
                             Case(
                                 App((UserVar "y_boxed"), []),
-                                (UserVar "x_boxed"),
+                                (UserVar "y_boxed"),
                                 AAlts (
                                     [(UserVar "Int",[(UserVar "y")]),
                                         Case(
