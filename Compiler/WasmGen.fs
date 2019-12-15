@@ -66,7 +66,7 @@ let genAtom tenv env =
         | Some(Func i) -> [ Wasm.Call i ]
         | Some(Lambda(i, _, _, _)) -> [ Wasm.LocalGet i ]
         | Some(Unreachable) -> failwith "Error"
-        | None -> failwith "Error"
+        | None -> failwithf "Variable %A not in environment" v
     | ALit w -> [ w ]
 
 
@@ -251,7 +251,7 @@ and genLetsCode tenv env = List.collect (genLetCode tenv env)
 *)
 let genTopBindCode tenv env (lf: LambdaForm<_>) =
     if not (List.isEmpty lf.frees) then
-        failwith "Error"
+        failwith "Top level bindings cannot have free variables"
     else
         let newEnv =
             Seq.concat
