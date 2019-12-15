@@ -1,37 +1,8 @@
 module StgGen
-
-type LambdaForm<'b> =
-    { args: 'b list
-      frees: 'b list
-      locals: 'b list
-      lets: ('b * LambdaForm<'b>) list
-      expr: Stg.Expr<'b> }
-
-let lambdaForm e =
-    { args = []
-      frees = []
-      locals = []
-      lets = []
-      expr = e }
-
-let combineLf lf1 lf2 = 
-    { args = [ lf1.args; lf2.args ] |> List.concat
-      frees = [ lf1.frees; lf2.frees ] |> List.concat
-      locals = [ lf1.locals; lf2.locals ] |> List.concat
-      lets = [ lf1.lets; lf2.lets ] |> List.concat
-      expr = lf1.expr }      
-
-let rec toStgLf { args=args;
-      frees=frees;
-      locals=locals;
-      lets=lets;
-      expr=expr;} =
-      let letsStg = lets |> List.map (fun (b, lf) -> Stg.Lifted(b, toStgLf lf))
-      ((args, frees, locals, letsStg), expr)
-
+ 
 let rec genExpr =
     function
-    | Core.Var v -> { lambdaForm (Stg.App(v, [])) with frees = [ v ] }
+    | Core.Var v -> { Stg.lambdaForm (Stg.App(v, [])) with frees = [ v ] }
     | Core.Lit lit -> failwith "TODO"
     | Core.Lam(v, e) -> genLam [ v ] e
     | Core.Let(bs, e) -> genLet e bs
@@ -61,7 +32,7 @@ and genLet e = function
 and genCase e v alts =
     let lf = genExpr e
     let stgAlts, lfAlts = genAlts alts
-    let lfCombined = combineLf lf lfAlts
+    let lfCombined = Stg.combineLf lf lfAlts
         
     let expr = Stg.Case(lf.expr, v, stgAlts)
     let locals = v :: lfCombined.locals
@@ -81,21 +52,21 @@ and genAAlts lfAcc def aalts =
     function
     | ((Core.Var(v), vs), e) :: xs ->
         let lf = genExpr e
-        let lfCombined = combineLf lf lfAcc
+        let lfCombined = Stg.combineLf lf lfAcc
         genAAlts lfCombined def
             (List.concat
                 [ [ (v, vs), lf.expr ]
                   aalts ]) xs
     | [] -> 
         let lf = genExpr def
-        let lfCombined = combineLf lf lfAcc
+        let lfCombined = Stg.combineLf lf lfAcc
         Stg.AAlts (aalts, lf.expr), lfCombined
 
 and genPAlts lfAcc def palts =
     function
     | ((Core.Prim([Stg.ALit l]), []), e) :: xs ->
         let lf = genExpr e
-        let lfCombined = combineLf lf lfAcc
+        let lfCombined = Stg.combineLf lf lfAcc
         genPAlts lfCombined def
             (List.concat
                 [ [ l, lf.expr ]
@@ -117,7 +88,7 @@ and genConstr v vs = function
 let genTopLevel =
     function
     | b, Core.TopExpr e ->
-       b, Stg.TopLam (genExpr e |> toStgLf)
+       b, Stg.TopLam (genExpr e)
     | b, Core.TopConstr vs ->
         b, Stg.TopConstr vs
 

@@ -30,13 +30,34 @@ and Alts<'b> =
     | PAlts of PAlts<'b> * Default<'b>
 and AAlts<'b> = ((Constr<'b> * 'b list) * Expr<'b>) list
 and PAlts<'b> = (Wasm.Instr * Expr<'b>) list
-and LambdaForm<'b> = (Args<'b> * Free<'b> * Locals<'b> * Lets<'b>) * Expr<'b>
 and Lifted<'b> = Lifted of Bind<'b>
 and Lets<'b> = Lifted<'b> list
 
+and LambdaForm<'b> =
+    { args: 'b list
+      frees: 'b list
+      locals: 'b list
+      lets: ('b * LambdaForm<'b>) list
+      expr: Expr<'b> }
+
 type TopLevel<'b> =
     |TopLam of LambdaForm<'b>
-    |TopConstr of 'b list
+    |TopConstr of 'b list      
 
 type TopBind<'b> = 'b * TopLevel<'b>
 type Program<'b> = TopBind<'b> list
+
+
+let lambdaForm e =
+    { args = []
+      frees = []
+      locals = []
+      lets = []
+      expr = e }
+
+let combineLf lf1 lf2 = 
+    { args = [ lf1.args; lf2.args ] |> List.concat
+      frees = [ lf1.frees; lf2.frees ] |> List.concat
+      locals = [ lf1.locals; lf2.locals ] |> List.concat
+      lets = [ lf1.lets; lf2.lets ] |> List.concat
+      expr = lf1.expr }     

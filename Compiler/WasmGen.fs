@@ -186,21 +186,20 @@ and genPrim tenv env atoms =
 
 
 let rec genLetFuncs = function
-    | Lifted(b, ((_, _, _, lets), _)) ->
+    | (b, lf) ->
         [ [ { name = b
               functype = stdFuncType
               indirect = true } ]
-          genLetsFuncs lets ]
+          genLetsFuncs lf.lets ]
         |> List.concat
 
 and genLetsFuncs = List.collect genLetFuncs
 
-let genTopLamFuncs b ((vars, e): LambdaForm<_>) =
-    let (args, free, locals, lets) = vars
+let genTopLamFuncs b (lf: LambdaForm<_>) =
     [ [ { name = b
-          functype = (Wasm.I32 |> List.replicate (args |> List.length), [ Wasm.I32 ])
+          functype = (Wasm.I32 |> List.replicate (lf.args |> List.length), [ Wasm.I32 ])
           indirect = false } ]
-      genLetsFuncs lets ]
+      genLetsFuncs lf.lets ]
     |> List.concat
 
 let genTopConstrFunc b vs =
@@ -214,8 +213,8 @@ let genTopLevelFuncs =
     | b, TopConstr vs -> [ genTopConstrFunc b vs ]
 
 let placeLocal local i = (local, Local i)
-let placeLet env (Lifted(b, ((args, free, _, _), _): LambdaForm<_>)) i =
-    (b, Lambda(i, getIndirectFunc env b, args, free))
+let placeLet env ((b, lf: LambdaForm<_>)) i =
+    (b, Lambda(i, getIndirectFunc env b, lf.args, lf.frees))
 
 let localsEnv env locals lets =
     let wasmLocals =
@@ -227,19 +226,17 @@ let localsEnv env locals lets =
     |> Seq.map (fun (f, i) -> f i)
 
 let rec genLetCode tenv env = function
-    | Lifted(_, (vars, code): LambdaForm<_>) ->
-        let (args, free, locals, lets) = vars
-
+    | (_, lf: LambdaForm<_>) ->
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
-                  localsEnv env locals lets
+                  localsEnv env lf.locals lf.lets
                   Seq.initInfinite (uint32 >> Heap)
-                  |> Seq.zip (ThisFunction :: NextArgPtr :: List.concat [ args; free ]) ]
+                  |> Seq.zip (ThisFunction :: NextArgPtr :: List.concat [ lf.args; lf.frees ]) ]
             |> Map.ofSeq
 
-        [ [ Wasm.I32 |> List.replicate ((locals |> List.length) + (lets |> List.length)), genExpr tenv newEnv code ]
-          genLetsCode tenv env lets ]
+        [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
+          genLetsCode tenv env lf.lets ]
         |> List.concat
 
 and genLetsCode tenv env = List.collect (genLetCode tenv env)
@@ -252,20 +249,19 @@ and genLetsCode tenv env = List.collect (genLetCode tenv env)
 2..arity: Args
 ...: Free
 *)
-let genTopBindCode tenv env ((vars, code): LambdaForm<_>) =
-    let (args, free, locals, lets) = vars
-    if not (List.isEmpty free) then
+let genTopBindCode tenv env (lf: LambdaForm<_>) =
+    if not (List.isEmpty lf.frees) then
         failwith "Error"
     else
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
-                  localsEnv env locals lets
-                  Seq.initInfinite (uint32 >> Local) |> Seq.zip (List.concat [ args; locals ]) ]
+                  localsEnv env lf.locals lf.lets
+                  Seq.initInfinite (uint32 >> Local) |> Seq.zip (List.concat [ lf.args; lf.locals ]) ]
             |> Map.ofSeq
 
-        [ [ Wasm.I32 |> List.replicate ((locals |> List.length) + (lets |> List.length)), genExpr tenv newEnv code ]
-          genLetsCode tenv env lets ]
+        [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
+          genLetsCode tenv env lf.lets ]
         |> List.concat
 
 let genTopConstrCode tenv env b vs =

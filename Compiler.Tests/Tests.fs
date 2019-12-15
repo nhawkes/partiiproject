@@ -87,13 +87,14 @@ let ``Boxed Int``() =
         [ (UserVar "Int", TopConstr [ UserVar "I" ])
           (UserVar "Get",
            TopLam
-               (([ UserVar "i" ], [], [], []),
+               {args=[ UserVar "i" ]; frees=[]; locals=[]; lets=[]; 
+                expr=
                 Prim
                     [ ALit
                         (Wasm.I32Load
                             { align = 0u
                               offset = 0u })
-                      ALit(Wasm.LocalGet 0u) ])) ]
+                      ALit(Wasm.LocalGet 0u) ]}) ]
     let boxedIntProgram =
         stgModule
         |> WasmGen.genProgram
@@ -109,38 +110,37 @@ let ``Boxed Int``() =
 let ``STG Fibinacci 7``() =
     let stgModule: Program<Var> =
         [ (UserVar "Fibonacci"),
-          TopLam
-              (([ (UserVar "x") ], [],
-                [ (UserVar "a")
-                  (UserVar "b") ], []),
-               Case
-                   (Prim [ AVar(UserVar "x") ], (UserVar "x"),
-                    PAlts
-                        ([ I32Const 0, Prim [ ALit(I32Const 1) ] ],
-                         Case
-                             (Prim [ AVar(UserVar "x") ], (UserVar "x"),
-                              PAlts
-                                  ([ I32Const 1, Prim [ ALit(I32Const 1) ] ],
-                                   Case
-                                       (Prim
-                                           [ AVar(UserVar "Fibonacci")
-                                             ALit I32Sub
-                                             ALit(I32Const 1)
-                                             AVar(UserVar "x") ], (UserVar "a"),
-                                        PAlts
-                                            ([],
-                                             Case
-                                                 (Prim
-                                                     [ AVar(UserVar "Fibonacci")
-                                                       ALit(I32Sub)
-                                                       ALit(I32Const 2)
-                                                       AVar((UserVar "x")) ], (UserVar "b"),
-                                                  PAlts
-                                                      ([],
-                                                       Prim
-                                                           [ ALit I32Add
-                                                             AVar(UserVar "a")
-                                                             AVar(UserVar "b") ]))))))))) ]
+          TopLam 
+               {args=[ UserVar "x" ]; frees=[]; locals=[UserVar "a"; UserVar "b"]; lets=[]; 
+                expr=
+                    Case
+                       (Prim [ AVar(UserVar "x") ], (UserVar "x"),
+                        PAlts
+                            ([ I32Const 0, Prim [ ALit(I32Const 1) ] ],
+                             Case
+                                 (Prim [ AVar(UserVar "x") ], (UserVar "x"),
+                                  PAlts
+                                      ([ I32Const 1, Prim [ ALit(I32Const 1) ] ],
+                                       Case
+                                           (Prim
+                                               [ AVar(UserVar "Fibonacci")
+                                                 ALit I32Sub
+                                                 ALit(I32Const 1)
+                                                 AVar(UserVar "x") ], (UserVar "a"),
+                                            PAlts
+                                                ([],
+                                                 Case
+                                                     (Prim
+                                                         [ AVar(UserVar "Fibonacci")
+                                                           ALit(I32Sub)
+                                                           ALit(I32Const 2)
+                                                           AVar((UserVar "x")) ], (UserVar "b"),
+                                                      PAlts
+                                                          ([],
+                                                           Prim
+                                                               [ ALit I32Add
+                                                                 AVar(UserVar "a")
+                                                                 AVar(UserVar "b") ]))))))))}]
     let fibonacciProgram =
         stgModule
         |> WasmGen.genProgram
@@ -156,7 +156,10 @@ let ``STG Boxed Fibinacci 7``() =
     let stgModule : Program<Var> =
         [
             (UserVar "Int", TopConstr [UserVar "I"])
-            (UserVar "add"), TopLam (([(UserVar "x_boxed");(UserVar "y_boxed")],[],[(UserVar "x");(UserVar "y");(UserVar "r")],[]),            
+            (UserVar "add"), 
+              TopLam 
+               { args=[UserVar "x_boxed";UserVar "y_boxed"]; frees=[]; locals=[UserVar "x"; UserVar "y"; UserVar "r"]; lets=[]; 
+                expr=
                 Case(
                     App((UserVar "x_boxed"), []),
                     (UserVar "x_boxed"),
@@ -179,9 +182,12 @@ let ``STG Boxed Fibinacci 7``() =
                         ],
                         Prim [ALit Wasm.Unreachable; ALit (I32Const 0)]
                     )
-                ) 
-            )
-            (UserVar "subtract"), TopLam (([(UserVar "x_boxed");(UserVar "y_boxed")],[],[(UserVar "x");(UserVar "y");(UserVar "r")],[]),
+                )
+            }
+            (UserVar "subtract"), 
+              TopLam 
+               { args=[UserVar "x_boxed";UserVar "y_boxed"]; frees=[]; locals=[UserVar "x"; UserVar "y"; UserVar "r"]; lets=[]; 
+                expr=
                 Case(
                     App((UserVar "x_boxed"), []),
                     (UserVar "x_boxed"),
@@ -205,8 +211,10 @@ let ``STG Boxed Fibinacci 7``() =
                         Prim [ALit Wasm.Unreachable; ALit (I32Const 0)]
                     )
                 )            
-            )
-            (UserVar "Fibonacci"),  TopLam (([(UserVar "x")],[],[(UserVar "x_boxed"); (UserVar "result"); (UserVar "return")],[]),
+            }
+            (UserVar "Fibonacci"), TopLam 
+               { args=[UserVar "x"]; frees=[]; locals=[UserVar "x_boxed"; UserVar "result"; UserVar "return"]; lets=[]; 
+                expr= 
                 Case(
                     Constr(UserVar "Int", [AVar (UserVar "x")]), 
                     (UserVar "x_boxed"),
@@ -223,8 +231,10 @@ let ``STG Boxed Fibinacci 7``() =
                         )
                     )
                 )               
-            )
-            (UserVar "fibonacci_boxed"), TopLam (([(UserVar "x_boxed")],[],[(UserVar "one"); (UserVar "two"); (UserVar "x_minus_one");(UserVar "x_minus_two");(UserVar "a");(UserVar "b"); (UserVar "x")],[]),
+            }
+            (UserVar "fibonacci_boxed"), TopLam
+              { args=[UserVar "x_boxed"]; frees=[]; locals=[UserVar "one"; UserVar "two"; UserVar "x_minus_one"; UserVar "x_minus_two"; UserVar "a"; UserVar "b"; UserVar "x"]; lets=[]; 
+                expr= 
                 Case(
                     App((UserVar "x_boxed"),[]),
                     (UserVar "x_boxed"),
@@ -285,7 +295,7 @@ let ``STG Boxed Fibinacci 7``() =
                         Prim [ALit Wasm.Unreachable; ALit (I32Const 0)]             
                     )
                 )
-            )        
+              }     
         ]
     let fibonacciProgram =
         stgModule
