@@ -143,7 +143,10 @@ let coreModule : Program<Var> =
 
 [<EntryPoint>]
 let main argv =
-    let wasmModule = coreModule |> WasmGen.genProgram
+    let wasmModule = 
+        coreModule
+         |> StgGen.genProgram
+         |> WasmGen.genProgram
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
     0

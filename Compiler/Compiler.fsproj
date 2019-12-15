@@ -8,6 +8,7 @@
     <Compile Include="Stg.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Emit.fs" />
+    <Compile Include="StgGen.fs" />
     <Compile Include="WasmGen.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
