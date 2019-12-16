@@ -89,17 +89,27 @@ and genPAlts lfAcc def palts =
 and genApp args = function
     | Core.App(f, a) ->
         genApp (a::args) f
-    | Core.Var v -> genConstr v [] args
+    | Core.Var v -> genPrimCall v [] args
         
 and genConstr v vs = function
     |(Core.Var arg)::args ->
-        let lf = genConstr v (Stg.AVar arg::vs) args
+        let lf:Stg.LambdaForm<_> = genConstr v (Stg.AVar arg::vs) args
         let frees = arg::lf.frees
         {lf with frees=frees}
     |(Core.Prim [Stg.ALit arg])::args ->
         genConstr v (Stg.ALit arg::vs) args
     |[] ->
         Stg.lambdaForm (Stg.Constr(v, vs))
+
+and genPrimCall f xs = function        
+    |(Core.Var arg)::args ->
+        let lf = genConstr f (Stg.AVar arg::xs) args
+        let frees = arg::lf.frees
+        {lf with frees=frees}
+    |(Core.Prim [Stg.ALit arg])::args ->
+        genConstr f (Stg.ALit arg::xs) args
+    |[] ->
+        Stg.lambdaForm (Stg.Prim(Stg.AVar f::xs))
 
 and genPrim ps =
     Stg.lambdaForm (Stg.Prim ps)
