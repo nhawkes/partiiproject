@@ -9,7 +9,7 @@ let coreModule : Program<Var> =
         (UserVar "Int", TopConstr [UserVar "I"])
         (UserVar "add"), TopExpr (         
             Lam(UserVar "x_boxed", 
-                Lam(UserVar "y_boxed",    
+                Lam(UserVar "y_boxed",
                     Case(
                         Var((UserVar "x_boxed")),
                         (UserVar "x_boxed_eval"),
@@ -32,7 +32,7 @@ let coreModule : Program<Var> =
                             ],
                             Prim [Stg.ALit Wasm.Unreachable]
                         )
-                    ) 
+                    )
                 )
             )
         )
@@ -116,7 +116,7 @@ let coreModule : Program<Var> =
                                                                 Prim[Stg.AVar(UserVar "subtract"); Stg.AVar (UserVar "x_boxed_eval");  Stg.AVar (UserVar "two")],
                                                                 (UserVar "x_minus_two"),
                                                                 Alts(
-                                                                    [],                                            
+                                                                    [],                            
                                                                     Case(
                                                                         Prim[Stg.AVar (UserVar "fibonacci_boxed"); Stg.AVar (UserVar "x_minus_one")],
                                                                         (UserVar "a"),
@@ -126,10 +126,11 @@ let coreModule : Program<Var> =
                                                                                 Prim[Stg.AVar (UserVar "fibonacci_boxed");  Stg.AVar (UserVar "x_minus_two")],
                                                                                 (UserVar "b"),
                                                                                 Alts([], 
-                                                                                    Prim[Stg.AVar(UserVar "add"); Stg.AVar (UserVar "a"); Stg.AVar (UserVar "b")])
+                                                                                    Prim[Stg.AVar(UserVar "add"); Stg.AVar (UserVar "a"); Stg.AVar (UserVar "b")]
+                                                                                )
                                                                            )        
                                                                         )     
-                                                                    )                                                      
+                                                                    )                                                   
                                                                 )
                                                             )  
                                                         )         
