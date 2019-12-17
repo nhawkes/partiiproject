@@ -50,7 +50,7 @@ let coreModule : Program<Var> =
                                     Alts (
                                         [(Var (UserVar "Int"),[(UserVar "y")]),
                                             Case(
-                                                Prim [Stg.ALit Wasm.I32Sub; Stg.AVar (UserVar "x"); Stg.AVar (UserVar "y"); ],
+                                                Prim [Stg.ALit Wasm.I32Sub; Stg.AVar (UserVar "y"); Stg.AVar (UserVar "x");],
                                                 (UserVar "r"),
                                                 Alts([], 
                                                     App (Var (UserVar "Int"), Var (UserVar "r"))))                                    
@@ -108,12 +108,12 @@ let coreModule : Program<Var> =
                                                 Alts(
                                                     [],
                                                     Case(
-                                                        Prim[Stg.AVar(UserVar "subtract"); Stg.AVar (UserVar "x_boxed_eval");  Stg.AVar (UserVar "one")],
+                                                        App(App(Var(UserVar "subtract"), Var (UserVar "x_boxed_eval")),  Var (UserVar "one")),
                                                         (UserVar "x_minus_one"),
                                                         Alts(
                                                             [],
                                                             Case(
-                                                                Prim[Stg.AVar(UserVar "subtract"); Stg.AVar (UserVar "x_boxed_eval");  Stg.AVar (UserVar "two")],
+                                                                App(App(Var(UserVar "subtract"), Var (UserVar "x_boxed_eval")), Var (UserVar "two")),
                                                                 (UserVar "x_minus_two"),
                                                                 Alts(
                                                                     [],                            
