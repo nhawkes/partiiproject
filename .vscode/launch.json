@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Benchmark Program",
+            "program": "${workspaceFolder}/Compiler.Benchmark/benchmark.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "cwd": "${workspaceFolder}/Compiler.Benchmark",
+            
+        },
+        {
             "name": ".NET Core Launch (Compiler)",
             "type": "coreclr",
             "request": "launch",

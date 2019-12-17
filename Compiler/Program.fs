@@ -12,12 +12,12 @@ let coreModule : Program<Var> =
                 Lam(UserVar "y_boxed",    
                     Case(
                         Var((UserVar "x_boxed")),
-                        (UserVar "x_boxed"),
+                        (UserVar "x_boxed_eval"),
                         Alts (                       
                             [  (Var(UserVar "Int"), [(UserVar "x")]),
                                 Case(
                                     Var((UserVar "y_boxed")),
-                                    (UserVar "y_boxed"),
+                                    (UserVar "y_boxed_eval"),
                                     Alts (
                                         [(Var (UserVar "Int"), [(UserVar "y")]),
                                             Case(
@@ -41,12 +41,12 @@ let coreModule : Program<Var> =
                 Lam(UserVar "y_boxed",  
                     Case(
                         Var (UserVar "x_boxed"),
-                        (UserVar "x_boxed"),
+                        (UserVar "x_boxed_eval"),
                         Alts (
                             [(Var (UserVar "Int"),[(UserVar "x")]),
                                 Case(
                                     Var((UserVar "y_boxed")),
-                                    (UserVar "x_boxed"),
+                                    (UserVar "y_boxed_eval"),
                                     Alts (
                                         [(Var (UserVar "Int"),[(UserVar "y")]),
                                             Case(
@@ -86,12 +86,12 @@ let coreModule : Program<Var> =
             Lam(UserVar "x_boxed", 
                 Case(
                     Var(UserVar "x_boxed"),
-                    (UserVar "x_boxed"),
+                    (UserVar "x_boxed_eval"),
                     Alts(
                         [(Var (UserVar "Int"), [(UserVar "x")]),
                             Case(
                                 Prim[Stg.AVar (UserVar "x")], 
-                                (UserVar "x"),
+                                (UserVar "x_eval"),
                                 Alts (
                                     [
                                         (Prim [Stg.ALit (Wasm.I32Const 0)], []), App (Var (UserVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])
@@ -108,12 +108,12 @@ let coreModule : Program<Var> =
                                                 Alts(
                                                     [],
                                                     Case(
-                                                        Prim[Stg.AVar(UserVar "subtract"); Stg.AVar (UserVar "x_boxed");  Stg.AVar (UserVar "one")],
+                                                        Prim[Stg.AVar(UserVar "subtract"); Stg.AVar (UserVar "x_boxed_eval");  Stg.AVar (UserVar "one")],
                                                         (UserVar "x_minus_one"),
                                                         Alts(
                                                             [],
                                                             Case(
-                                                                Prim[Stg.AVar(UserVar "subtract"); Stg.AVar (UserVar "x_boxed");  Stg.AVar (UserVar "two")],
+                                                                Prim[Stg.AVar(UserVar "subtract"); Stg.AVar (UserVar "x_boxed_eval");  Stg.AVar (UserVar "two")],
                                                                 (UserVar "x_minus_two"),
                                                                 Alts(
                                                                     [],                                            

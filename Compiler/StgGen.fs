@@ -123,4 +123,5 @@ let genTopLevel =
         b, Stg.TopConstr vs
 
 let genProgram (core: Core.Program<'b>): Stg.Program<'b> =
-    core |> List.map genTopLevel
+    let program = core |> List.map genTopLevel
+    program
