@@ -1,5 +1,29 @@
 module StgGen
  
+type Unique =
+    |TopLevel of string
+    |Unique of int
+type Var = {unique:Unique; name:string}
+
+
+let freshVar =
+    let i = ref 0
+    fun () -> 
+        let next = !i
+        i := !i+1
+        {unique=Unique next; name=""}
+let var = 
+    let map = ref Map.empty
+    fun s ->
+    match !map |> Map.tryFind s with
+    |Some value -> value
+    |None ->
+        let newVar = {freshVar() with name=s}     
+        map := !map |> Map.add s newVar
+        newVar
+
+let topVar s = {unique=TopLevel s; name=s }   
+
 let rec genExpr =
     function
     | Core.Var v -> { Stg.lambdaForm (Stg.App(v, [])) with frees = [ v ] }
@@ -98,19 +122,33 @@ and genConstr v vs = function
         {lf with frees=frees}
     |(Core.Prim [Stg.ALit arg])::args ->
         genConstr v (Stg.ALit arg::vs) args
+    |arg::args ->
+        let var = freshVar ()
+        let lfInner = genConstr v (Stg.AVar var::vs) args
+        let lfE = genExpr arg
+        let lets = (var, lfE)::lfInner.lets
+        {lfInner with lets=lets; expr=Stg.Let(Stg.NonRec [var], lfInner.expr)}
+
+
     |[] ->
         Stg.lambdaForm (Stg.Constr(v, vs))
 
 and genPrimCall f xs = function        
     |(Core.Var arg)::args ->
-        let lf = genConstr f (Stg.AVar arg::xs) args
+        let lf = genPrimCall f (Stg.AVar arg::xs) args
         let frees = arg::lf.frees
         {lf with frees=frees}
+        
     |(Core.Prim [Stg.ALit arg])::args ->
-        genConstr f (Stg.ALit arg::xs) args
+        genPrimCall f (Stg.ALit arg::xs) args        
+    |arg::args ->
+        let var = freshVar ()
+        let lfInner = genPrimCall f (Stg.AVar var::xs) args
+        let lfE = genExpr arg
+        let lets = (var, lfE)::lfInner.lets
+        {lfInner with lets=lets; expr=Stg.Let(Stg.NonRec [var], lfInner.expr)}
     |[] ->
         Stg.lambdaForm (Stg.Prim(Stg.AVar f::xs))
-
 and genPrim ps =
     Stg.lambdaForm (Stg.Prim ps)
 
@@ -122,6 +160,6 @@ let genTopLevel =
     | b, Core.TopConstr vs ->
         b, Stg.TopConstr vs
 
-let genProgram (core: Core.Program<'b>): Stg.Program<'b> =
+let genProgram (core: Core.Program<Var>): Stg.Program<Var> =
     let program = core |> List.map genTopLevel
     program

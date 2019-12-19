@@ -3,19 +3,19 @@ module WasmGen
 open Stg
 
 type Var =
-    | UserVar of string
+    | StgVar of StgGen.Var
     | Identity
     | Malloc
     | This
     | ThisFunction
     | NextArgPtr
 
-type Placement<'b> =
+type Placement =
     | Heap of uint32
     | Local of Wasm.LocalIdx
     | Func of Wasm.FuncIdx
     | IndirectFunc of Wasm.TableIdx
-    | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args<'b> * Free<'b>
+    | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args<Var> * Free<Var>
     | Unreachable
 
 type RuntimeFunction =
@@ -56,7 +56,7 @@ let getLambda env v =
 let genAtom tenv env =
     function
     | AVar v ->
-        match env |> Map.tryFind v with
+        match env |> Map.tryFind (v) with
         | Some(Heap i) ->
             [ Wasm.LocalGet 0u
               Wasm.I32Load
@@ -69,8 +69,12 @@ let genAtom tenv env =
         | None -> failwithf "Variable %A not in environment" v
     | ALit w -> [ w ]
 
+let genStgVarAtom tenv env = function
+    |AVar v -> genAtom tenv env (AVar (StgVar v))
+    |ALit w -> genAtom tenv env (ALit w)
 
-let rec genExpr tenv env =
+
+let rec genExpr tenv (env:Map<Var, Placement>) =
     function
     | Let(binds, e) -> genLet tenv env binds e
     | Case(e, v, alts) -> genCase tenv env v e alts
@@ -86,7 +90,7 @@ and genLet tenv env binds e =
 
 and genBinds tenv env = function
     | NonRec [ x ] ->
-        let (localidx, funcidx, args, frees) = getLambda env x
+        let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
         let size = 1 + List.length args + List.length frees
         let freeOffset = 2 + List.length args
         let storeFrees = (frees |> List.mapi(fun i free -> 
@@ -118,17 +122,17 @@ and genBinds tenv env = function
         ] |> List.concat
 
 and genApp tenv env v =
-    [ genAtom tenv env (AVar v)
-      genAtom tenv env (AVar v)
+    [ genAtom tenv env (AVar (StgVar v))
+      genAtom tenv env (AVar (StgVar v))
       [ Wasm.I32Load
           { align = 0u
             offset = 0u } ]
       [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
     |> List.concat
 
-and genCase tenv env (v: Var) e alts =
-    let atom = AVar v
-    let local = getLocal env v
+and genCase tenv env (v: StgGen.Var) e alts =
+    let atom = AVar (StgVar v)
+    let local = getLocal env (StgVar v)
     [ e |> genExpr tenv env
       [ Wasm.LocalSet(local) ]
       alts |> genAlts tenv env atom ]
@@ -152,12 +156,12 @@ and genPAlts tenv env atom def =
 and genAAlts tenv env atom def =
     function
     | ((c, vs), e) :: xs ->
-        let funcIndex = getFunc env c
+        let funcIndex = getFunc env (StgVar c)
 
         let assignLocals =
             vs
             |> List.mapi (fun i v ->
-                let local = getLocal env v
+                let local = getLocal env (StgVar v)
                 [ genAtom tenv env atom
                   [ Wasm.I32Load
                       { align = 0u
@@ -182,12 +186,12 @@ and genAAlts tenv env atom def =
 and genPrim tenv env atoms =
     atoms
     |> List.rev
-    |> List.collect (genAtom tenv env)
+    |> List.collect (genStgVarAtom tenv env)
 
 
 let rec genLetFuncs = function
     | (b, lf) ->
-        [ [ { name = b
+        [ [ { name = StgVar b
               functype = stdFuncType
               indirect = true } ]
           genLetsFuncs lf.lets ]
@@ -195,44 +199,44 @@ let rec genLetFuncs = function
 
 and genLetsFuncs = List.collect genLetFuncs
 
-let genTopLamFuncs b (lf: LambdaForm<_>) =
-    [ [ { name = b
+let genTopLamFuncs b (lf: LambdaForm<StgGen.Var>) =
+    [ [ { name = StgVar b
           functype = (Wasm.I32 |> List.replicate (lf.args |> List.length), [ Wasm.I32 ])
           indirect = false } ]
       genLetsFuncs lf.lets ]
     |> List.concat
 
 let genTopConstrFunc b vs =
-    { name = b
+    { name = StgVar b
       functype = (Wasm.I32 |> List.replicate (vs |> List.length), [ Wasm.I32 ])
       indirect = false }
 
 let genTopLevelFuncs =
     function
-    | b, TopLam lam -> genTopLamFuncs b lam
+    | b:StgGen.Var, TopLam lam -> genTopLamFuncs b lam
     | b, TopConstr vs -> [ genTopConstrFunc b vs ]
 
 let placeLocal local i = (local, Local i)
-let placeLet env ((b, lf: LambdaForm<_>)) i =
-    (b, Lambda(i, getIndirectFunc env b, lf.args, lf.frees))
+let placeLet (env:Map<Var, Placement>) ((b, lf: LambdaForm<StgGen.Var>)) i =
+    (StgVar b, Lambda(i, getIndirectFunc env (StgVar b), lf.args |> List.map StgVar, lf.frees |> List.map StgVar))
 
-let localsEnv env locals lets =
+let localsEnv env locals (lets:(StgGen.Var*LambdaForm<StgGen.Var>) list) =
     let wasmLocals =
         List.concat
-            [ This :: locals |> List.map placeLocal
+            [ This :: (locals |> List.map StgVar) |> List.map placeLocal
               lets |> List.map (placeLet env) ]
     Seq.initInfinite (uint32)
     |> Seq.zip wasmLocals
     |> Seq.map (fun (f, i) -> f i)
 
 let rec genLetCode tenv env = function
-    | (_, lf: LambdaForm<_>) ->
+    | (_, lf: LambdaForm<StgGen.Var>) ->
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
                   localsEnv env lf.locals lf.lets
                   Seq.initInfinite (uint32 >> Heap)
-                  |> Seq.zip (ThisFunction :: NextArgPtr :: List.concat [ lf.args; lf.frees ]) ]
+                  |> Seq.zip (ThisFunction :: NextArgPtr :: List.concat [ lf.args |> List.map StgVar; lf.frees |> List.map StgVar]) ]
             |> Map.ofSeq
 
         [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
@@ -251,13 +255,13 @@ and genLetsCode tenv env = List.collect (genLetCode tenv env)
 *)
 let genTopBindCode tenv env (lf: LambdaForm<_>) =
     if not (List.isEmpty lf.frees) then
-        failwith "Top level bindings cannot have free variables"
+        failwithf "Top level bindings cannot have free variables: %A" lf.frees
     else
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
                   localsEnv env lf.locals lf.lets
-                  Seq.initInfinite (uint32 >> Local) |> Seq.zip (List.concat [ lf.args; lf.locals ]) ]
+                  Seq.initInfinite (uint32 >> Local) |> Seq.zip (List.concat [ lf.args |> List.map StgVar; lf.locals |> List.map StgVar]) ]
             |> Map.ofSeq
 
         [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
@@ -294,7 +298,7 @@ let genTopConstrCode tenv env b vs =
               offset = 4u * uint32 (0u) } ]
       [ 
         Wasm.LocalGet localidx
-        Wasm.I32Const(getFunc env b |> int)
+        Wasm.I32Const(getFunc env (StgVar b) |> int)
         Wasm.I32Store
             { align = 0u
               offset = 4u * uint32 (1u) } ]
@@ -369,7 +373,7 @@ let malloc =
           |> List.concat }
 
 
-let genProgram (program: Program<_>) =
+let genProgram (program: Program<StgGen.Var>) =
     let runtimeFuncs = [ identity; malloc ]
 
     let topLevelFuncs =
@@ -400,7 +404,7 @@ let genProgram (program: Program<_>) =
         topLevelFuncVars
         |> List.indexed
         |> List.choose (function
-            | (i, UserVar nm) ->
+            | (i, StgVar {unique=StgGen.TopLevel nm}) ->
                 Some
                     { Wasm.Export.nm = nm
                       Wasm.Export.exportdesc = Wasm.ExportFunc(uint32 i) }

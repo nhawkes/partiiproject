@@ -3,28 +3,29 @@
 open System
 open Core
 open WasmGen
+open StgGen
 
 let coreModule : Program<Var> =
     [
-        (UserVar "Int", TopConstr [UserVar "I"])
-        (UserVar "add"), TopExpr (         
-            Lam(UserVar "x_boxed", 
-                Lam(UserVar "y_boxed",
+        (topVar "Int", TopConstr [var "I"])
+        (topVar "add"), TopExpr (         
+            Lam(var "x_boxed", 
+                Lam(var "y_boxed",
                     Case(
-                        Var((UserVar "x_boxed")),
-                        (UserVar "x_boxed_eval"),
+                        Var((var "x_boxed")),
+                        (var "x_boxed_eval"),
                         Alts (                       
-                            [  (Var(UserVar "Int"), [(UserVar "x")]),
+                            [  (Var(topVar "Int"), [(var "x")]),
                                 Case(
-                                    Var((UserVar "y_boxed")),
-                                    (UserVar "y_boxed_eval"),
+                                    Var((var "y_boxed")),
+                                    (var "y_boxed_eval"),
                                     Alts (
-                                        [(Var (UserVar "Int"), [(UserVar "y")]),
+                                        [(Var (topVar "Int"), [(var "y")]),
                                             Case(
-                                                Prim [Stg.ALit Wasm.I32Add; Stg.AVar (UserVar "x"); Stg.AVar (UserVar "y")],
-                                                (UserVar "r"),
+                                                Prim [Stg.ALit Wasm.I32Add; Stg.AVar (var "x"); Stg.AVar (var "y")],
+                                                (var "r"),
                                                 Alts([], 
-                                                    App (Var(UserVar "Int"), Var (UserVar "r"))))                                    
+                                                    App (Var(topVar "Int"), Var (var "r"))))                                    
                                         ],
                                         Prim [Stg.ALit Wasm.Unreachable]
                                     )
@@ -36,24 +37,24 @@ let coreModule : Program<Var> =
                 )
             )
         )
-        (UserVar "subtract"), TopExpr (    
-            Lam(UserVar "x_boxed", 
-                Lam(UserVar "y_boxed",  
+        (topVar "subtract"), TopExpr (    
+            Lam(var "x_boxed", 
+                Lam(var "y_boxed",  
                     Case(
-                        Var (UserVar "x_boxed"),
-                        (UserVar "x_boxed_eval"),
+                        Var (var "x_boxed"),
+                        (var "x_boxed_eval"),
                         Alts (
-                            [(Var (UserVar "Int"),[(UserVar "x")]),
+                            [(Var (topVar "Int"),[(var "x")]),
                                 Case(
-                                    Var((UserVar "y_boxed")),
-                                    (UserVar "y_boxed_eval"),
+                                    Var((var "y_boxed")),
+                                    (var "y_boxed_eval"),
                                     Alts (
-                                        [(Var (UserVar "Int"),[(UserVar "y")]),
+                                        [(Var (topVar "Int"),[(var "y")]),
                                             Case(
-                                                Prim [Stg.ALit Wasm.I32Sub; Stg.AVar (UserVar "y"); Stg.AVar (UserVar "x");],
-                                                (UserVar "r"),
+                                                Prim [Stg.ALit Wasm.I32Sub; Stg.AVar (var "y"); Stg.AVar (var "x");],
+                                                (var "r"),
                                                 Alts([], 
-                                                    App (Var (UserVar "Int"), Var (UserVar "r"))))                                    
+                                                    App (Var (topVar "Int"), Var (var "r"))))                                    
                                         ],
                                         Prim [Stg.ALit Wasm.Unreachable]
                                     )
@@ -65,15 +66,15 @@ let coreModule : Program<Var> =
                 )
             )
         )
-        (UserVar "fibonacci"),  TopExpr (   
-            Lam(UserVar "x", 
-                Let(NonRec [UserVar "x_boxed", App(Var (UserVar "Int"), Var (UserVar "x"))], 
+        (topVar "fibonacci"),  TopExpr (   
+            Lam(var "x", 
+                Let(NonRec [var "x_boxed", App(Var (topVar "Int"), Var (var "x"))], 
                     Case(
-                        Prim[Stg.AVar (UserVar "fibonacci_boxed");  Stg.AVar((UserVar "x_boxed"))],
-                        (UserVar "result"),
+                        Prim[Stg.AVar (topVar "fibonacci_boxed");  Stg.AVar((var "x_boxed"))],
+                        (var "result"),
                         Alts(
-                            [(Var (UserVar "Int"), [(UserVar "return")]),
-                                Prim [Stg.AVar (UserVar "return")]
+                            [(Var (topVar "Int"), [(var "return")]),
+                                Prim [Stg.AVar (var "return")]
                             ],
                             Prim [Stg.ALit Wasm.Unreachable]
                         )
@@ -82,61 +83,48 @@ let coreModule : Program<Var> =
                 )  
             )       
         )
-        (UserVar "fibonacci_boxed"), TopExpr( 
-            Lam(UserVar "x_boxed", 
+        (topVar "fibonacci_boxed"), TopExpr( 
+            Lam(var "x_boxed", 
                 Case(
-                    Var(UserVar "x_boxed"),
-                    (UserVar "x_boxed_eval"),
+                    Var(var "x_boxed"),
+                    (var "x_boxed_eval"),
                     Alts(
-                        [(Var (UserVar "Int"), [(UserVar "x")]),
+                        [(Var (topVar "Int"), [(var "x")]),
                             Case(
-                                Prim[Stg.AVar (UserVar "x")], 
-                                (UserVar "x_eval"),
+                                Prim[Stg.AVar (var "x")], 
+                                (var "x_eval"),
                                 Alts (
                                     [
-                                        (Prim [Stg.ALit (Wasm.I32Const 0)], []), App (Var (UserVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])
-                                        (Prim [Stg.ALit (Wasm.I32Const 1)], []), App (Var (UserVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])
+                                        (Prim [Stg.ALit (Wasm.I32Const 0)], []), App (Var (topVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])
+                                        (Prim [Stg.ALit (Wasm.I32Const 1)], []), App (Var (topVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])
                                     ],
                                     Case(
-                                        App (Var (UserVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)]),
-                                        (UserVar "one"),
+                                        App(App(Var(topVar "subtract"), Var (var "x_boxed_eval")),  App (Var (topVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])),
+                                        (var "x_minus_one"),
                                         Alts(
                                             [],
                                             Case(
-                                                App (Var (UserVar "Int"), Prim [Stg.ALit (Wasm.I32Const 2)]),
-                                                (UserVar "two"),
+                                                App(App(Var(topVar "subtract"), Var (var "x_boxed_eval")), App (Var (topVar "Int"), Prim [Stg.ALit (Wasm.I32Const 2)])),
+                                                (var "x_minus_two"),
                                                 Alts(
-                                                    [],
+                                                    [],                            
                                                     Case(
-                                                        App(App(Var(UserVar "subtract"), Var (UserVar "x_boxed_eval")),  Var (UserVar "one")),
-                                                        (UserVar "x_minus_one"),
+                                                        Prim[Stg.AVar (topVar "fibonacci_boxed"); Stg.AVar (var "x_minus_one")],
+                                                        (var "a"),
                                                         Alts(
                                                             [],
                                                             Case(
-                                                                App(App(Var(UserVar "subtract"), Var (UserVar "x_boxed_eval")), Var (UserVar "two")),
-                                                                (UserVar "x_minus_two"),
-                                                                Alts(
-                                                                    [],                            
-                                                                    Case(
-                                                                        Prim[Stg.AVar (UserVar "fibonacci_boxed"); Stg.AVar (UserVar "x_minus_one")],
-                                                                        (UserVar "a"),
-                                                                        Alts(
-                                                                            [],
-                                                                            Case(
-                                                                                Prim[Stg.AVar (UserVar "fibonacci_boxed");  Stg.AVar (UserVar "x_minus_two")],
-                                                                                (UserVar "b"),
-                                                                                Alts([], 
-                                                                                    Prim[Stg.AVar(UserVar "add"); Stg.AVar (UserVar "a"); Stg.AVar (UserVar "b")]
-                                                                                )
-                                                                           )        
-                                                                        )     
-                                                                    )                                                   
+                                                                Prim[Stg.AVar (topVar "fibonacci_boxed");  Stg.AVar (var "x_minus_two")],
+                                                                (var "b"),
+                                                                Alts([], 
+                                                                    Prim[Stg.AVar(topVar "add"); Stg.AVar (var "a"); Stg.AVar (var "b")]
                                                                 )
-                                                            )  
-                                                        )         
-                                                    )
+                                                           )        
+                                                        )     
+                                                    )                                                   
                                                 )
-                                            )
+                                            )  
+                                            
                                         )
                                     )
                                 )
@@ -154,7 +142,7 @@ let coreModule : Program<Var> =
 let main argv =
     let wasmModule = 
         coreModule
-         |> StgGen.genProgram
+         |> StgGen.genProgram    
          |> WasmGen.genProgram
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
