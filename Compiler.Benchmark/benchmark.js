@@ -8,11 +8,10 @@ suite
     .add('JS#fibonacci', function () {
         fibonacci(20)
     })
-    .add('Wasm#fibonacci', async function () {
+    .add('Wasm#fibonacci', function () {
         libBaseline.fibonacci(20)
-        libBaseline.Int(20)
     })
-    .add('Compiler#fibonacci', async function () {
+    .add('Compiler#fibonacci', function () {
         libCompiler.fibonacci(20)
     })
     .on('cycle', function (event) {

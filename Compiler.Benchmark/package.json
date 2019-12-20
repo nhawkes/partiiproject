@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "benchmark.js",
   "scripts": {
-    "start": "node benchmark.js --expose-wasm",
+    "start": "node --experimental-modules --experimental-wasm-modules benchmark.js",
     "build:js": "babel src -d out",
     "build:wat": "wat2wasm src/wat/fibonacci.wat -o out/wasm/baseline.wasm",
     "test": "jest"

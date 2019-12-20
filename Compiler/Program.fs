@@ -7,7 +7,7 @@ open StgGen
 
 let coreModule : Program<Var> =
     [
-        (globalVar "Int", TopConstr [localVar "I"])
+        (globalVar "Int", TopConstr [localVar "i"])
         (globalVar "add"), TopExpr (         
             Lam(localVar "x_boxed", 
                 Lam(localVar "y_boxed",
