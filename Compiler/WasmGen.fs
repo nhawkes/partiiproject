@@ -91,7 +91,7 @@ and genLet tenv env binds e =
 and genBinds tenv env = function
     | NonRec [ x ] ->
         let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
-        let size = 1 + List.length args + List.length frees
+        let size = 2 + List.length args + List.length frees
         let freeOffset = 2 + List.length args
         let storeFrees = (frees |> List.mapi(fun i free -> 
             [
@@ -404,7 +404,7 @@ let genProgram (program: Program<StgGen.Var>) =
         topLevelFuncVars
         |> List.indexed
         |> List.choose (function
-            | (i, StgVar {unique=StgGen.TopLevel nm}) ->
+            | (i, StgVar {unique=StgGen.Global nm}) ->
                 Some
                     { Wasm.Export.nm = nm
                       Wasm.Export.exportdesc = Wasm.ExportFunc(uint32 i) }

@@ -1,8 +1,8 @@
 module StgGen
  
 type Unique =
-    |TopLevel of string
-    |Unique of int
+    |Global of string
+    |Local of int
 type Var = {unique:Unique; name:string}
 
 
@@ -11,8 +11,8 @@ let freshVar =
     fun () -> 
         let next = !i
         i := !i+1
-        {unique=Unique next; name=""}
-let var = 
+        {unique=Local next; name=""}
+let localVar = 
     let map = ref Map.empty
     fun s ->
     match !map |> Map.tryFind s with
@@ -22,17 +22,26 @@ let var =
         map := !map |> Map.add s newVar
         newVar
 
-let topVar s = {unique=TopLevel s; name=s }   
+let globalVar s = {unique=Global s; name=s }   
+
+let addFree v frees =
+    match v with    
+    | {unique=Global _ } -> frees
+    | {unique=Local _ } -> v::frees
 
 let rec genExpr =
     function
-    | Core.Var v -> { Stg.lambdaForm (Stg.App(v, [])) with frees = [ v ] }
+    | Core.Var v -> genVar v
     | Core.Lit lit -> failwith "TODO"
     | Core.Lam(v, e) -> genLam [ v ] e
     | Core.Let(bs, e) -> genLet e bs
     | Core.Case(e, v, alts) -> genCase e v alts
     | Core.App(a, b) -> genApp [b] a
     | Core.Prim ps -> genPrim ps
+
+and genVar v =
+    let lf = Stg.lambdaForm (Stg.App(v, []))
+    {lf with frees = lf.frees |> addFree v}
 
 and genLam vs =
     function
@@ -50,7 +59,9 @@ and genLet e = function
             List.concat
                 [ [ v1, genExpr e1 ]
                   lf.lets ]
+        let frees = lf.frees |> List.filter((<>) v1)
         { lf with
+              frees=frees
               lets = lets
               expr = Stg.Let(Stg.NonRec [ v1 ], lf.expr) }
 
@@ -118,7 +129,7 @@ and genApp args = function
 and genConstr v vs = function
     |(Core.Var arg)::args ->
         let lf:Stg.LambdaForm<_> = genConstr v (Stg.AVar arg::vs) args
-        let frees = arg::lf.frees
+        let frees = lf.frees |> addFree arg
         {lf with frees=frees}
     |(Core.Prim [Stg.ALit arg])::args ->
         genConstr v (Stg.ALit arg::vs) args
@@ -127,7 +138,8 @@ and genConstr v vs = function
         let lfInner = genConstr v (Stg.AVar var::vs) args
         let lfE = genExpr arg
         let lets = (var, lfE)::lfInner.lets
-        {lfInner with lets=lets; expr=Stg.Let(Stg.NonRec [var], lfInner.expr)}
+        let frees = List.concat [lfInner.frees; lfE.frees]
+        {lfInner with lets=lets; frees=frees; expr=Stg.Let(Stg.NonRec [var], lfInner.expr)}
 
 
     |[] ->
@@ -136,21 +148,25 @@ and genConstr v vs = function
 and genPrimCall f xs = function        
     |(Core.Var arg)::args ->
         let lf = genPrimCall f (Stg.AVar arg::xs) args
-        let frees = arg::lf.frees
+        let frees = lf.frees |> addFree arg
         {lf with frees=frees}
         
     |(Core.Prim [Stg.ALit arg])::args ->
         genPrimCall f (Stg.ALit arg::xs) args        
     |arg::args ->
         let var = freshVar ()
-        let lfInner = genPrimCall f (Stg.AVar var::xs) args
+        let lfInner = genConstr f (Stg.AVar var::xs) args
         let lfE = genExpr arg
         let lets = (var, lfE)::lfInner.lets
-        {lfInner with lets=lets; expr=Stg.Let(Stg.NonRec [var], lfInner.expr)}
+        let frees = List.concat [lfInner.frees; lfE.frees]
+        {lfInner with lets=lets; frees=frees; expr=Stg.Let(Stg.NonRec [var], lfInner.expr)}
     |[] ->
         Stg.lambdaForm (Stg.Prim(Stg.AVar f::xs))
 and genPrim ps =
-    Stg.lambdaForm (Stg.Prim ps)
+    let vars = ps |> List.choose(function |(Stg.AVar v) -> Some v |_ -> None)
+    let lf = Stg.lambdaForm (Stg.Prim ps)
+    let frees = vars |> List.fold (fun frees v -> frees |> addFree v) []
+    {lf with frees=frees}
 
 
 let genTopLevel =
