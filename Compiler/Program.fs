@@ -2,118 +2,112 @@
 
 open System
 open Core
-open WasmGen
 open StgGen
+open Ast
 
-let coreModule : Program<Var> =
+let astModule : Program<Var> =
     [
-        (globalVar "Int", TopConstr [localVar "i"])
-        (globalVar "add"), TopExpr (         
-            Lam(localVar "x_boxed", 
-                Lam(localVar "y_boxed",
-                    Case(
+        TypeDecl(globalVar "Int", [localVar "i"])
+        GlobalDecl((globalVar "add"), 
+            Block([localVar "x_boxed"; localVar "y_boxed"],
+                [Return(
+                    Match(
                         Var((localVar "x_boxed")),
-                        (localVar "x_boxed_eval"),
-                        Alts (                       
-                            [  (Var(globalVar "Int"), [(localVar "x")]),
-                                Case(
-                                    Var((localVar "y_boxed")),
-                                    (localVar "y_boxed_eval"),
-                                    Alts (
-                                        [(Var (globalVar "Int"), [(localVar "y")]),
-                                            Case(
-                                                Prim [Stg.ALit Wasm.I32Add; Stg.AVar (localVar "x"); Stg.AVar (localVar "y")],
-                                                (localVar "r"),
-                                                Alts([], 
-                                                    App (Var(globalVar "Int"), Var (localVar "r"))))                                    
-                                        ],
-                                        Prim [Stg.ALit Wasm.Unreachable]
+                        [
+                            PatConstr((globalVar "Int"), [PatBind (localVar "x")]),
+                            Match(
+                                Var((localVar "y_boxed")),
+                                [
+                                    PatConstr((globalVar "Int"), [PatBind (localVar "y")]),
+                                    Match(
+                                        Prim [PrimWasm Wasm.I32Add; PrimVar (localVar "x"); PrimVar (localVar "y")],
+                                        [
+                                            PatBind(localVar "r"),
+                                            App (globalVar "Int", [Var (localVar "r")])
+                                        ]
                                     )
-                                )
-                            ],
-                            Prim [Stg.ALit Wasm.Unreachable]
-                        )
-                    )
-                )
-            )
-        )
-        (globalVar "subtract"), TopExpr (    
-            Lam(localVar "x_boxed", 
-                Lam(localVar "y_boxed",
-                    Case(
-                        Var (localVar "x_boxed"),
-                        (localVar "x_boxed_eval"),
-                        Alts (
-                            [(Var (globalVar "Int"),[(localVar "x")]),
-                                Case(
-                                    Var((localVar "y_boxed")),
-                                    (localVar "y_boxed_eval"),
-                                    Alts (
-                                        [(Var (globalVar "Int"),[(localVar "y")]),
-                                            Case(
-                                                Prim [Stg.ALit Wasm.I32Sub; Stg.AVar (localVar "y"); Stg.AVar (localVar "x");],
-                                                (localVar "r"),
-                                                Alts([], 
-                                                    App (Var (globalVar "Int"), Var (localVar "r"))))                                    
-                                        ],
-                                        Prim [Stg.ALit Wasm.Unreachable]
-                                    )
-                                )
-                            ],
-                            Prim [Stg.ALit Wasm.Unreachable]
-                        )
-                    )     
-                )
-            )
-        )
-        (globalVar "fibonacci"),  TopExpr (   
-            Lam(localVar "x", 
-                Let(NonRec [localVar "x_boxed", App(Var (globalVar "Int"), Var (localVar "x"))], 
-                    Case(
-                        Prim[Stg.AVar (globalVar "fibonacci_boxed");  Stg.AVar((localVar "x_boxed"))],
-                        (localVar "result"),
-                        Alts(
-                            [(Var (globalVar "Int"), [(localVar "return")]),
-                                Prim [Stg.AVar (localVar "return")]
-                            ],
-                            Prim [Stg.ALit Wasm.Unreachable]
-                        )
-                    
-                    )       
-                )  
-            )       
-        )
-        (globalVar "fibonacci_boxed"), TopExpr( 
-            Lam(localVar "x_boxed", 
-                Case(
-                    Var(localVar "x_boxed"),
-                    (localVar "x_boxed_eval"),
-                    Alts(
-                        [(Var (globalVar "Int"), [(localVar "x")]),
-                            Case(
-                                Prim[Stg.AVar (localVar "x")], 
-                                (localVar "x_eval"),
-                                Alts (
-                                    [
-                                        (Prim [Stg.ALit (Wasm.I32Const 0)], []), App (Var (globalVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])
-                                        (Prim [Stg.ALit (Wasm.I32Const 1)], []), App (Var (globalVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])
-                                    ],
-                                    App(
-                                        App(
-                                            Var(globalVar "add"),
-                                            App(Var(globalVar "fibonacci_boxed"),
-                                                App(App(Var(globalVar "subtract"), Var (localVar "x_boxed_eval")), App (Var (globalVar "Int"), Prim [Stg.ALit (Wasm.I32Const 1)])))
-                                        ),
-                                        App(Var(globalVar "fibonacci_boxed"),
-                                                App(App(Var(globalVar "subtract"), Var (localVar "x_boxed_eval")), App (Var (globalVar "Int"), Prim [Stg.ALit (Wasm.I32Const 2)])))
-                                    )                       
-                                )
+                                ]
                             )
-                        
-                        ],
-                        Prim [Stg.ALit Wasm.Unreachable]             
+                        ]
+                    )
+                )]
+            )
+        )
+        GlobalDecl((globalVar "subtract"), 
+            Block([localVar "x_boxed"; localVar "y_boxed"],
+                [Return(
+                    Match(
+                        Var((localVar "x_boxed")),
+                        [
+                            PatConstr((globalVar "Int"), [PatBind (localVar "x")]),
+                            Match(
+                                Var((localVar "y_boxed")),
+                                [
+                                    PatConstr((globalVar "Int"), [PatBind (localVar "y")]),
+                                    Match(
+                                        Prim [PrimWasm Wasm.I32Sub; PrimVar (localVar "y"); PrimVar (localVar "x")],
+                                        [
+                                            PatBind(localVar "r"),
+                                            App (globalVar "Int", [Var (localVar "r")])
+                                        ]
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                )]
+            )
+        )
+        GlobalDecl((globalVar "fibonacci"), 
+            Block([localVar "x"],
+                [
+                Assign(localVar "x_boxed", App(globalVar "Int", [Var (localVar "x")]))
+                Return(
+                    Match(
+                        App(globalVar "fibonacci_boxed", [Var(localVar "x_boxed")]),
+                        [
+                            PatConstr((globalVar "Int"), [PatBind (localVar "result")]),
+                            Var((localVar "result"))
+                        ]
                     )
                 )
+                ]
+            )
+        )
+        GlobalDecl((globalVar "fibonacci_boxed"), 
+            Block([localVar "x_boxed"],
+                [
+                    Return(
+                        Match(
+                            Var(localVar "x_boxed"),
+                            [
+                                PatLit(Box (Integer 0)), Lit(Box (Integer 1))
+                                PatLit(Box (Integer 1)), Lit(Box (Integer 1))
+                                PatBind(localVar "_"), 
+                                App((globalVar "add"),
+                                    [
+                                    App(globalVar "fibonacci_boxed",
+                                        [
+                                        App(globalVar "subtract",
+                                            [
+                                                Var(localVar "x_boxed_eval")
+                                                Lit(Box (Integer 1))
+                                            ])
+                                        ])
+                                    App(globalVar "fibonacci_boxed",
+                                        [
+                                        App(globalVar "subtract",
+                                            [
+                                                Var(localVar "x_boxed_eval")
+                                                Lit(Box (Integer 1))
+                                            ])
+                                        ])
+                                    ]
+                                )
+                            ]
+                        )
+                    )
+                ]
             )
         )
     ]
@@ -121,6 +115,9 @@ let coreModule : Program<Var> =
 
 [<EntryPoint>]
 let main argv =
+    let coreModule =
+        astModule 
+         |> CoreGen.genProgram
     let stgModule = 
         coreModule
          |> StgGen.genProgram   

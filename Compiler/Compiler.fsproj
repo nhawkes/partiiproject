@@ -7,7 +7,9 @@
     <Compile Include="Wasm.fs" />
     <Compile Include="Stg.fs" />
     <Compile Include="Core.fs" />
+    <Compile Include="Ast.fs" />
     <Compile Include="Emit.fs" />
+    <Compile Include="CoreGen.fs" />
     <Compile Include="StgGen.fs" />
     <Compile Include="WasmGen.fs" />
     <Compile Include="Program.fs" />
