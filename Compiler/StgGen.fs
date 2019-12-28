@@ -1,33 +1,10 @@
 module StgGen
  
-type Unique =
-    |Global of string
-    |Local of int
-type Var = {unique:Unique; name:string}
-
-
-let freshVar =
-    let i = ref 0
-    fun () -> 
-        let next = !i
-        i := !i+1
-        {unique=Local next; name=""}
-let localVar = 
-    let map = ref Map.empty
-    fun s ->
-    match !map |> Map.tryFind s with
-    |Some value -> value
-    |None ->
-        let newVar = {freshVar() with name=s}     
-        map := !map |> Map.add s newVar
-        newVar
-
-let globalVar s = {unique=Global s; name=s }   
 
 let addFree v frees =
     match v with    
-    | {unique=Global _ } -> frees
-    | {unique=Local _ } -> v::frees
+    | {Ast.unique=Ast.Global _ } -> frees
+    | {unique=Ast.Local _ } -> v::frees
 
 let rec genExpr =
     function
@@ -134,7 +111,7 @@ and genConstr v vs = function
     |(Core.Prim [Stg.ALit arg])::args ->
         genConstr v (Stg.ALit arg::vs) args
     |arg::args ->
-        let var = freshVar ()
+        let var = Ast.freshVar ()
         let lfInner = genConstr v (Stg.AVar var::vs) args
         let lfE = genExpr arg
         let lets = (var, lfE)::lfInner.lets
@@ -154,7 +131,7 @@ and genPrimCall f xs = function
     |(Core.Prim [Stg.ALit arg])::args ->
         genPrimCall f (Stg.ALit arg::xs) args        
     |arg::args ->
-        let var = freshVar ()
+        let var = Ast.freshVar ()
         let lfInner = genConstr f (Stg.AVar var::xs) args
         let lfE = genExpr arg
         let lets = (var, lfE)::lfInner.lets
@@ -176,6 +153,6 @@ let genTopLevel =
     | b, Core.TopConstr vs ->
         b, Stg.TopConstr vs
 
-let genProgram (core: Core.Program<Var>): Stg.Program<Var> =
+let genProgram (core: Core.Program<Ast.Var>): Stg.Program<Ast.Var> =
     let program = core |> List.map genTopLevel
     program
