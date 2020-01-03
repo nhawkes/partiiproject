@@ -117,6 +117,9 @@ and genBlock returnValue lets args = function
         |None -> genBlock (Some (genExpr e)) lets args xs
         |Some _ -> failwith "Multiple return values"
     |[] ->
+        match args with
+        |x::xs -> Core.Lam(x, genBlock returnValue lets xs [])
+        |[] ->
         match returnValue with
         |None -> failwith "No return value of block"
         |Some value -> Core.Let(Core.NonRec lets, value)

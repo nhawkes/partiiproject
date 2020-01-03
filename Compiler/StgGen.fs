@@ -6,15 +6,21 @@ let addFree v frees =
     | {Ast.unique=Ast.Global _ } -> frees
     | {unique=Ast.Local _ } -> v::frees
 
-let rec genExpr =
-    function
-    | Core.Var v -> genVar v
-    | Core.Lit lit -> failwith "TODO"
-    | Core.Lam(v, e) -> genLam [ v ] e
-    | Core.Let(bs, e) -> genLet e bs
-    | Core.Case(e, v, alts) -> genCase e v alts
-    | Core.App(a, b) -> genApp [b] a
-    | Core.Prim ps -> genPrim ps
+let genLit = function
+    |Core.I32 i -> Wasm.I32Const i
+
+let rec genExpr e =
+    let lf = 
+        match e with
+        | Core.Var v -> genVar v
+        | Core.Lit lit -> Stg.lambdaForm (Stg.Prim [Stg.ALit(genLit lit)])
+        | Core.Lam(v, e) -> genLam [ v ] e
+        | Core.Let(bs, e) -> genLet e bs
+        | Core.Case(e, v, alts) -> genCase e v alts
+        | Core.App(a, b) -> genApp [b] a
+        | Core.Prim ps -> genPrim ps
+    Stg.normLf lf
+    
 
 and genVar v =
     let lf = Stg.lambdaForm (Stg.App(v, []))
@@ -29,14 +35,21 @@ and genLam vs =
         { lf with args = vs |> List.rev; frees=frees }
 
 and genLet e = function
+    | Core.NonRec [] -> genExpr e
     | Core.NonRec [ v1, e1 ] ->
         let lf = genExpr e
+        let lf1 = genExpr e1
+        let innerFrees = 
+            lf1.frees 
+                |> List.filter (fun free -> not(lf.locals |> List.contains free))
+                |> List.filter (fun free -> not(lf.args |> List.contains free))
+                |> List.filter (fun free -> not(lf.lets |> List.map fst |> List.contains free))
 
         let lets =
             List.concat
-                [ [ v1, genExpr e1 ]
+                [ [ v1, lf1 ]
                   lf.lets ]
-        let frees = lf.frees |> List.filter((<>) v1)
+        let frees = lf.frees |> List.append innerFrees |> List.filter((<>) v1)
         { lf with
               frees=frees
               lets = lets
@@ -60,7 +73,7 @@ and genAlts =
     | ((Core.Var(v), vs), e) :: xs, def ->
         let lfDef = genExpr def
         genAAlt lfDef lfDef.expr [] v vs e xs
-    | ((Core.Prim([Stg.ALit l]), []), e) :: xs, def ->
+    | ((Core.Lit l, []), e) :: xs, def ->
         let lfDef = genExpr def
         genPAlt lfDef lfDef.expr [] l e xs
     | [], def ->
@@ -88,12 +101,12 @@ and genPAlt lfAcc def palts l e xs =
     let lfCombined = Stg.combineLf lfE lfAcc
     genPAlts lfCombined def
         (List.concat
-            [ [ l, lfCombined.expr ]
+            [ [genLit l, lfCombined.expr ]
               palts ]) xs
 
-and genPAlts lfAcc def palts =
+and genPAlts lfAcc def (palts:Stg.PAlts<_>) =
     function
-    | ((Core.Prim([Stg.ALit l]), []), e) :: xs ->
+    | ((Core.Lit l, []), e) :: xs ->
         genPAlt lfAcc def palts l e xs
     | [] -> 
         Stg.PAlts (palts, def), lfAcc
@@ -130,6 +143,8 @@ and genPrimCall f xs = function
         
     |(Core.Prim [Stg.ALit arg])::args ->
         genPrimCall f (Stg.ALit arg::xs) args        
+    |(Core.Lit arg)::args ->
+        genPrimCall f (Stg.ALit (genLit arg)::xs) args        
     |arg::args ->
         let var = Ast.freshVar ()
         let lfInner = genConstr f (Stg.AVar var::xs) args

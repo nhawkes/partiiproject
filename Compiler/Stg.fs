@@ -61,3 +61,11 @@ let combineLf lf1 lf2 =
       locals = [ lf1.locals; lf2.locals ] |> List.concat
       lets = [ lf1.lets; lf2.lets ] |> List.concat
       expr = lf1.expr }     
+
+let normLf lf =
+    { args = lf.args |> List.distinct
+      frees = lf.frees |> List.distinct
+      locals = lf.locals |> List.distinct
+      lets = lf.lets |> List.distinct
+      expr = lf.expr
+    }
