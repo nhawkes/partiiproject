@@ -1,5 +1,11 @@
 module Ast
 
+type Typ =
+    |TopFuncT of Typ list * Typ
+    |FuncT of Typ * Typ
+    |IntT    
+    |ValueT
+
 type Boxed =
     | Integer of int32
 
@@ -16,7 +22,7 @@ type Expr<'b> =
     | Lit of Lit
     | Var of 'b
     | Call of 'b * Expr<'b> list
-    | Match of Expr<'b> * Case<'b> list
+    | Match of (Expr<'b> * Typ) * Case<'b> list
     | Block of Block<'b>
     | Prim of Prim<'b> list
 
@@ -41,30 +47,33 @@ type Program<'b> =
 
 type BuiltIn =
     | IntegerConstr
+
     
     
 type Unique =
     |Global of string
     |Local of int
     |BuiltIn of BuiltIn
-type Var = {unique:Unique; name:string}
+type Var = {unique:Unique; name:string; typ:Typ}
 
+let typeofBuiltIn = function
+    | IntegerConstr -> TopFuncT([IntT], ValueT)
 
 let freshVar =
     let i = ref 0
-    fun () -> 
+    fun typ -> 
         let next = !i
         i := !i+1
-        {unique=Local next; name=""}
-let localVar = 
+        {unique=Local next; name=""; typ=typ}
+let localVar  = 
     let map = ref Map.empty
-    fun s ->
+    fun s typ ->
     match !map |> Map.tryFind s with
     |Some value -> value
     |None ->
-        let newVar = {freshVar() with name=s}     
+        let newVar = {freshVar typ with name=s}     
         map := !map |> Map.add s newVar
         newVar
 
-let globalVar s = {unique=Global s; name=s }  
-let builtInVar b = {unique=BuiltIn b; name=sprintf "%A" b}
+let globalVar s typ = {unique=Global s; name=s; typ=typ}  
+let builtInVar b = {unique=BuiltIn b; name=sprintf "%A" b; typ=typeofBuiltIn b}

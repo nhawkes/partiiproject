@@ -22,8 +22,15 @@ let rec genExpr e =
     Stg.normLf lf
     
 
-and genVar v =
-    let lf = Stg.lambdaForm (Stg.App(v, []))
+and genVar (v:Ast.Var) =
+    let e = 
+        match v.typ with
+        |Ast.ValueT -> Stg.App(v, [])
+        |Ast.FuncT _ -> Stg.App(v, [])
+        |Ast.IntT -> Stg.Prim[Stg.AVar v]
+        |_ -> failwith "TODO"
+
+    let lf = Stg.lambdaForm e
     {lf with frees = lf.frees |> addFree v}
 
 and genLam vs =
@@ -124,7 +131,7 @@ and genConstr v vs = function
     |(Core.Prim [Stg.ALit arg])::args ->
         genConstr v (Stg.ALit arg::vs) args
     |arg::args ->
-        let var = Ast.freshVar ()
+        let var = Ast.freshVar Ast.ValueT
         let lfInner = genConstr v (Stg.AVar var::vs) args
         let lfE = genExpr arg
         let lets = (var, lfE)::lfInner.lets
@@ -146,7 +153,7 @@ and genPrimCall f xs = function
     |(Core.Lit arg)::args ->
         genPrimCall f (Stg.ALit (genLit arg)::xs) args        
     |arg::args ->
-        let var = Ast.freshVar ()
+        let var = Ast.freshVar Ast.ValueT
         let lfInner = genConstr f (Stg.AVar var::xs) args
         let lfE = genExpr arg
         let lets = (var, lfE)::lfInner.lets
