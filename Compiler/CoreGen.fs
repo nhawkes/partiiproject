@@ -18,7 +18,7 @@ let rec genExpr =
     | Ast.Var v -> Core.Var v
     | Ast.Call(f, args) -> genCall (Core.Var f) args
     | Ast.Match(e, cases) -> genMatch e cases
-    | Ast.Block(args, block) -> genBlock None [] args block
+    | Ast.Block( block) -> genBlock None [] block
     | Ast.Prim ps -> genPrim [] ps
 
 and genLit =
@@ -95,28 +95,24 @@ and genPatLit state (l: Core.Lit) (subCases: (Ast.Pattern<Ast.Var> list * Ast.Ex
         let alt = ((Core.Lit l, []), e)
         genCasesWithDefault (def, alt :: alts, (matchexpr, typ), es, bind) otherCases
 
-
-
-
-
-
-
-
-
-and genBlock returnValue lets args =
+and genBlock returnValue lets =
     function
-    | Ast.Assign(lhs, rhs) :: xs -> genBlock returnValue ((lhs, genExpr rhs) :: lets) args xs
+    | Ast.Assign(lhs, args, rhs) :: xs -> 
+        genBlock returnValue ((lhs, genRhs rhs args) :: lets) xs
     | Ast.Return(e) :: xs ->
         match returnValue with
-        | None -> genBlock (Some(genExpr e)) lets args xs
+        | None -> genBlock (Some(genExpr e)) lets xs
         | Some _ -> failwith "Multiple return values"
     | [] ->
-        match args with
-        | x :: xs -> Core.Lam(x, genBlock returnValue lets xs [])
-        | [] ->
-            match returnValue with
+        match returnValue with
             | None -> failwith "No return value of block"
             | Some value -> Core.Let(Core.NonRec lets, value)
+        
+
+and genRhs rhs = function
+    | x :: xs -> Core.Lam(x, genRhs rhs xs)
+    | [] -> genExpr rhs
+            
 
 and genPrim xs =
     function
@@ -127,7 +123,7 @@ and genPrim xs =
 
 let genDeclaration =
     function
-    | Ast.GlobalDecl(v, e) -> v, Core.TopExpr(genExpr e)
+    | Ast.GlobalDecl(lhs, args, rhs) -> lhs, Core.TopExpr(genRhs rhs args)
     | Ast.TypeDecl(v, vs) -> v, Core.TopConstr(vs)
 
 let genProgram (ast: Ast.Program<_>): Core.Program<_> = ast |> List.map genDeclaration

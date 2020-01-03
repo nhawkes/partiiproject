@@ -32,14 +32,14 @@ and Prim<'b> =
 
 and Case<'b> = Pattern<'b> * Expr<'b>
 
-and Block<'b> = 'b list * Statement<'b> list    
+and Block<'b> = Statement<'b> list    
 
 and Statement<'b> =
-    | Assign of 'b * Expr<'b>
+    | Assign of 'b * 'b list * Expr<'b>
     | Return of Expr<'b>    
 
 type Declaration<'b> =
-    | GlobalDecl of 'b * Expr<'b>
+    | GlobalDecl of 'b * 'b list * Expr<'b>
     | TypeDecl of 'b * 'b list
 
 type Program<'b> =
