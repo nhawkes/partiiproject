@@ -5,6 +5,16 @@ open Core
 open StgGen
 open Ast
 
+let program = """
+export fibonacci(x) = {
+    return switch(x){
+        | 0 => 1
+        | 1 => 1
+        | _ => fibonacci(x-1) + fibonacci(x-2)
+    }
+}
+"""
+
 let astModule : Program<Var> =
     [
         TypeDecl(builtInVar IntegerConstr, [localVar "i" IntT])
@@ -56,48 +66,17 @@ let astModule : Program<Var> =
                 )]
             )
         )
-        ExportDecl("fibonacci", 
-            ["x_boxed"],
-            Block(
-                [
-                    Return(
-                        Match(
-                            (Var(localVar "x_boxed" ValueT), ValueT),
-                            [
-                                PatLit(Box (Integer 0)), Lit(Box (Integer 1))
-                                PatLit(Box (Integer 1)), Lit(Box (Integer 1))
-                                PatBind(localVar "x_boxed_eval" ValueT), 
-                                Call((globalVar "add" (TopFuncT([ValueT; ValueT], ValueT))),
-                                    [
-                                    Call(globalVar "fibonacci" (TopFuncT([ValueT], ValueT)),
-                                        [
-                                        Call(globalVar "subtract" (TopFuncT([ValueT; ValueT], ValueT)),
-                                            [
-                                                Var(localVar "x_boxed_eval" ValueT)
-                                                Lit(Box (Integer 1))
-                                            ])
-                                        ])
-                                    Call(globalVar "fibonacci" (TopFuncT([ValueT], ValueT)),
-                                        [
-                                        Call(globalVar "subtract" (TopFuncT([ValueT; ValueT], ValueT)),
-                                            [
-                                                Var(localVar "x_boxed_eval" ValueT)
-                                                Lit(Box (Integer 2))
-                                            ])
-                                        ])
-                                    ]
-                                )
-                            ]
-                        )
-                    )
-                ]
-            )
-        )
+        
     ]
 
 
 [<EntryPoint>]
 let main argv =
+    match Parser.parse program with
+    |Error err -> failwith err
+    |Ok astModule ->
+    printfn "%A" astModule
+    (*    
     let coreModule =
         astModule 
          |> CoreGen.genProgram
@@ -111,4 +90,5 @@ let main argv =
          |> WasmGen.genProgram
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
+    *)
     0

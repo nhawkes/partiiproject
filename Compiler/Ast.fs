@@ -18,9 +18,14 @@ type Pattern<'b> =
     | PatBind of 'b
     | PatConstr of 'b * Pattern<'b> list
 
+type Op = 
+    |Add
+    |Sub
+
 type Expr<'b> =
     | Lit of Lit
     | Var of 'b
+    | BinOp of Expr<'b> * Op * Expr<'b>
     | Call of 'b * Expr<'b> list
     | Match of (Expr<'b> * Typ) * Case<'b> list
     | Block of Block<'b>
@@ -38,7 +43,7 @@ and Statement<'b> =
     | Assign of 'b * 'b list * Expr<'b>
     | Return of Expr<'b>    
 
-type Declaration<'b> =
+type Declaration<'b> =  
     | ExportDecl of string * string list * Expr<'b>
     | GlobalDecl of 'b * 'b list * Expr<'b>
     | TypeDecl of 'b * 'b list
