@@ -115,7 +115,7 @@ and genBinds tenv env = function
                 Wasm.I32Const(args |> List.length)
                 Wasm.I32Store
                   { align = 0u
-                    offset = 4u * 1u } 
+                    offset = 4u * 1u }
                
             ]
             storeFrees
@@ -404,7 +404,7 @@ let genProgram (program: Program<Ast.Var>) =
         topLevelFuncVars
         |> List.indexed
         |> List.choose (function
-            | (i, StgVar {unique=Ast.Global nm}) ->
+            | (i, StgVar {unique=Ast.Export nm}) ->
                 Some
                     { Wasm.Export.nm = nm
                       Wasm.Export.exportdesc = Wasm.ExportFunc(uint32 i) }

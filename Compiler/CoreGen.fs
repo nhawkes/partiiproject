@@ -98,7 +98,7 @@ and genPatLit state (l: Core.Lit) (subCases: (Ast.Pattern<Ast.Var> list * Ast.Ex
 and genBlock returnValue lets =
     function
     | Ast.Assign(lhs, args, rhs) :: xs -> 
-        genBlock returnValue ((lhs, genRhs rhs args) :: lets) xs
+        genBlock returnValue ((lhs, genRhs (genExpr rhs) args) :: lets) xs
     | Ast.Return(e) :: xs ->
         match returnValue with
         | None -> genBlock (Some(genExpr e)) lets xs
@@ -109,9 +109,9 @@ and genBlock returnValue lets =
             | Some value -> Core.Let(Core.NonRec lets, value)
         
 
-and genRhs rhs = function
+and genRhs (rhs:Core.Expr<_>) = function
     | x :: xs -> Core.Lam(x, genRhs rhs xs)
-    | [] -> genExpr rhs
+    | [] -> rhs
             
 
 and genPrim xs =
@@ -120,10 +120,40 @@ and genPrim xs =
     | Ast.PrimWasm w :: ps -> genPrim (Stg.ALit w :: xs) ps
     | [] -> Core.Prim(xs |> List.rev)
 
+let rec genExport call args rhs =
+    match args with
+    |x::xs ->
+        genExport (Core.App(call, Core.App(Core.Var (Ast.builtInVar Ast.IntegerConstr), Core.Var x))) xs rhs
+    |[] -> 
+        let resultVar = Ast.freshVar Ast.ValueT
+        let returnVar = Ast.freshVar Ast.IntT
+        Core.Case(
+            call,                        
+            resultVar,
+            Core.Alts(       
+                [(Core.Var (Ast.builtInVar Ast.IntegerConstr), [returnVar]),
+                    Core.Var(returnVar)            
+                ],
+                Core.Prim [Stg.ALit Wasm.Unreachable]
+            )
+        )   
 
 let genDeclaration =
     function
-    | Ast.GlobalDecl(lhs, args, rhs) -> lhs, Core.TopExpr(genRhs rhs args)
-    | Ast.TypeDecl(v, vs) -> v, Core.TopConstr(vs)
+    | Ast.GlobalDecl(lhs : Ast.Var, args, rhs) ->
+        [lhs, Core.TopExpr(genRhs (genExpr rhs) args)]
+    | Ast.ExportDecl(name : string, args, rhs) ->
+        let globalTyp = Ast.TopFuncT(List.replicate (args |> List.length) Ast.ValueT, Ast.ValueT)
+        let exportTyp = Ast.TopFuncT(List.replicate (args |> List.length) Ast.IntT, Ast.IntT)
+        let globalVar = Ast.globalVar name globalTyp
+        let exportVar = Ast.exportVar name exportTyp
+        let globalArgs = args |> List.map (fun arg -> Ast.localVar arg Ast.ValueT)
+        let exportArgs = args |> List.map (fun arg -> Ast.localVar arg Ast.IntT)
+        [
+            globalVar, Core.TopExpr(genRhs (genExpr rhs) globalArgs)
+            exportVar, Core.TopExpr(
+                genRhs (genExport (Core.Var globalVar) exportArgs rhs) exportArgs)
+        ]
+    | Ast.TypeDecl(v, vs) -> [v, Core.TopConstr(vs)]
 
-let genProgram (ast: Ast.Program<_>): Core.Program<_> = ast |> List.map genDeclaration
+let genProgram (ast: Ast.Program<_>): Core.Program<_> = ast |> List.collect genDeclaration

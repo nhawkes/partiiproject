@@ -56,25 +56,8 @@ let astModule : Program<Var> =
                 )]
             )
         )
-        GlobalDecl((globalVar "fibonacci" (TopFuncT([IntT], ValueT))), 
-            [localVar "x" IntT],
-            Block(
-                [
-                Assign(localVar "x_boxed" ValueT, [], Call(builtInVar IntegerConstr, [Var (localVar "x" IntT)]))
-                Return(
-                    Match(
-                        (Call(globalVar "fibonacci_boxed" (TopFuncT([ValueT], ValueT)), [Var(localVar "x_boxed" ValueT)]), ValueT),
-                        [
-                            PatConstr(builtInVar IntegerConstr, [PatBind (localVar "result" IntT)]),
-                            Var((localVar "result" IntT))
-                        ]
-                    )
-                )
-                ]
-            )
-        )
-        GlobalDecl((globalVar "fibonacci_boxed" (TopFuncT([ValueT], ValueT))), 
-            [localVar "x_boxed" ValueT],
+        ExportDecl("fibonacci", 
+            ["x_boxed"],
             Block(
                 [
                     Return(
@@ -86,7 +69,7 @@ let astModule : Program<Var> =
                                 PatBind(localVar "x_boxed_eval" ValueT), 
                                 Call((globalVar "add" (TopFuncT([ValueT; ValueT], ValueT))),
                                     [
-                                    Call(globalVar "fibonacci_boxed" (TopFuncT([ValueT], ValueT)),
+                                    Call(globalVar "fibonacci" (TopFuncT([ValueT], ValueT)),
                                         [
                                         Call(globalVar "subtract" (TopFuncT([ValueT; ValueT], ValueT)),
                                             [
@@ -94,7 +77,7 @@ let astModule : Program<Var> =
                                                 Lit(Box (Integer 1))
                                             ])
                                         ])
-                                    Call(globalVar "fibonacci_boxed" (TopFuncT([ValueT], ValueT)),
+                                    Call(globalVar "fibonacci" (TopFuncT([ValueT], ValueT)),
                                         [
                                         Call(globalVar "subtract" (TopFuncT([ValueT; ValueT], ValueT)),
                                             [

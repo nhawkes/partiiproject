@@ -39,6 +39,7 @@ and Statement<'b> =
     | Return of Expr<'b>    
 
 type Declaration<'b> =
+    | ExportDecl of string * string list * Expr<'b>
     | GlobalDecl of 'b * 'b list * Expr<'b>
     | TypeDecl of 'b * 'b list
 
@@ -51,6 +52,7 @@ type BuiltIn =
     
     
 type Unique =
+    |Export of string
     |Global of string
     |Local of int
     |BuiltIn of BuiltIn
@@ -76,4 +78,5 @@ let localVar  =
         newVar
 
 let globalVar s typ = {unique=Global s; name=s; typ=typ}  
+let exportVar s typ = {unique=Export s; name=s; typ=typ}  
 let builtInVar b = {unique=BuiltIn b; name=sprintf "%A" b; typ=typeofBuiltIn b}
