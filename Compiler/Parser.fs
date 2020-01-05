@@ -84,13 +84,13 @@ pblockImpl :=
 
 let pexportDecl = 
     ps "export" >>. passign  |>> function
-    |((v, None), e) -> ExportDecl(v, [], e)
-    |((f, Some args), e) -> ExportDecl(f, args, e)
+    |((v, None), e) -> ExportDecl((v, []), (v, []), e)
+    |((f, Some args), e) -> ExportDecl((f, args), (f, args), e)
 
 let pglobalDecl = 
     pidentifier .>>. (opt passignArgs .>> ws) .>>. ((ps "=") >>. pexpr) |>> function
-    |((v, None), e) -> ExportDecl(v, [], e)
-    |((f, Some args), e) -> ExportDecl(f, args, e)
+    |((v, None), e) -> GlobalDecl(v, [], e)
+    |((f, Some args), e) -> GlobalDecl(f, args, e)
 
 let pdecl = choice [pexportDecl; pglobalDecl]
 

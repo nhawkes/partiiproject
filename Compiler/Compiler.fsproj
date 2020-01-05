@@ -8,11 +8,14 @@
     <Compile Include="Stg.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Ast.fs" />
-    <Compile Include="Emit.fs" />
-    <Compile Include="WasmGen.fs" />
-    <Compile Include="StgGen.fs" />
-    <Compile Include="CoreGen.fs" />
     <Compile Include="Parser.fs" />
+    <Compile Include="Vars.fs" />
+    <Compile Include="BuiltIns.fs" />
+    <Compile Include="Renamer.fs" />
+    <Compile Include="CoreGen.fs" />
+    <Compile Include="StgGen.fs" />
+    <Compile Include="WasmGen.fs" />
+    <Compile Include="Emit.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

@@ -44,44 +44,16 @@ and Statement<'b> =
     | Return of Expr<'b>    
 
 type Declaration<'b> =  
-    | ExportDecl of string * string list * Expr<'b>
+    | ExportDecl of (string * string list) * ('b * 'b list) * Expr<'b>
     | GlobalDecl of 'b * 'b list * Expr<'b>
     | TypeDecl of 'b * 'b list
 
 type Program<'b> =
     Declaration<'b> list
 
-type BuiltIn =
-    | IntegerConstr
+
 
     
     
-type Unique =
-    |Export of string
-    |Global of string
-    |Local of int
-    |BuiltIn of BuiltIn
-type Var = {unique:Unique; name:string; typ:Typ}
 
-let typeofBuiltIn = function
-    | IntegerConstr -> TopFuncT([IntT], ValueT)
 
-let freshVar =
-    let i = ref 0
-    fun typ -> 
-        let next = !i
-        i := !i+1
-        {unique=Local next; name=""; typ=typ}
-let localVar  = 
-    let map = ref Map.empty
-    fun s typ ->
-    match !map |> Map.tryFind s with
-    |Some value -> value
-    |None ->
-        let newVar = {freshVar typ with name=s}     
-        map := !map |> Map.add s newVar
-        newVar
-
-let globalVar s typ = {unique=Global s; name=s; typ=typ}  
-let exportVar s typ = {unique=Export s; name=s; typ=typ}  
-let builtInVar b = {unique=BuiltIn b; name=sprintf "%A" b; typ=typeofBuiltIn b}

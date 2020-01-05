@@ -3,8 +3,8 @@ module StgGen
 
 let addFree v frees =
     match v with    
-    | {Ast.unique=Ast.Global _ } -> frees
-    | {unique=Ast.Local _ } -> v::frees
+    | {Vars.unique=Vars.Global _ } -> frees
+    | {unique=Vars.Local _ } -> v::frees
 
 let genLit = function
     |Core.I32 i -> Wasm.I32Const i
@@ -22,7 +22,7 @@ let rec genExpr e =
     Stg.normLf lf
     
 
-and genVar (v:Ast.Var) =
+and genVar (v:Vars.Var) =
     let e = 
         match v.typ with
         |Ast.ValueT -> Stg.App(v, [])
@@ -131,7 +131,7 @@ and genConstr v vs = function
     |(Core.Prim [Stg.ALit arg])::args ->
         genConstr v (Stg.ALit arg::vs) args
     |arg::args ->
-        let var = Ast.freshVar Ast.ValueT
+        let var = Vars.generateVar Ast.ValueT
         let lfInner = genConstr v (Stg.AVar var::vs) args
         let lfE = genExpr arg
         let lets = (var, lfE)::lfInner.lets
@@ -153,7 +153,7 @@ and genPrimCall f xs = function
     |(Core.Lit arg)::args ->
         genPrimCall f (Stg.ALit (genLit arg)::xs) args        
     |arg::args ->
-        let var = Ast.freshVar Ast.ValueT
+        let var = Vars.generateVar Ast.ValueT
         let lfInner = genConstr f (Stg.AVar var::xs) args
         let lfE = genExpr arg
         let lets = (var, lfE)::lfInner.lets
@@ -175,6 +175,6 @@ let genTopLevel =
     | b, Core.TopConstr vs ->
         b, Stg.TopConstr vs
 
-let genProgram (core: Core.Program<Ast.Var>): Stg.Program<Ast.Var> =
+let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
     let program = core |> List.map genTopLevel
     program

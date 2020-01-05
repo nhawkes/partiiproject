@@ -3,7 +3,7 @@ module WasmGen
 open Stg
 
 type Var =
-    | StgVar of Ast.Var
+    | StgVar of Vars.Var
     | Identity
     | Malloc
     | This
@@ -130,7 +130,7 @@ and genApp tenv env v =
       [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
     |> List.concat
 
-and genCase tenv env (v: Ast.Var) e alts =
+and genCase tenv env (v: Vars.Var) e alts =
     let atom = AVar (StgVar v)
     let local = getLocal env (StgVar v)
     [ e |> genExpr tenv env
@@ -199,7 +199,7 @@ let rec genLetFuncs = function
 
 and genLetsFuncs = List.collect genLetFuncs
 
-let genTopLamFuncs b (lf: LambdaForm<Ast.Var>) =
+let genTopLamFuncs b (lf: LambdaForm<Vars.Var>) =
     [ [ { name = StgVar b
           functype = (Wasm.I32 |> List.replicate (lf.args |> List.length), [ Wasm.I32 ])
           indirect = false } ]
@@ -213,14 +213,14 @@ let genTopConstrFunc b vs =
 
 let genTopLevelFuncs =
     function
-    | b:Ast.Var, TopLam lam -> genTopLamFuncs b lam
+    | b:Vars.Var, TopLam lam -> genTopLamFuncs b lam
     | b, TopConstr vs -> [ genTopConstrFunc b vs ]
 
 let placeLocal local i = (local, Local i)
-let placeLet (env:Map<Var, Placement>) ((b, lf: LambdaForm<Ast.Var>)) i =
+let placeLet (env:Map<Var, Placement>) ((b, lf: LambdaForm<Vars.Var>)) i =
     (StgVar b, Lambda(i, getIndirectFunc env (StgVar b), lf.args |> List.map StgVar, lf.frees |> List.map StgVar))
 
-let localsEnv env locals (lets:(Ast.Var*LambdaForm<Ast.Var>) list) =
+let localsEnv env locals (lets:(Vars.Var*LambdaForm<Vars.Var>) list) =
     let wasmLocals =
         List.concat
             [ This :: (locals |> List.map StgVar) |> List.map placeLocal
@@ -230,7 +230,7 @@ let localsEnv env locals (lets:(Ast.Var*LambdaForm<Ast.Var>) list) =
     |> Seq.map (fun (f, i) -> f i)
 
 let rec genLetCode tenv env = function
-    | (_, lf: LambdaForm<Ast.Var>) ->
+    | (_, lf: LambdaForm<Vars.Var>) ->
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
@@ -373,7 +373,7 @@ let malloc =
           |> List.concat }
 
 
-let genProgram (program: Program<Ast.Var>) =
+let genProgram (program: Program<Vars.Var>) =
     let runtimeFuncs = [ identity; malloc ]
 
     let topLevelFuncs =
@@ -404,7 +404,7 @@ let genProgram (program: Program<Ast.Var>) =
         topLevelFuncVars
         |> List.indexed
         |> List.choose (function
-            | (i, StgVar {unique=Ast.Export nm}) ->
+            | (i, StgVar {unique=Vars.Export nm}) ->
                 Some
                     { Wasm.Export.nm = nm
                       Wasm.Export.exportdesc = Wasm.ExportFunc(uint32 i) }
