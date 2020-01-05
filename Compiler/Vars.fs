@@ -8,8 +8,7 @@ type BuiltIn =
 
 type Unique =
     |Export of string
-    |Global of string
-    |Local of int
+    |User of int
     |Generated of int
     |Anonymous of int
     |BuiltIn of BuiltIn
@@ -25,12 +24,12 @@ let anonymousVar =
         i := !i+1
         {unique=Anonymous next; name=""; typ=typ}
 
-let localVar name =
+let userVar name =
     let i = ref 0
     fun typ -> 
         let next = !i
         i := !i+1
-        {unique=Local next; name=name; typ=typ}        
+        {unique=User next; name=name; typ=typ}        
 
 let generateVar =
     let i = ref 0
@@ -40,14 +39,13 @@ let generateVar =
         {unique=Generated next; name=""; typ=typ}
         
 
-let globalVar s typ = {unique=Global s; name=s; typ=typ}  
 let exportVar s typ = {unique=Export s; name=s; typ=typ}  
 
-let integerConstrVar = 
+let integerConstr = 
     {unique=BuiltIn IntegerConstr;  name="Int"; typ=TopFuncT([ValueT], ValueT)}
-let addOpVar = 
+let addOp = 
     {unique=BuiltIn AddOp;  name=""; typ=TopFuncT([ValueT; ValueT], ValueT)}
-let subOpVar = 
+let subOp = 
     {unique=BuiltIn SubOp;  name=""; typ=TopFuncT([ValueT; ValueT], ValueT)}
 
 let xInt = 

@@ -10,16 +10,16 @@ let lookup env b =
     |"" -> failwithf "Cannot lookup empty"
     |"_" -> failwithf "'_' can only be used in bindings"
     |_ ->
-    match env |> Map.tryFind (StringName b) with
+    match env |> Map.tryFind (b) with
     |Some v -> v
     |None -> failwith "%s is not defined" b
     
 let newVar typ = function    
     |"_" -> anonymousVar typ
-    |b -> localVar b typ    
+    |b -> userVar b typ    
 
 let put env (var:Var) =
-    env |> Map.add (StringName var.name) var
+    env |> Map.add (var.name) var
 
 let rec putAll env = function
     |v::vs -> putAll (put env v) vs
@@ -74,8 +74,8 @@ and renameBlock env assigns ret = function
     |Assign(b, bs, e)::xs -> 
         let typ =  TopFuncT(ValueT |> List.replicate (bs |> List.length), ValueT)
         let v = newVar typ b
-        let vs, newEnv = renameVars env [] bs
-        renameBlock (put newEnv v) ((v, vs, e)::assigns) ret xs
+        let vs, newEnv = renameVars (put env v) [] bs
+        renameBlock newEnv ((v, vs, e)::assigns) ret xs
     |Return(e)::xs ->
         renameBlock env assigns (ret |> Option.orElse (Some e)) xs
     |[] -> 
@@ -95,12 +95,12 @@ let rec renameDecls env exportDecls globalDecls typeDecls = function
     | ExportDecl(n, (b, bs), e)::xs -> 
         let typ =  TopFuncT(ValueT |> List.replicate (bs |> List.length), ValueT)
         let v = newVar typ b
-        let vs, newEnv = renameVars env [] bs
+        let vs, newEnv = renameVars (put env v) [] bs
         renameDecls newEnv ((n, (v,vs), e)::exportDecls) globalDecls typeDecls xs
     | GlobalDecl(b, bs, e)::xs ->
         let typ =  TopFuncT(ValueT |> List.replicate (bs |> List.length), ValueT)
         let v = newVar typ b
-        let vs, newEnv = renameVars env [] bs
+        let vs, newEnv = renameVars (put env v) [] bs
         renameDecls newEnv exportDecls ((v, vs, e)::globalDecls) typeDecls xs
     | TypeDecl(v, vs)::xs -> failwith "TODO"
     |[] ->

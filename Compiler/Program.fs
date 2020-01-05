@@ -20,10 +20,11 @@ let main argv =
     match Parser.parse program with
     |Error err -> failwith err
     |Ok astModule ->
-    printfn "%A" astModule
-    (*    
+    printfn "Ast: %A" astModule
+    
     let coreModule =
         astModule 
+         |> Renamer.renameProgram
          |> CoreGen.genProgram
     printfn "Core: %A" coreModule
     let stgModule = 
@@ -35,5 +36,5 @@ let main argv =
          |> WasmGen.genProgram
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
-    *)
+    
     0

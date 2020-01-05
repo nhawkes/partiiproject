@@ -3,10 +3,6 @@ open Ast
 open Vars
 
 
-type Name =
-    |StringName of string
-    |OpName of Op
-
 let typeofBuiltIn = function
     | IntegerConstr -> TopFuncT([IntT], ValueT)
 
@@ -16,7 +12,7 @@ let builtInConstr builtInVar =
     let fields = args |> List.mapi(fun i t -> {unique=InternalField i;  name=""; typ=t})
     TypeDecl(builtInVar, fields)
 
-let builtInOp builtInVar : Declaration<Var> = 
+let builtInOp builtInVar w : Declaration<Var> = 
     GlobalDecl(builtInVar,
             [xValue; yValue], 
             Block [
@@ -24,15 +20,15 @@ let builtInOp builtInVar : Declaration<Var> =
                     Match(
                         (Var((xValue)), ValueT),
                         [
-                            PatConstr(integerConstrVar, [PatBind xInt]),
+                            PatConstr(integerConstr, [PatBind xInt]),
                             Match(
                                 (Var((yValue)), ValueT),
                                 [
-                                    PatConstr(integerConstrVar, [PatBind yInt]),
+                                    PatConstr(integerConstr, [PatBind yInt]),
                                     Match(
-                                        (Prim [PrimWasm Wasm.I32Add; PrimVar xInt; PrimVar yInt], IntT),
+                                        (Prim [PrimWasm w; PrimVar xInt; PrimVar yInt], IntT),
                                         [
-                                            PatBind(rInt), (Call (integerConstrVar, [Var (rInt)]))
+                                            PatBind(rInt), (Call (integerConstr, [Var (rInt)]))
                                         ]
                                     )
                                 ]
@@ -45,14 +41,12 @@ let builtInOp builtInVar : Declaration<Var> =
 
 let builtIns =
     [
-        builtInConstr integerConstrVar
-        builtInOp addOpVar
-        builtInOp subOpVar
+        builtInConstr integerConstr
+        builtInOp addOp Wasm.I32Add
+        builtInOp subOp Wasm.I32Sub
     ]
 
 let builtInsEnv =
     [
-        StringName "Int", integerConstrVar
-        OpName Add, addOpVar
-        OpName Sub, subOpVar
+        "Int", integerConstr
     ] |> Map.ofList
