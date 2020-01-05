@@ -89,38 +89,40 @@ and genLet tenv env binds e =
     |> List.concat
 
 and genBinds tenv env = function
-    | NonRec [ x ] ->
-        let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
-        let size = 2 + List.length args + List.length frees
-        let freeOffset = 2 + List.length args
-        let storeFrees = (frees |> List.mapi(fun i free -> 
-            [
-                [Wasm.LocalGet localidx]
-                genAtom tenv env (AVar free)
-                [Wasm.I32Store
-                  { align = 0u
-                    offset = 4u * uint32 (freeOffset+i) }]
-            ]) |> List.concat |> List.concat)
-        [
-            [ 
-                Wasm.I32Const (4 * size)
-                Wasm.Call(getFunc env Malloc)
-                Wasm.LocalSet localidx
-                Wasm.LocalGet localidx
-                Wasm.I32Const(int32 funcidx)
-                Wasm.I32Store
-                  { align = 0u
-                    offset = 4u * 0u } 
-                Wasm.LocalGet localidx
-                Wasm.I32Const(args |> List.length)
-                Wasm.I32Store
-                  { align = 0u
-                    offset = 4u * 1u }
-               
-            ]
-            storeFrees
-        ] |> List.concat
+    | NonRec xs -> xs |> List.collect (genNonRec tenv env)
+        
 
+and genNonRec tenv env  x =     
+    let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
+    let size = 2 + List.length args + List.length frees
+    let freeOffset = 2 + List.length args
+    let storeFrees = (frees |> List.mapi(fun i free -> 
+        [
+            [Wasm.LocalGet localidx]
+            genAtom tenv env (AVar free)
+            [Wasm.I32Store
+              { align = 0u
+                offset = 4u * uint32 (freeOffset+i) }]
+        ]) |> List.concat |> List.concat)
+    [
+        [ 
+            Wasm.I32Const (4 * size)
+            Wasm.Call(getFunc env Malloc)
+            Wasm.LocalSet localidx
+            Wasm.LocalGet localidx
+            Wasm.I32Const(int32 funcidx)
+            Wasm.I32Store
+              { align = 0u
+                offset = 4u * 0u } 
+            Wasm.LocalGet localidx
+            Wasm.I32Const(args |> List.length)
+            Wasm.I32Store
+              { align = 0u
+                offset = 4u * 1u }
+           
+        ]
+        storeFrees
+    ] |> List.concat
 and genApp tenv env v =
     [ genAtom tenv env (AVar (StgVar v))
       genAtom tenv env (AVar (StgVar v))

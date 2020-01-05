@@ -50,12 +50,16 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
     and genLet e =
         function
         | Core.NonRec [] -> genExpr e
-        | Core.NonRec [ v1, e1 ] ->
+        | Core.NonRec ls ->
             let lf = genExpr e
-            let lf1 = genExpr e1
+            let newLets = ls |> List.map(fun (v,e) -> v, genExpr e)
+            let vs = newLets |> List.map fst
+            let lfs = newLets |> List.map snd
 
             let innerFrees =
-                lf1.frees
+                lfs 
+                |> List.collect(fun lf -> lf.frees) 
+                |> List.distinct
                 |> List.filter (fun free -> not (lf.locals |> List.contains free))
                 |> List.filter (fun free -> not (lf.args |> List.contains free))
                 |> List.filter (fun free ->
@@ -66,18 +70,18 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
 
             let lets =
                 List.concat
-                    [ [ v1, lf1 ]
+                    [ newLets
                       lf.lets ]
 
             let frees =
                 lf.frees
                 |> List.append innerFrees
-                |> List.filter ((<>) v1)
+                |> List.filter (fun v -> not(vs |> List.contains v))
 
             { lf with
                   frees = frees
                   lets = lets
-                  expr = Stg.Let(Stg.NonRec [ v1 ], lf.expr) }
+                  expr = Stg.Let(Stg.NonRec vs, lf.expr) }
 
     and genCase e v alts =
         let lf = genExpr e
