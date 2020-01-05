@@ -144,20 +144,35 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
     and genApp args =
         function
         | Core.App(f, a) -> genApp (a :: args) f
-        | Core.Var v -> genPrimCall v [] args
+        | Core.Var v -> genAppWithArgs v args
 
-    and genPrimCall f xs =
+    and genAppWithArgs f args =
+        match f.callArity with 
+        |None -> 
+            genAtoms (fun xs -> Stg.lambdaForm(Stg.App (f, xs))) [] args
+        |Some i when i = (args |> List.length) -> 
+            // Saturated
+            genAtoms (fun xs -> Stg.lambdaForm (Stg.Call(f, xs))) [] args
+        |Some i when i < (args |> List.length) -> 
+            // Undersaturated
+            failwith "TODO"
+        |Some i when i > (args |> List.length) -> 
+            // Oversaturated
+            failwith "TODO"
+        
+
+    and genAtoms f xs =
         function
         | (Core.Var arg) :: args ->
-            let lf = genPrimCall f (Stg.AVar arg :: xs) args
+            let (lf:Stg.LambdaForm<_>) = genAtoms f (Stg.AVar arg :: xs) args
             let frees = lf.frees |> addFree arg
             { lf with frees = frees }
 
-        | (Core.Prim [ Stg.ALit arg ]) :: args -> genPrimCall f (Stg.ALit arg :: xs) args
-        | (Core.Lit arg) :: args -> genPrimCall f (Stg.ALit(genLit arg) :: xs) args
+        | (Core.Prim [ Stg.ALit arg ]) :: args -> genAtoms f (Stg.ALit arg :: xs) args
+        | (Core.Lit arg) :: args -> genAtoms f (Stg.ALit(genLit arg) :: xs) args
         | arg :: args ->
             let var = Vars.generateVar Ast.ValueT
-            let lfInner = genPrimCall f (Stg.AVar var :: xs) args
+            let lfInner = genAtoms f (Stg.AVar var :: xs) args
             let lfE = genExpr arg
             let lets = (var, lfE) :: lfInner.lets
             let frees = List.concat [ lfInner.frees; lfE.frees ]
@@ -165,7 +180,7 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
                   lets = lets
                   frees = frees
                   expr = Stg.Let(Stg.NonRec [ var ], lfInner.expr) }
-        | [] -> Stg.lambdaForm (Stg.Prim(Stg.AVar f :: (xs |> List.rev)))
+        | [] -> f (xs |> List.rev)
     and genPrim ps =
         let vars =
             ps

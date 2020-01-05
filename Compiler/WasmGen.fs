@@ -80,7 +80,7 @@ let rec genExpr tenv (env:Map<Var, Placement>) =
     | Case(e, v, alts) -> genCase tenv env v e alts
     | App(v, []) -> genApp tenv env v
     | App(v, atoms) -> failwith "Not Implemented"
-    | Constr(constr, atoms) -> genPrim tenv env (AVar constr :: atoms)
+    | Call(constr, atoms) -> genPrim tenv env (AVar constr :: atoms)
     | Prim(atoms) -> genPrim tenv env atoms
 
 and genLet tenv env binds e =

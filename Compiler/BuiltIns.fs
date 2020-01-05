@@ -9,7 +9,7 @@ let typeofBuiltIn = function
 
 let builtInConstr builtInVar =
     let (TopFuncT(args, ValueT)) = builtInVar.typ
-    let fields = args |> List.mapi(fun i t -> {unique=InternalField i;  name=""; typ=t})
+    let fields = args |> List.mapi(fun i t -> {unique=InternalField i;  name=""; typ=t; callArity=None})
     TypeDecl(builtInVar, fields)
 
 let builtInOp builtInVar w : Declaration<Var> = 
@@ -50,3 +50,4 @@ let builtInsEnv =
     [
         "Int", integerConstr
     ] |> Map.ofList
+

@@ -14,7 +14,7 @@ type Expr<'b> =
     | Let of Binds<'b> * Expr<'b>
     | Case of Expr<'b> * 'b * Alts<'b>
     | App of 'b * Atom<'b> list
-    | Constr of Constr<'b> * Atom<'b> list
+    | Call of 'b * Atom<'b> list
     | Prim of Atom<'b> list
 
 and Binds<'b> =

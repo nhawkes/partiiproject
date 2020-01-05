@@ -70,14 +70,14 @@ pexprImpl := operatorPrecedenceParser.ExpressionParser
 
 let passignArgs = between (ps "(") (ps ")") (sepBy pidentifier (ps ","))
 let passign = pidentifier .>>. (opt passignArgs .>> ws) .>>. ((ps "=") >>. pexpr)
-let passignStatement = passign |>> function
+let passignStatement = passign <??> "Assignment" |>> function
     |((v, None), e) -> Assign(v, [], e)
     |((f, Some args), e) -> Assign(f, args, e)
 
 let preturn = 
     ps "return" >>. pexpr
 
-let preturnStatement = preturn |>> Return
+let preturnStatement = preturn <??> "Return" |>> Return
 let pstatement = choice [preturnStatement; passignStatement]    
 pblockImpl := 
     many (pstatement .>> spaces) |>> Block

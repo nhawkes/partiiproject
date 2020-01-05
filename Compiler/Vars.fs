@@ -15,48 +15,48 @@ type Unique =
     |Internal of string
     |InternalField of int
 
-type Var = {unique:Unique; name:string; typ:Typ}
+type Var = {unique:Unique; name:string; typ:Typ; callArity: int option}
 
 let anonymousVar =
     let i = ref 0
     fun typ -> 
         let next = !i
         i := !i+1
-        {unique=Anonymous next; name=""; typ=typ}
+        {unique=Anonymous next; name=""; typ=typ; callArity=None}
 
 let userVar name =
     let i = ref 0
     fun typ -> 
         let next = !i
         i := !i+1
-        {unique=User next; name=name; typ=typ}        
+        {unique=User next; name=name; typ=typ; callArity=None}        
 
 let generateVar =
     let i = ref 0
     fun typ -> 
         let next = !i
         i := !i+1
-        {unique=Generated next; name=""; typ=typ}
+        {unique=Generated next; name=""; typ=typ; callArity=None}
         
 
-let exportVar s typ = {unique=Export s; name=s; typ=typ}  
+let exportVar s typ = {unique=Export s; name=s; typ=typ; callArity=None}  
 
 let integerConstr = 
-    {unique=BuiltIn IntegerConstr;  name="Int"; typ=TopFuncT([ValueT], ValueT)}
+    {unique=BuiltIn IntegerConstr;  name="Int"; typ=TopFuncT([ValueT], ValueT); callArity=Some 1}
 let addOp = 
-    {unique=BuiltIn AddOp;  name=""; typ=TopFuncT([ValueT; ValueT], ValueT)}
+    {unique=BuiltIn AddOp;  name=""; typ=TopFuncT([ValueT; ValueT], ValueT); callArity=Some 2}
 let subOp = 
-    {unique=BuiltIn SubOp;  name=""; typ=TopFuncT([ValueT; ValueT], ValueT)}
+    {unique=BuiltIn SubOp;  name=""; typ=TopFuncT([ValueT; ValueT], ValueT); callArity=Some 2}
 
 let xInt = 
-    {unique=Internal "xInt";  name=""; typ=IntT}
+    {unique=Internal "xInt";  name=""; typ=IntT; callArity=None}
 let yInt = 
-    {unique=Internal "yInt";  name=""; typ=IntT}
+    {unique=Internal "yInt";  name=""; typ=IntT; callArity=None}
 let rInt = 
-    {unique=Internal "rInt";  name=""; typ=IntT}
+    {unique=Internal "rInt";  name=""; typ=IntT; callArity=None}
 let xValue = 
-    {unique=Internal "xValue";  name=""; typ=ValueT}
+    {unique=Internal "xValue";  name=""; typ=ValueT; callArity=None}
 let yValue = 
-    {unique=Internal "yValue";  name=""; typ=ValueT}
+    {unique=Internal "yValue";  name=""; typ=ValueT; callArity=None}
 let rValue = 
-    {unique=Internal "rValue";  name=""; typ=ValueT}
+    {unique=Internal "rValue";  name=""; typ=ValueT; callArity=None}
