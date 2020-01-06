@@ -13,7 +13,7 @@ let lookup env b =
     |_ ->
     match env |> Map.tryFind (b) with
     |Some v -> v
-    |None -> failwith "%s is not defined" b
+    |None -> failwithf "%s is not defined" b
     
 let newVar typ = function    
     |"_" -> anonymousVar typ

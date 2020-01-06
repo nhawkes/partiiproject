@@ -39,7 +39,7 @@ and genBinOp x y = function
 
 and genMatch e cases =
     let manyCases = (cases |> List.map (fun (pat, expr) -> ([ pat ], expr)))
-    genManyMatch (Core.Prim[Stg.ALit Wasm.Unreachable]) [ e ] manyCases
+    genManyMatch (Core.Prim[Stg.ALit Wasm.Unreachable; Stg.ALit (Wasm.I32Const -1)]) [ e ] manyCases
 
 and genManyMatch def es (cases: (Ast.Pattern<Vars.Var> list * Ast.Expr<Vars.Var>) list) =
     match es with
@@ -140,7 +140,7 @@ let rec genExport call args rhs =
                 [(Core.Var (Vars.integerConstr), [returnVar]),
                     Core.Var(returnVar)            
                 ],
-                Core.Prim [Stg.ALit Wasm.Unreachable]
+                Core.Prim [Stg.ALit Wasm.Unreachable; Stg.ALit (Wasm.I32Const -1)]
             )
         )   
 
