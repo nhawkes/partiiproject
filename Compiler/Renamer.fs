@@ -32,7 +32,7 @@ let rec renamePattern env = function
         let v = newVar ValueT b
         PatBind (v), put env v
     | PatConstr(b, bs) ->
-        let v = newVar ValueT b
+        let v = lookup env b
         let vs, newEnv = renamePatterns env [] bs
         PatConstr(v, vs), newEnv
 
@@ -75,7 +75,8 @@ and renameBlock env assigns ret = function
     |Assign(b, bs, e)::xs -> 
         let typ =  createFuncT(ValueT |> List.replicate (bs |> List.length)) (ValueT)
         let v = newVar typ b
-        let vs, newEnv = renameVars (put env v) [] bs
+        let vs = bs |> List.map (newVar ValueT)
+        let newEnv = put env v
         renameBlock newEnv ((v, vs, e)::assigns) ret xs
     |Return(e)::xs ->
         renameBlock env assigns (ret |> Option.orElse (Some e)) xs
@@ -97,15 +98,24 @@ let rec renameDecls env exportDecls globalDecls typeDecls = function
         let typ =  createFuncT(ValueT |> List.replicate (bs |> List.length)) (ValueT)
         let callArity = bs |> List.length
         let v = {newVar typ b with callArity=Some callArity}
-        let vs, newEnv = renameVars (put env v) [] bs
+        let vs = bs |> List.map (newVar ValueT)
+        let newEnv = put env v
         renameDecls newEnv ((n, (v,vs), e)::exportDecls) globalDecls typeDecls xs
     | GlobalDecl(b, bs, e)::xs ->
         let typ =  createFuncT(ValueT |> List.replicate (bs |> List.length)) (ValueT)
         let callArity = bs |> List.length
         let v = {newVar typ b with callArity=Some callArity}
-        let vs, newEnv = renameVars (put env v) [] bs
+        let vs = bs |> List.map (newVar ValueT)
+        let newEnv = put env v
         renameDecls newEnv exportDecls ((v, vs, e)::globalDecls) typeDecls xs
-    | TypeDecl(v, vs)::xs -> failwith "TODO"
+    | TypeDecl(b, bs)::xs -> 
+        let typ =  createFuncT(ValueT |> List.replicate (bs |> List.length)) (ValueT)
+        let callArity = bs |> List.length
+        let v = {newVar typ b with callArity=Some callArity}
+        let vs = bs |> List.map (newVar ValueT)
+        let newEnv = put env v
+        renameDecls newEnv exportDecls globalDecls ((v,vs)::typeDecls) xs
+
     |[] ->
        let exportDeclsRenamed = exportDecls |> List.map (renameExportDecl env)
        let globalDeclsRenamed = globalDecls |> List.map (renameGlobalDecl env)
@@ -124,7 +134,8 @@ and renameGlobalDecl env (v, vs, e) =
     let newEnv = putAll env vs
     GlobalDecl(v, vs, renameExpr newEnv e)
 
-and renameTypeDecl env (v, vs, e) = failwith "TODO"
+and renameTypeDecl env (v, vs) = 
+    TypeDecl(v, vs)
 
 
 let renameProgram program =

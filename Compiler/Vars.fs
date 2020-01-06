@@ -25,9 +25,9 @@ let anonymousVar =
         i := !i+1
         {unique=Anonymous next; name=""; typ=typ; callArity=None}
 
-let userVar name =
+let userVar =
     let i = ref 0
-    fun typ -> 
+    fun name typ -> 
         let next = !i
         i := !i+1
         {unique=User next; name=name; typ=typ; callArity=None}        

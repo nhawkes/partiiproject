@@ -15,13 +15,21 @@ let pblock, pblockImpl = createParserForwardedToRef()
 let isIdentifierStartChar c =
     isAsciiLetter c || isAnyOf ['_'] c
 
+let isTIdentifierStartChar c =
+    isAsciiUpper c
+
 let isIdentifierContinueChar c =
     isAsciiLetter c || isAnyOf ['_'] c || isDigit c
 
 let pidentifier =
     identifier (
         IdentifierOptions(isAsciiIdStart=isIdentifierStartChar, isAsciiIdContinue=isIdentifierContinueChar)
-    ) .>> ws
+    ) .>> ws <?> "Identifier"
+
+let ptidentifier =
+    identifier (
+        IdentifierOptions(isAsciiIdStart=isTIdentifierStartChar, isAsciiIdContinue=isIdentifierContinueChar)
+    ) .>> ws <?> "Data Identifier"
 
 let pinteger =
     pint32 .>> ws
@@ -39,9 +47,12 @@ let pcall =
     |(v, None) -> Var v
     |(v, Some args) -> Call(v, args)
 
+let ppat, ppatImpl = createParserForwardedToRef()
 let ppatlit = pliteralvalue |>> PatLit
+let ppatconstr = 
+    ptidentifier .>>. between (ps "(") (ps ")") (sepBy ppat (ps ",")) |>> PatConstr
 let ppatbind = pidentifier |>> PatBind
-let ppat = choice [ppatlit; ppatbind]
+ppatImpl := choice [ppatconstr; ppatlit; ppatbind]
 
 let pcaseexpr = choice [
     pexpr
@@ -93,7 +104,12 @@ let pglobalDecl =
     |((v, None), e) -> GlobalDecl(v, [], e)
     |((f, Some args), e) -> GlobalDecl(f, args, e)
 
-let pdecl = choice [pexportDecl; pglobalDecl]
+
+let pdata =
+    ps "data" >>.  pidentifier .>>. passignArgs .>> ws |>> function    
+    |(f, args) -> TypeDecl(f, args)
+
+let pdecl = choice [pdata; pexportDecl; pglobalDecl]
 
 let pprogram = spaces >>. many (pdecl .>> spaces) .>> eof
 

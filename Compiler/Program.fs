@@ -6,11 +6,25 @@ open StgGen
 open Ast
 
 let program = """
+data List(head, tail)
+numbersFrom(i) = {
+    return List(i, numbersFrom(i+1))
+}
 export fibonacci(x) = {
-    return switch(x){
-        | 0 => 1
-        | 1 => 1
-        | _ => fibonacci(x-1) + fibonacci(x-2)
+    return switch(numbersFrom(0)){
+        |List(_, i) => i
+    }
+}
+"""
+"""
+data Box(v)
+box(i) = {
+    a = i
+    return Box(a)
+}
+export fibonacci(x) = {
+    return switch(box(x)){
+        |Box(i)=>i
     }
 }
 """

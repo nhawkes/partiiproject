@@ -68,7 +68,9 @@ and genCasesWithDefault (def, alts, (matchexpr, typ), es, bind) cases =
     | ((Ast.PatLit(Ast.Raw l) :: _, _)) :: xs -> genPatLit state l [] [] cases
     | ((Ast.PatLit(Ast.Box(Ast.Integer _)) :: _, _)) :: xs ->
         genPatConstr state (Vars.integerConstr) [ Vars.generateVar Types.IntT ] [] [] cases
-    | ([ Ast.PatConstr(v, [ Ast.PatBind v1 ]) ], e) :: xs -> genPatConstr state v [ v1 ] [] [] cases
+    | ([ Ast.PatConstr(v, ps) ], e) :: xs ->  
+        let vs = ps |> List.map (function |Ast.PatBind(v) -> v |_->Vars.generateVar Types.ValueT)
+        genPatConstr state v vs [] [] cases
     | (((Ast.PatBind(_)::_), e)) :: xs -> 
         genCasesWithDefault (def, alts, (matchexpr, typ), es, bind) xs
     | [] ->
