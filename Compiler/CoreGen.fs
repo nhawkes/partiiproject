@@ -58,7 +58,7 @@ and genCases (def, (matchexpr, typ), es, bind) subCases otherCases = function
     |[] ->
         let def =
             genManyMatch def es subCases
-        genCasesWithDefault (def, [], (matchexpr, typ), es, bind |> Option.defaultWith(fun () -> Vars.generateVar Ast.ValueT)) otherCases 
+        genCasesWithDefault (def, [], (matchexpr, typ), es, bind |> Option.defaultWith(fun () -> Vars.generateVar Types.ValueT)) otherCases 
     
 
 
@@ -67,7 +67,7 @@ and genCasesWithDefault (def, alts, (matchexpr, typ), es, bind) cases =
     match cases with
     | ((Ast.PatLit(Ast.Raw l) :: _, _)) :: xs -> genPatLit state l [] [] cases
     | ((Ast.PatLit(Ast.Box(Ast.Integer _)) :: _, _)) :: xs ->
-        genPatConstr state (Vars.integerConstr) [ Vars.generateVar Ast.IntT ] [] [] cases
+        genPatConstr state (Vars.integerConstr) [ Vars.generateVar Types.IntT ] [] [] cases
     | ([ Ast.PatConstr(v, [ Ast.PatBind v1 ]) ], e) :: xs -> genPatConstr state v [ v1 ] [] [] cases
     | (((Ast.PatBind(_)::_), e)) :: xs -> 
         genCasesWithDefault (def, alts, (matchexpr, typ), es, bind) xs
@@ -131,8 +131,8 @@ let rec genExport call args rhs =
     |x::xs ->
         genExport (Core.App(call, Core.App(Core.Var (Vars.integerConstr), Core.Var x))) xs rhs
     |[] -> 
-        let resultVar = Vars.generateVar Ast.ValueT
-        let returnVar = Vars.generateVar Ast.IntT
+        let resultVar = Vars.generateVar Types.ValueT
+        let returnVar = Vars.generateVar Types.IntT
         Core.Case(
             call,                        
             resultVar,
@@ -149,9 +149,9 @@ let genDeclaration =
     | Ast.GlobalDecl(lhs : Vars.Var, args, rhs) ->
         [lhs, Core.TopExpr(genRhs (genExpr rhs) args)]
     | Ast.ExportDecl((exportName, exportArgs), (lhs, args), rhs) ->
-        let exportTyp = Ast.TopFuncT(List.replicate (args |> List.length) Ast.IntT, Ast.IntT)
+        let exportTyp = Types.createFuncT (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
         let exportVar = Vars.exportVar exportName exportTyp
-        let exportArgs = exportArgs |> List.map (fun arg -> Vars.userVar arg Ast.IntT)
+        let exportArgs = exportArgs |> List.map (fun arg -> Vars.userVar arg Types.IntT)
         [
             lhs, Core.TopExpr(genRhs (genExpr rhs) args)
             exportVar, Core.TopExpr(

@@ -29,9 +29,9 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
     and genVar (v: Vars.Var) =
         let e =
             match v.typ with
-            | Ast.ValueT -> Stg.App(v, [])
-            | Ast.FuncT _ -> Stg.App(v, [])
-            | Ast.IntT -> Stg.Prim [ Stg.AVar v ]
+            | Types.ValueT -> Stg.App(v, [])
+            | Types.FuncT _ -> Stg.App(v, [])
+            | Types.IntT -> Stg.Prim [ Stg.AVar v ]
             | _ -> failwith "TODO"
 
         let lf = Stg.lambdaForm e
@@ -154,11 +154,16 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
             // Saturated
             genAtoms (fun xs -> Stg.lambdaForm (Stg.Call(f, xs))) [] args
         |Some i when i < (args |> List.length) -> 
-            // Undersaturated
-            failwith "TODO"
-        |Some i when i > (args |> List.length) -> 
             // Oversaturated
-            failwith "TODO"
+            let firstArgs = args |> List.take i
+            let secondArgs = args |> List.skip i
+            let firstResult = genAppWithArgs f firstArgs
+            genAtom (fun f -> genAppWithArgs f secondArgs) firstResult
+        |Some i when i > (args |> List.length) -> 
+            // Undersaturated
+            let extraArgs = [(args |> List.length)..i] |> List.map (fun _ -> Vars.generateVar Types.ValueT)
+            let lf = genAppWithArgs f (List.concat [args; extraArgs |> List.map Core.Var])
+            {lf with args=List.concat[extraArgs; lf.args]}
         
 
     and genAtoms f xs =
@@ -167,20 +172,23 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
             let (lf:Stg.LambdaForm<_>) = genAtoms f (Stg.AVar arg :: xs) args
             let frees = lf.frees |> addFree arg
             { lf with frees = frees }
-
         | (Core.Prim [ Stg.ALit arg ]) :: args -> genAtoms f (Stg.ALit arg :: xs) args
         | (Core.Lit arg) :: args -> genAtoms f (Stg.ALit(genLit arg) :: xs) args
         | arg :: args ->
-            let var = Vars.generateVar Ast.ValueT
-            let lfInner = genAtoms f (Stg.AVar var :: xs) args
-            let lfE = genExpr arg
-            let lets = (var, lfE) :: lfInner.lets
-            let frees = List.concat [ lfInner.frees; lfE.frees ]
-            { lfInner with
-                  lets = lets
-                  frees = frees
-                  expr = Stg.Let(Stg.NonRec [ var ], lfInner.expr) }
+            genAtom (fun var -> genAtoms f (Stg.AVar var :: xs) args) (genExpr arg)
         | [] -> f (xs |> List.rev)
+
+    and genAtom f (arg) =    
+        let var = Vars.generateVar Types.ValueT
+        let lfInner = f var
+        let lfE = arg
+        let lets = (var, lfE) :: lfInner.lets
+        let frees = List.concat [ lfInner.frees; lfE.frees ]
+        { lfInner with
+              lets = lets
+              frees = frees
+              expr = Stg.Let(Stg.NonRec [ var ], lfInner.expr) }
+
     and genPrim ps =
         let vars =
             ps

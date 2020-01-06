@@ -1,5 +1,6 @@
 module Vars
 open Ast
+open Types
 
 type BuiltIn =
     | IntegerConstr
@@ -42,11 +43,11 @@ let generateVar =
 let exportVar s typ = {unique=Export s; name=s; typ=typ; callArity=None}  
 
 let integerConstr = 
-    {unique=BuiltIn IntegerConstr;  name="Int"; typ=TopFuncT([ValueT], ValueT); callArity=Some 1}
+    {unique=BuiltIn IntegerConstr;  name="Int"; typ=FuncT(ValueT, ValueT); callArity=Some 1}
 let addOp = 
-    {unique=BuiltIn AddOp;  name=""; typ=TopFuncT([ValueT; ValueT], ValueT); callArity=Some 2}
+    {unique=BuiltIn AddOp;  name=""; typ=FuncT(ValueT, FuncT(ValueT, ValueT)); callArity=Some 2}
 let subOp = 
-    {unique=BuiltIn SubOp;  name=""; typ=TopFuncT([ValueT; ValueT], ValueT); callArity=Some 2}
+    {unique=BuiltIn SubOp;  name=""; typ=FuncT(ValueT, FuncT(ValueT, ValueT)); callArity=Some 2}
 
 let xInt = 
     {unique=Internal "xInt";  name=""; typ=IntT; callArity=None}

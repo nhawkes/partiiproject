@@ -4,6 +4,7 @@ open FParsec
 open FParsec.CharParsers
 open FParsec.Primitives
 open Ast
+open Types
 
 let ws = skipMany(skipChar ' ')
 let ps s = skipString s .>> spaces

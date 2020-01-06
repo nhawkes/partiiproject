@@ -3,6 +3,7 @@ module Renamer
 open Ast
 open BuiltIns
 open Vars
+open Types
 
 
 let lookup env b =
@@ -72,7 +73,7 @@ and renameCases env = List.map (renameCase env)
 
 and renameBlock env assigns ret = function
     |Assign(b, bs, e)::xs -> 
-        let typ =  TopFuncT(ValueT |> List.replicate (bs |> List.length), ValueT)
+        let typ =  createFuncT(ValueT |> List.replicate (bs |> List.length)) (ValueT)
         let v = newVar typ b
         let vs, newEnv = renameVars (put env v) [] bs
         renameBlock newEnv ((v, vs, e)::assigns) ret xs
@@ -93,13 +94,13 @@ and renameReturn env e = Return(renameExpr env e)
 
 let rec renameDecls env exportDecls globalDecls typeDecls = function
     | ExportDecl(n, (b, bs), e)::xs -> 
-        let typ =  TopFuncT(ValueT |> List.replicate (bs |> List.length), ValueT)
+        let typ =  createFuncT(ValueT |> List.replicate (bs |> List.length)) (ValueT)
         let callArity = bs |> List.length
         let v = {newVar typ b with callArity=Some callArity}
         let vs, newEnv = renameVars (put env v) [] bs
         renameDecls newEnv ((n, (v,vs), e)::exportDecls) globalDecls typeDecls xs
     | GlobalDecl(b, bs, e)::xs ->
-        let typ =  TopFuncT(ValueT |> List.replicate (bs |> List.length), ValueT)
+        let typ =  createFuncT(ValueT |> List.replicate (bs |> List.length)) (ValueT)
         let callArity = bs |> List.length
         let v = {newVar typ b with callArity=Some callArity}
         let vs, newEnv = renameVars (put env v) [] bs

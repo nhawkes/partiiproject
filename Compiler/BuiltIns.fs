@@ -1,20 +1,20 @@
 module BuiltIns
 open Ast
 open Vars
+open Types
 
-
-let typeofBuiltIn = function
-    | IntegerConstr -> TopFuncT([IntT], ValueT)
+let rec fieldsForType i = function
+    |FuncT(t, b) -> 
+        {unique=InternalField i;  name=""; typ=t; callArity=None}::fieldsForType (i+1) b
+    |ValueT -> []
 
 
 let builtInConstr builtInVar =
-    let (TopFuncT(args, ValueT)) = builtInVar.typ
-    let fields = args |> List.mapi(fun i t -> {unique=InternalField i;  name=""; typ=t; callArity=None})
-    TypeDecl(builtInVar, fields)
+    TypeDecl(builtInVar, fieldsForType 0 builtInVar.typ)
 
 let builtInOp builtInVar w : Declaration<Var> = 
     GlobalDecl(builtInVar,
-            [xValue; yValue], 
+            [xValue; yValue],
             Block [
                 Return(
                     Match(

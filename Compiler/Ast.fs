@@ -1,10 +1,6 @@
 module Ast
 
-type Typ =
-    |TopFuncT of Typ list * Typ
-    |FuncT of Typ * Typ
-    |IntT    
-    |ValueT
+
 
 type Boxed =
     | Integer of int32
@@ -27,7 +23,7 @@ type Expr<'b> =
     | Var of 'b
     | BinOp of Expr<'b> * Op * Expr<'b>
     | Call of 'b * Expr<'b> list
-    | Match of (Expr<'b> * Typ) * Case<'b> list
+    | Match of (Expr<'b> * Types.Typ) * Case<'b> list
     | Block of Block<'b>
     | Prim of Prim<'b> list
 
