@@ -6,7 +6,7 @@ open FParsec.Primitives
 open Ast
 open Types
 
-let ws = skipMany(skipChar ' ')
+let ws = skipMany(skipChar ' ') <?> "whitespace"
 let ps s = skipString s .>> spaces
 
 let pexpr, pexprImpl = createParserForwardedToRef()

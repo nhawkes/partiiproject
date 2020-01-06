@@ -163,7 +163,8 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
             // Undersaturated
             let extraArgs = [(args |> List.length)..i] |> List.map (fun _ -> Vars.generateVar Types.ValueT)
             let lf = genAppWithArgs f (List.concat [args; extraArgs |> List.map Core.Var])
-            {lf with args=List.concat[extraArgs; lf.args]}
+            let frees = lf.frees |> List.filter(fun v -> not(extraArgs |> List.contains(v)))
+            {lf with args=List.concat[extraArgs; lf.args]; frees=frees}
         
 
     and genAtoms f xs =

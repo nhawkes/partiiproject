@@ -7,25 +7,13 @@ open Ast
 
 let program = """
 data List(head, tail)
-numbersFrom(i) = {
-    return List(i, numbersFrom(i+1))
+data Empty()
+add(a, b) = {
+    return a+b
 }
 export fibonacci(x) = {
-    return switch(numbersFrom(0)){
-        |List(_, i) => i
-    }
-}
-"""
-"""
-data Box(v)
-box(i) = {
-    a = i
-    return Box(a)
-}
-export fibonacci(x) = {
-    return switch(box(x)){
-        |Box(i)=>i
-    }
+    f = add(1)
+    return f(2)+f(3)
 }
 """
 

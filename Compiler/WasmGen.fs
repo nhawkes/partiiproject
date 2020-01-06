@@ -6,6 +6,7 @@ type Var =
     | StgVar of Vars.Var
     | Identity
     | Malloc
+    | Clone
     | This
     | ThisFunction
     | NextArgPtr
@@ -78,9 +79,8 @@ let rec genExpr tenv (env:Map<Var, Placement>) =
     function
     | Let(binds, e) -> genLet tenv env binds e
     | Case(e, v, alts) -> genCase tenv env v e alts
-    | App(v, []) -> genApp tenv env v
-    | App(v, atoms) -> failwith "Not Implemented"
-    | Call(constr, atoms) -> genPrim tenv env (AVar constr :: atoms)
+    | App(v, atoms) -> genApp tenv env v atoms
+    | Call(constr, atoms) -> genPrim tenv env (AVar constr :: (atoms |> List.rev))
     | Prim(atoms) -> genPrim tenv env atoms
 
 and genLet tenv env binds e =
@@ -123,14 +123,19 @@ and genNonRec tenv env  x =
         ]
         storeFrees
     ] |> List.concat
-and genApp tenv env v =
-    [ genAtom tenv env (AVar (StgVar v))
-      genAtom tenv env (AVar (StgVar v))
-      [ Wasm.I32Load
-          { align = 0u
-            offset = 0u } ]
-      [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
-    |> List.concat
+and genApp tenv env v args =
+    let whnf =
+        [ genAtom tenv env (AVar (StgVar v))
+          genAtom tenv env (AVar (StgVar v))
+          [ Wasm.I32Load
+              { align = 0u
+                offset = 0u } ]
+          [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
+        |> List.concat
+    if not (args |> List.isEmpty) then
+        whnf
+    else
+        whnf
 
 and genCase tenv env (v: Vars.Var) e alts =
     let atom = AVar (StgVar v)
