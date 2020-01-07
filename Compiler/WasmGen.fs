@@ -357,17 +357,24 @@ let malloc =
               Wasm.GlobalSet heapTop ]
 
             // Grow if needed
-            [ Wasm.Loop
-                ([],
-                 [ Wasm.GlobalGet heapTop
-                   Wasm.I32Const 16
-                   Wasm.I32ShrU
-                   Wasm.MemorySize
-                   Wasm.I32GtU
-                   Wasm.BrIf 0u
-                   Wasm.I32Const 1
-                   Wasm.MemoryGrow
-                   Wasm.Drop ]) ]
+            [ Wasm.Block([],
+                [
+                 Wasm.Loop ([],
+                    [  
+                       Wasm.MemorySize
+                       Wasm.GlobalGet heapTop
+                       Wasm.I32Const 16
+                       Wasm.I32ShrU
+                       Wasm.I32GtU
+                       Wasm.BrIf 1u
+                       Wasm.I32Const 1
+                       Wasm.MemoryGrow
+                       Wasm.Drop 
+                       Wasm.Br 0u
+                    ])
+                ])
+            ]
+            
 
             // Load heapTop
             [ Wasm.LocalGet 0u
@@ -379,9 +386,82 @@ let malloc =
           ]
           |> List.concat }
 
+let clone mallocIdx =     
+    let size = 2u
+    let i = 3u
+    let cloned = 4u
+    { name = Clone
+      functype = [ Wasm.I32 ], [ Wasm.I32 ]
+      indirect = false
+      func =
+          [Wasm.I32; Wasm.I32; Wasm.I32; Wasm.I32],
+          [ [
+              Wasm.LocalGet 0u
+              Wasm.I32Const -4
+              Wasm.I32Add
+              Wasm.I32Load
+                { align = 0u
+                  offset = 0u }
+              Wasm.LocalSet size
+              // Get size from This
+
+              Wasm.LocalGet size
+              Wasm.Call mallocIdx // Call Malloc
+              Wasm.LocalSet cloned
+
+              Wasm.I32Const 0
+              Wasm.LocalSet i
+              //i=0
+            ]
+
+
+            [ Wasm.Block([],
+                    [Wasm.Loop ([],
+                       [
+                       // If(i>=size) break;
+                       Wasm.LocalGet i
+                       Wasm.LocalGet size
+                       Wasm.I32GeU
+                       Wasm.BrIf 1u
+
+                        
+                       // Destination
+                       Wasm.LocalGet cloned
+                       Wasm.LocalGet i
+                       Wasm.I32Add
+
+                       // Source
+                       Wasm.LocalGet 0u
+                       Wasm.LocalGet i
+                       Wasm.I32Add
+
+                       // Copy
+                       Wasm.I32Load {align = 0u; offset = 0u}
+                       Wasm.I32Store {align = 0u; offset = 0u}
+
+                       // i+=4
+                       Wasm.LocalGet i
+                       Wasm.I32Const 4
+                       Wasm.I32Add
+                       Wasm.LocalSet i
+
+                       // Continue
+                       Wasm.Br 0u
+                       ])
+                    ])
+            ]            
+            [
+                Wasm.LocalGet cloned
+            ]
+
+              
+                    
+          ]
+          |> List.concat }
+
 
 let genProgram (program: Program<Vars.Var>) =
-    let runtimeFuncs = [ identity; malloc ]
+    let runtimeFuncs = [ identity; malloc; clone 1u ]
 
     let topLevelFuncs =
         List.concat

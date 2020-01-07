@@ -6,14 +6,12 @@ open StgGen
 open Ast
 
 let program = """
-data List(head, tail)
-data Empty()
-add(a, b) = {
-    return a+b
-}
 export fibonacci(x) = {
-    f = add(1)
-    return f(2)+f(3)
+    return switch(x){
+        | 0 => 1
+        | 1 => 1
+        | _ => fibonacci(x-1) + fibonacci(x-2)
+    }
 }
 """
 
