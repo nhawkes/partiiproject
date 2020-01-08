@@ -130,7 +130,7 @@ let Apply() =
     let applyProgram = emitWasmModule wasmModule |> compile
     let (memory:WebAssembly.Runtime.UnmanagedMemory) = applyProgram.Exports?Memory()
     printfn("%A") memory
-    System.Runtime.InteropServices.Marshal.Copy([|12; 0; 20; 0|], 0, memory.Start, 4)
+    System.Runtime.InteropServices.Marshal.Copy([|12; 20; 1; 0|], 0, memory.Start, 4)
     printfn "%A" (memoryToArray memory)
     let output2 = applyProgram.Exports?Apply (4, 14)
     printfn "%A" (memoryToArray memory)

@@ -318,7 +318,7 @@ let rec genLetCode tenv env = function
                 [ Map.toSeq env
                   localsEnv env lf.locals lf.lets
                   Seq.initInfinite (uint32 >> Heap)
-                  |> Seq.zip (ArgsRemaining :: ThisFunction :: List.concat [ lf.args |> List.map StgVar; lf.frees |> List.map StgVar]) ]
+                  |> Seq.zip (ArgsRemaining :: ThisFunction :: List.concat [ lf.args |> List.rev |> List.map StgVar; lf.frees |> List.map StgVar]) ]
             |> Map.ofSeq
 
         [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
@@ -404,13 +404,6 @@ let identity =
       indirect = true
       func = [], [ Wasm.LocalGet 0u ] }
 
-(*
-Memory layout:
--1: Size
-0: Function
-1: Constr
-...: Data
-*)
 let malloc =
     { name = Malloc
       functype = [ Wasm.I32 ], [ Wasm.I32 ]
@@ -562,7 +555,7 @@ let apply stdFuncTypeIdx =
               // Calculate position of next arg
 
               Wasm.LocalGet arg
-              Wasm.I32Store { align = 0u; offset = 8u }
+              Wasm.I32Store { align = 0u; offset = 4u }
               // Store the next argument
 
               Wasm.LocalGet argsRemaining
@@ -592,7 +585,7 @@ let apply stdFuncTypeIdx =
                     Wasm.LocalGet argsRemaining
                     Wasm.I32Store
                       { align = 0u
-                        offset = 4u }
+                        offset = 0u }
                     Wasm.LocalGet thisPointer    
                 ]              
               )
