@@ -7,38 +7,35 @@ Memory layout:
 All
 ======
 -4: Size
-0: Whnf function
+0: ArgsRemaining
+4: Function
 ...: Data/Thunk/Function
 
-Data
+Func - ArgsRemaining>0
 =======
-4: Type Idx
-...: Fields
+8..n: args
+n..: frees
 
-Thunk
+Data - ArgsRemaining=0 Function=0
 =======
-...: frees
+8: Type Idx
+12..: Fields
 
-Func
+Thunk - ArgsRemaining=0 Function!=0
 =======
-4: NextArgPosition
-8: Function
-...: args
-...: frees
-
-
-
+8..: frees
 *)
 
 type Var =
     | StgVar of Vars.Var
     | Identity
+    | WhnfEval
     | Malloc
     | Clone
     | Apply
     | This
     | ThisFunction
-    | NextArgPosition
+    | ArgsRemaining
 
 type Placement =
     | Heap of uint32
@@ -138,29 +135,61 @@ and genNonRec tenv env  x =
             Wasm.I32Const (4 * size)
             Wasm.Call(getFunc env Malloc)
             Wasm.LocalSet localidx
-            Wasm.LocalGet localidx
-            Wasm.I32Const(int32 funcidx)
-            Wasm.I32Store
-              { align = 0u
-                offset = 4u * 0u } 
+            
+            // Args remaining
             Wasm.LocalGet localidx
             Wasm.I32Const(4 * (args |> List.length))
             Wasm.I32Store
               { align = 0u
-                offset = 4u * 1u }
+                offset = 0u }
+                
+            // Function
+            Wasm.LocalGet localidx
+            Wasm.I32Const(int32 funcidx)
+            Wasm.I32Store
+              { align = 0u
+                offset = 4u}                 
            
         ]
         storeFrees
     ] |> List.concat
 and genApp tenv env v args =
     let whnf =
-        [ genAtom tenv env (AVar (StgVar v))
-          genAtom tenv env (AVar (StgVar v))
-          [ Wasm.I32Load
+        [
+            
+            // Check if thunk and call if so
+
+            genAtom tenv env (AVar (StgVar v))
+            [Wasm.I32Load
               { align = 0u
-                offset = 0u } ]
-          [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
-        |> List.concat
+                offset = 0u }]
+            [Wasm.I32Eqz]
+            // Args Remaining = 0
+
+            genAtom tenv env (AVar (StgVar v))
+            [Wasm.I32Load
+              { align = 0u
+                offset = 4u }]
+            [Wasm.I32Eqz; Wasm.I32Const -1; Wasm.I32Xor]
+            // Function != 0
+
+            [Wasm.I32And]
+            // Args Remaining = 0 and Function != 0 ie. is a thunk
+
+            [
+                Wasm.IfElse([Wasm.I32],
+                    [ genAtom tenv env (AVar (StgVar v))
+                      genAtom tenv env (AVar (StgVar v))
+                      [ Wasm.I32Load
+                          { align = 0u
+                            offset = 4u } ]
+                      [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
+                    |> List.concat, [
+                        genAtom tenv env (AVar (StgVar v))
+                    ] |> List.concat
+                )
+            ]
+        ] |> List.concat
 
     let clone = 
         if args |> List.isEmpty then
@@ -217,14 +246,15 @@ and genAAlts tenv env atom def =
                 [ genAtom tenv env atom
                   [ Wasm.I32Load
                       { align = 0u
-                        offset = 4u * (2u + uint32 (i)) } ]
+                        offset = 4u * (3u + uint32 (i)) } ]
                   [ Wasm.LocalSet local ] ]
                 |> List.concat)
 
+        // This must a data heap object - check Type Idx
         [ genAtom tenv env atom
           [ Wasm.I32Load
               { align = 0u
-                offset = 4u * 1u }
+                offset = 8u }
             Wasm.I32Const(int funcIndex)
             Wasm.I32Eq
             Wasm.IfElse
@@ -288,7 +318,7 @@ let rec genLetCode tenv env = function
                 [ Map.toSeq env
                   localsEnv env lf.locals lf.lets
                   Seq.initInfinite (uint32 >> Heap)
-                  |> Seq.zip (ThisFunction :: NextArgPosition :: List.concat [ lf.args |> List.map StgVar; lf.frees |> List.map StgVar]) ]
+                  |> Seq.zip (ArgsRemaining :: ThisFunction :: List.concat [ lf.args |> List.map StgVar; lf.frees |> List.map StgVar]) ]
             |> Map.ofSeq
 
         [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
@@ -297,14 +327,6 @@ let rec genLetCode tenv env = function
 
 and genLetsCode tenv env = List.collect (genLetCode tenv env)
 
-
-(*/ Memory layout:
--1: Size
-0: Function
-1: NextArgPosition
-2..arity: Args
-...: Free
-*)
 let genTopBindCode tenv env (lf: LambdaForm<_>) =
     if not (List.isEmpty lf.frees) then
         failwithf "Top level bindings cannot have free variables: %A" lf.frees
@@ -334,26 +356,38 @@ let genTopConstrCode tenv env b vs =
               Wasm.LocalGet(uint32 i)
               Wasm.I32Store
                   { align = 0u
-                    offset = 4u * uint32 (i + 2)} ])
+                    offset = 4u * uint32 (i + 3)} ])
 
     [ Wasm.I32 ],
     [ [ Wasm.I32Const
             (4 * (vs
              |> List.length
-             |> (+) 2))
+             |> (+) 3))
         Wasm.Call(getFunc env Malloc)
         Wasm.LocalSet localidx ]
+
+      // Create a data heap object
+
+      // ArgsRemaining = 0
+      [ Wasm.LocalGet localidx
+        Wasm.I32Const(0)        
+        Wasm.I32Store
+            { align = 0u
+              offset = 0u } ]
+
+      // Function = Identity = 0
       [ Wasm.LocalGet localidx
         Wasm.I32Const(getIndirectFunc env Identity |> int)        
         Wasm.I32Store
             { align = 0u
-              offset = 4u * uint32 (0u) } ]
+              offset = 4u } ]
+
       [ 
         Wasm.LocalGet localidx
         Wasm.I32Const(getFunc env (StgVar b) |> int)
         Wasm.I32Store
             { align = 0u
-              offset = 4u * uint32 (1u) } ]
+              offset = 8u } ]
       vsStores |> List.concat
       [ Wasm.LocalGet localidx ] ]
     |> List.concat
@@ -508,36 +542,36 @@ let clone mallocIdx =
 let apply stdFuncTypeIdx =     
     let thisPointer = 0u
     let arg = 1u
-    let nextArgPosition = 2u
+    let argsRemaining = 2u
     { name = Apply
       functype = [ Wasm.I32; Wasm.I32 ], [ Wasm.I32 ]
       indirect = false
       func =
           [ Wasm.I32 ],
           [
-              // Get nextArgPosition
+              // Get argsRemaining
               Wasm.LocalGet thisPointer
               Wasm.I32Load
                 { align = 0u
-                  offset = 4u }
-              Wasm.LocalSet nextArgPosition                  
+                  offset = 0u }
+              Wasm.LocalSet argsRemaining                  
 
-              Wasm.LocalGet nextArgPosition
+              Wasm.LocalGet argsRemaining
               Wasm.LocalGet thisPointer
               Wasm.I32Add
               // Calculate position of next arg
 
               Wasm.LocalGet arg
-              Wasm.I32Store { align = 0u; offset = 4u }
+              Wasm.I32Store { align = 0u; offset = 8u }
               // Store the next argument
 
-              Wasm.LocalGet nextArgPosition
+              Wasm.LocalGet argsRemaining
               Wasm.I32Const -4
               Wasm.I32Add
-              Wasm.LocalSet nextArgPosition
+              Wasm.LocalSet argsRemaining
               // Calculate next arg position
 
-              Wasm.LocalGet nextArgPosition
+              Wasm.LocalGet argsRemaining
               Wasm.I32Eqz
               
               Wasm.IfElse([Wasm.I32], 
@@ -547,7 +581,7 @@ let apply stdFuncTypeIdx =
                     Wasm.LocalGet thisPointer
                     Wasm.I32Load
                       { align = 0u
-                        offset = 0u }
+                        offset = 4u }
                     Wasm.CallIndirect(stdFuncTypeIdx)
                 ],
                 [
@@ -555,7 +589,7 @@ let apply stdFuncTypeIdx =
                     // Update next arg pointer
                     Wasm.LocalGet thisPointer
                     
-                    Wasm.LocalGet nextArgPosition
+                    Wasm.LocalGet argsRemaining
                     Wasm.I32Store
                       { align = 0u
                         offset = 4u }
