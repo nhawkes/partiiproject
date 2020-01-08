@@ -6,20 +6,12 @@ open StgGen
 open Ast
 
 let program = """
-data List(head, tail)
-fibonacciList(a, b) = {
-    return List(a, fibonacciList(b, a+b))
-}
-take(n, list) = {
-    return switch(list){
-        | List(head, tail) => return switch(n){
-            | 0 => head
-            | _ => take(n-1, list)
-        }
-    }
-}
 export fibonacci(x) = {
-    return take(x, fibonacciList(1, 1))
+    return switch(x){
+        | 0 => 1
+        | 1 => 1
+        | _ => fibonacci(x-1) + fibonacci(x-2)
+    }
 }
 """
 

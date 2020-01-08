@@ -302,11 +302,13 @@ let placeLocal local i = (local, Local i)
 let placeLet (env:Map<Var, Placement>) ((b, lf: LambdaForm<Vars.Var>)) i =
     (StgVar b, Lambda(i, getIndirectFunc env (StgVar b), lf.args |> List.map StgVar, lf.frees |> List.map StgVar))
 
-let localsEnv env locals (lets:(Vars.Var*LambdaForm<Vars.Var>) list) =
+let localsEnv env args locals (lets:(Vars.Var*LambdaForm<Vars.Var>) list) =
     let wasmLocals =
-        List.concat
-            [ This :: (locals |> List.map StgVar) |> List.map placeLocal
-              lets |> List.map (placeLet env) ]
+        List.concat 
+            [ args |> List.map (placeLocal)
+              locals |> List.map (StgVar >> placeLocal)
+              lets |> List.map (placeLet env) 
+            ]
     Seq.initInfinite (uint32)
     |> Seq.zip wasmLocals
     |> Seq.map (fun (f, i) -> f i)
@@ -316,7 +318,7 @@ let rec genLetCode tenv env = function
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
-                  localsEnv env lf.locals lf.lets
+                  localsEnv env [This] lf.locals lf.lets
                   Seq.initInfinite (uint32 >> Heap)
                   |> Seq.zip (ArgsRemaining :: ThisFunction :: List.concat [ lf.args |> List.rev |> List.map StgVar; lf.frees |> List.map StgVar]) ]
             |> Map.ofSeq
@@ -334,11 +336,12 @@ let genTopBindCode tenv env (lf: LambdaForm<_>) =
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
-                  localsEnv env lf.locals lf.lets
-                  Seq.initInfinite (uint32 >> Local) |> Seq.zip (List.concat [ lf.args |> List.map StgVar; lf.locals |> List.map StgVar]) ]
+                  localsEnv env (lf.args |> List.map StgVar) lf.locals lf.lets 
+                ]
             |> Map.ofSeq
 
-        [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
+        let wasmLocalTypes = Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length))
+        [ [wasmLocalTypes, genExpr tenv newEnv lf.expr ]
           genLetsCode tenv env lf.lets ]
         |> List.concat
 
