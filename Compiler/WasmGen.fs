@@ -2,14 +2,43 @@ module WasmGen
 
 open Stg
 
+(*
+Memory layout:
+All
+======
+-4: Size
+0: Whnf function
+...: Data/Thunk/Function
+
+Data
+=======
+4: Type Idx
+...: Fields
+
+Thunk
+=======
+...: frees
+
+Func
+=======
+4: NextArgPosition
+8: Function
+...: args
+...: frees
+
+
+
+*)
+
 type Var =
     | StgVar of Vars.Var
     | Identity
     | Malloc
     | Clone
+    | Apply
     | This
     | ThisFunction
-    | NextArgPtr
+    | NextArgPosition
 
 type Placement =
     | Heap of uint32
@@ -115,7 +144,7 @@ and genNonRec tenv env  x =
               { align = 0u
                 offset = 4u * 0u } 
             Wasm.LocalGet localidx
-            Wasm.I32Const(args |> List.length)
+            Wasm.I32Const(4 * (args |> List.length))
             Wasm.I32Store
               { align = 0u
                 offset = 4u * 1u }
@@ -132,10 +161,26 @@ and genApp tenv env v args =
                 offset = 0u } ]
           [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
         |> List.concat
-    if not (args |> List.isEmpty) then
+
+    let clone = 
+        if args |> List.isEmpty then
+            []
+        else 
+            [Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone)]       
+
+    let applyArgs =
+            args |> List.collect(fun arg -> 
+                [
+                    genStgVarAtom tenv env arg
+                    [Wasm.Call (getFunc env Apply)]
+                    
+                ] |> List.concat)
+    
+    [
         whnf
-    else
-        whnf
+        clone
+        applyArgs
+    ] |> List.concat
 
 and genCase tenv env (v: Vars.Var) e alts =
     let atom = AVar (StgVar v)
@@ -243,7 +288,7 @@ let rec genLetCode tenv env = function
                 [ Map.toSeq env
                   localsEnv env lf.locals lf.lets
                   Seq.initInfinite (uint32 >> Heap)
-                  |> Seq.zip (ThisFunction :: NextArgPtr :: List.concat [ lf.args |> List.map StgVar; lf.frees |> List.map StgVar]) ]
+                  |> Seq.zip (ThisFunction :: NextArgPosition :: List.concat [ lf.args |> List.map StgVar; lf.frees |> List.map StgVar]) ]
             |> Map.ofSeq
 
         [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
@@ -256,7 +301,7 @@ and genLetsCode tenv env = List.collect (genLetCode tenv env)
 (*/ Memory layout:
 -1: Size
 0: Function
-1: NextArgPointer
+1: NextArgPosition
 2..arity: Args
 ...: Free
 *)
@@ -387,16 +432,17 @@ let malloc =
           |> List.concat }
 
 let clone mallocIdx =     
-    let size = 2u
-    let i = 3u
-    let cloned = 4u
+    let thisPointer = 0u
+    let size = 1u
+    let i = 2u
+    let cloned = 3u
     { name = Clone
       functype = [ Wasm.I32 ], [ Wasm.I32 ]
       indirect = false
       func =
           [Wasm.I32; Wasm.I32; Wasm.I32; Wasm.I32],
           [ [
-              Wasm.LocalGet 0u
+              Wasm.LocalGet thisPointer
               Wasm.I32Const -4
               Wasm.I32Add
               Wasm.I32Load
@@ -431,7 +477,7 @@ let clone mallocIdx =
                        Wasm.I32Add
 
                        // Source
-                       Wasm.LocalGet 0u
+                       Wasm.LocalGet thisPointer
                        Wasm.LocalGet i
                        Wasm.I32Add
 
@@ -459,9 +505,68 @@ let clone mallocIdx =
           ]
           |> List.concat }
 
+let apply stdFuncTypeIdx =     
+    let thisPointer = 0u
+    let arg = 1u
+    let nextArgPosition = 2u
+    { name = Apply
+      functype = [ Wasm.I32; Wasm.I32 ], [ Wasm.I32 ]
+      indirect = false
+      func =
+          [ Wasm.I32 ],
+          [
+              // Get nextArgPosition
+              Wasm.LocalGet thisPointer
+              Wasm.I32Load
+                { align = 0u
+                  offset = 4u }
+              Wasm.LocalSet nextArgPosition                  
+
+              Wasm.LocalGet nextArgPosition
+              Wasm.LocalGet thisPointer
+              Wasm.I32Add
+              // Calculate position of next arg
+
+              Wasm.LocalGet arg
+              Wasm.I32Store { align = 0u; offset = 4u }
+              // Store the next argument
+
+              Wasm.LocalGet nextArgPosition
+              Wasm.I32Const -4
+              Wasm.I32Add
+              Wasm.LocalSet nextArgPosition
+              // Calculate next arg position
+
+              Wasm.LocalGet nextArgPosition
+              Wasm.I32Eqz
+              
+              Wasm.IfElse([Wasm.I32], 
+                [                    
+                    // Function now has enough argument to be called
+                    Wasm.LocalGet thisPointer
+                    Wasm.LocalGet thisPointer
+                    Wasm.I32Load
+                      { align = 0u
+                        offset = 0u }
+                    Wasm.CallIndirect(stdFuncTypeIdx)
+                ],
+                [
+                    
+                    // Update next arg pointer
+                    Wasm.LocalGet thisPointer
+                    
+                    Wasm.LocalGet nextArgPosition
+                    Wasm.I32Store
+                      { align = 0u
+                        offset = 4u }
+                    Wasm.LocalGet thisPointer    
+                ]              
+              )
+          ] }
+
 
 let genProgram (program: Program<Vars.Var>) =
-    let runtimeFuncs = [ identity; malloc; clone 1u ]
+    let runtimeFuncs = [ identity; malloc; clone 1u; apply 0u ]
 
     let topLevelFuncs =
         List.concat
@@ -533,7 +638,7 @@ let genProgram (program: Program<Vars.Var>) =
       Wasm.GlobalSec
           [ { gt = Wasm.I32, Wasm.Var
               init = [ Wasm.I32Const 0 ] } ]
-      Wasm.ExportSec(exportSec)
+      Wasm.ExportSec({ nm = "Memory"; exportdesc = Wasm.ExportMem 0u}::exportSec)
       Wasm.ElemSec
           [ { table = 0u
               offset = [ Wasm.I32Const 0 ]

@@ -55,8 +55,8 @@ let ppatbind = pidentifier |>> PatBind
 ppatImpl := choice [ppatconstr; ppatlit; ppatbind]
 
 let pcaseexpr = choice [
-    pexpr
-    skipNewline >>. pblock
+    skipNewline >>. pblock <??> "Switch block"
+    pexpr <??> "Switch expression"
 ]
 let pcase = 
     ps "|" >>. ppat .>> ps "=>" .>>. pcaseexpr

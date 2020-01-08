@@ -108,3 +108,36 @@ let Clone() =
     let output2 = cloneProgram.Exports?Clone (4)
     let output1 = cloneProgram.Exports?Malloc (12)
     Assert.Equal(20, output2)
+
+[<Fact>]
+let Apply() =
+    let wasmModule =
+        [ TypeSec [ stdFuncType; (WasmGen.apply 0u).functype; ]
+          FuncSec [ 1u ]
+          TableSec [ Wasm.Table(Wasm.FuncRef, Wasm.MinMax(1u, 1u)) ]
+          MemSec [ Min 1u ]
+          GlobalSec
+              [ { gt = I32, Var
+                  init = [ I32Const 0 ] } ]
+          ExportSec
+              [ { nm = "Apply"
+                  exportdesc = ExportFunc 0u }                   
+                { nm = "Memory"
+                  exportdesc = ExportMem 0u } ]
+          CodeSec [ (WasmGen.apply 0u).func ]
+        ]
+
+    let applyProgram = emitWasmModule wasmModule |> compile
+    let (memory:WebAssembly.Runtime.UnmanagedMemory) = applyProgram.Exports?Memory()
+    printfn("%A") memory
+    System.Runtime.InteropServices.Marshal.Copy([|12; 0; 20; 0|], 0, memory.Start, 4)
+    printfn "%A" (memoryToArray memory)
+    let output2 = applyProgram.Exports?Apply (4, 14)
+    printfn "%A" (memoryToArray memory)
+    let output2 = applyProgram.Exports?Apply (4, 13)
+    printfn "%A" (memoryToArray memory)
+    let output2 = applyProgram.Exports?Apply (4, 12)
+    printfn "%A" (memoryToArray memory)
+    let output2 = applyProgram.Exports?Apply (4, 11)
+    printfn "%A" (memoryToArray memory)
+    Assert.Equal(4, output2)

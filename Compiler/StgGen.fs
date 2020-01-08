@@ -16,7 +16,7 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
     let rec genExpr e =
         let lf =
             match e with
-            | Core.Var v -> genVar v
+            | Core.Var v -> genAppWithAtoms v []
             | Core.Lit lit -> Stg.lambdaForm (Stg.Prim [ Stg.ALit(genLit lit) ])
             | Core.Lam(v, e) -> genLam [ v ] e
             | Core.Let(bs, e) -> genLet e bs
@@ -25,17 +25,6 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
             | Core.Prim ps -> genPrim ps
         Stg.normLf lf
 
-
-    and genVar (v: Vars.Var) =
-        let e =
-            match v.typ with
-            | Types.ValueT -> Stg.App(v, [])
-            | Types.FuncT _ -> Stg.App(v, [])
-            | Types.IntT -> Stg.Prim [ Stg.AVar v ]
-            | _ -> failwith "TODO"
-
-        let lf = Stg.lambdaForm e
-        { lf with frees = lf.frees |> addFree v }
 
     and genLam vs =
         function
@@ -149,7 +138,7 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
     and genAppWithArgs f args =
         match f.callArity with 
         |None -> 
-            genAtoms (fun xs -> Stg.lambdaForm(Stg.App (f, xs))) [] args
+            genAtoms (genAppWithAtoms f) [] args
         |Some i when i = (args |> List.length) -> 
             // Saturated
             genAtoms (fun xs -> Stg.lambdaForm (Stg.Call(f, xs))) [] args
@@ -166,6 +155,18 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
             let frees = lf.frees |> List.filter(fun v -> not(extraArgs |> List.contains(v)))
             {lf with args=List.concat[extraArgs; lf.args]; frees=frees}
         
+    and genAppWithAtoms (f:Vars.Var) atoms =        
+        let e =
+            match f.typ with
+            | Types.ValueT -> Stg.App(f, atoms)
+            | Types.FuncT _ -> Stg.App(f, atoms)
+            | Types.IntT -> 
+                if atoms |> List.isEmpty then
+                    Stg.Prim [ Stg.AVar f ]
+                else failwith "Literal cannot take arguments"
+
+        let lf = Stg.lambdaForm e
+        { lf with frees = lf.frees |> addFree f }
 
     and genAtoms f xs =
         function

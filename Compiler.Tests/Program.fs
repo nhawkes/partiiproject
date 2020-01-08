@@ -1,1 +1,1 @@
-module Program = let [<EntryPoint>] main _ = Tests.Malloc(); 0
+module Program = let [<EntryPoint>] main _ = Tests.Apply(); 0
