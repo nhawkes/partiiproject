@@ -7,6 +7,9 @@ open Ast
 
 let program = """
 data List(head, tail)
+fibonacciList(a, b) = {
+    return List(a, fibonacciList(b, a+b))
+}
 take(n, list) = {
     return switch(list){
         | List(head, tail) => switch(n){
@@ -15,10 +18,9 @@ take(n, list) = {
         }
     }
 }
+answer = take(7, fibonacciList(1,1))
 export fibonacci(x) = {
-    oneThenTwo = List(1, twoThenOne)
-    twoThenOne = List(2, oneThenTwo)
-    return take(x, oneThenTwo)
+    return answer
 }
 """
 

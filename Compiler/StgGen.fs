@@ -53,6 +53,7 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
     and genLet e =
         function
         | Core.NonRec [] -> genExpr e
+        | Core.Rec [] -> genExpr e
         | Core.NonRec ls -> genBindings (fun (vs, expr) -> Stg.Let(Stg.NonRec vs, expr)) ls e
         | Core.Rec ls -> genBindings (fun (vs, expr) -> Stg.Let(Stg.Rec vs, expr)) ls e
             
@@ -225,6 +226,7 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
 
     let genTopLevel =
         function
+        | b, Core.TopExpr e when (b:Vars.Var).typ = Types.ValueT -> b, Stg.TopCaf(genExpr e)
         | b, Core.TopExpr e -> b, Stg.TopLam(genExpr e)
         | b, Core.TopConstr vs -> b, Stg.TopConstr vs
 

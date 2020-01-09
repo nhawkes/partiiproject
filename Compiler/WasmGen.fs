@@ -1,6 +1,7 @@
 module WasmGen
 
 open Stg
+open RuntimeFunctions
 
 (*
 Memory layout:
@@ -26,16 +27,7 @@ Thunk - ArgsRemaining=0 Function!=0
 8..: frees
 *)
 
-type Var =
-    | StgVar of Vars.Var
-    | Identity
-    | WhnfEval
-    | Malloc
-    | Clone
-    | Apply
-    | This
-    | ThisFunction
-    | ArgsRemaining
+
 
 type Placement =
     | Heap of uint32
@@ -43,21 +35,16 @@ type Placement =
     | Func of Wasm.FuncIdx
     | IndirectFunc of Wasm.TableIdx
     | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args<Var> * Free<Var>
+    | Data of uint32
     | Unreachable
-
-type RuntimeFunction =
-    { name: Var
-      functype: Wasm.FuncType
-      indirect: bool
-      func: Wasm.Func }
 
 type Func =
     { name: Var
       functype: Wasm.FuncType
-      indirect: bool }
+      indirect: bool
+      caf: bool }
 
-let stdFuncType = [ Wasm.I32 ], [ Wasm.I32 ]
-let heapTop = 0u
+
 
 
 let getLocal env v =
@@ -92,6 +79,11 @@ let genAtom tenv env =
         | Some(Local i) -> [ Wasm.LocalGet i ]
         | Some(Func i) -> [ Wasm.Call i ]
         | Some(Lambda(i, _, _, _)) -> [ Wasm.LocalGet i ]
+        | Some(Data(i)) -> [ 
+              Wasm.I32Const 0
+              Wasm.I32Load
+                  { align = 0u
+                    offset = uint32 i } ]
         | Some(Unreachable) -> failwith "Error"
         | None -> failwithf "Variable %A not in environment" v
     | ALit w -> [ w ]
@@ -319,7 +311,8 @@ let rec genLetFuncs = function
     | (b, lf) ->
         [ [ { name = StgVar b
               functype = stdFuncType
-              indirect = true } ]
+              indirect = true
+              caf = false } ]
           genLetsFuncs lf.lets ]
         |> List.concat
 
@@ -328,18 +321,32 @@ and genLetsFuncs = List.collect genLetFuncs
 let genTopLamFuncs b (lf: LambdaForm<Vars.Var>) =
     [ [ { name = StgVar b
           functype = (Wasm.I32 |> List.replicate (lf.args |> List.length), [ Wasm.I32 ])
-          indirect = false } ]
+          indirect = false
+          caf = false } ]
       genLetsFuncs lf.lets ]
     |> List.concat
+
+let genTopCafFunc b lf =
+    [
+        [{
+        name = StgVar b
+        functype = stdFuncType
+        indirect = true
+        caf = true
+        }]
+        genLetsFuncs lf.lets
+    ] |> List.concat 
 
 let genTopConstrFunc b vs =
     { name = StgVar b
       functype = (Wasm.I32 |> List.replicate (vs |> List.length), [ Wasm.I32 ])
-      indirect = false }
+      indirect = false
+      caf = false }
 
 let genTopLevelFuncs =
     function
     | b:Vars.Var, TopLam lam -> genTopLamFuncs b lam
+    | b, TopCaf lam -> genTopCafFunc b lam
     | b, TopConstr vs -> [ genTopConstrFunc b vs ]
 
 let placeLocal local i = (local, Local i)
@@ -442,201 +449,28 @@ let genTopConstrCode tenv env b vs =
 let genTopLevelCode tenv env =
     function
     | _, TopLam lam -> genTopBindCode tenv env lam
+    | _, TopCaf lam -> genTopBindCode tenv env lam
     | b, TopConstr(vs) -> [ genTopConstrCode tenv env b vs ]
 
 
-let identity =
-    { name = Identity
-      functype = stdFuncType
-      indirect = true
-      func = [], [ Wasm.LocalGet 0u ] }
+let genCafData env (caf:Func) =
+    let func = getIndirectFunc env caf.name
+    [
+        // Size = 12
+        System.BitConverter.GetBytes(12u) |> Array.toList
 
-let malloc =
-    { name = Malloc
-      functype = [ Wasm.I32 ], [ Wasm.I32 ]
-      indirect = false
-      func =
-          [],
-          [ [
-              
-              // Load heapTop + 4
-              Wasm.GlobalGet heapTop
-              Wasm.I32Const 4
-              Wasm.I32Add ]
+        // ArgsRemaining = 0
+        System.BitConverter.GetBytes(0u) |> Array.toList
 
-            // Save heapTop
-            [ Wasm.GlobalGet heapTop ]
+        // Func 
+        System.BitConverter.GetBytes(func) |> Array.toList
 
-            // Increment to save size at -1
-            [ Wasm.GlobalGet heapTop
-              Wasm.LocalGet 0u
-              Wasm.I32Const 4
-              Wasm.I32Add
-              Wasm.I32Add
-              Wasm.GlobalSet heapTop ]
+        // Reserved
+        System.BitConverter.GetBytes(0u) |> Array.toList
 
-            // Grow if needed
-            [ Wasm.Block([],
-                [
-                 Wasm.Loop ([],
-                    [  
-                       Wasm.MemorySize
-                       Wasm.GlobalGet heapTop
-                       Wasm.I32Const 16
-                       Wasm.I32ShrU
-                       Wasm.I32GtU
-                       Wasm.BrIf 1u
-                       Wasm.I32Const 1
-                       Wasm.MemoryGrow
-                       Wasm.Drop 
-                       Wasm.Br 0u
-                    ])
-                ])
-            ]
-            
+    ] |> List.concat
+    
 
-            // Load heapTop
-            [ Wasm.LocalGet 0u
-              Wasm.I32Store
-                  { align = 0u
-                    offset = 0u } ] 
-
-            // Return (old) heapTop + 4          
-          ]
-          |> List.concat }
-
-let clone mallocIdx =     
-    let thisPointer = 0u
-    let size = 1u
-    let i = 2u
-    let cloned = 3u
-    { name = Clone
-      functype = [ Wasm.I32 ], [ Wasm.I32 ]
-      indirect = false
-      func =
-          [Wasm.I32; Wasm.I32; Wasm.I32; Wasm.I32],
-          [ [
-              Wasm.LocalGet thisPointer
-              Wasm.I32Const -4
-              Wasm.I32Add
-              Wasm.I32Load
-                { align = 0u
-                  offset = 0u }
-              Wasm.LocalSet size
-              // Get size from This
-
-              Wasm.LocalGet size
-              Wasm.Call mallocIdx // Call Malloc
-              Wasm.LocalSet cloned
-
-              Wasm.I32Const 0
-              Wasm.LocalSet i
-              //i=0
-            ]
-
-
-            [ Wasm.Block([],
-                    [Wasm.Loop ([],
-                       [
-                       // If(i>=size) break;
-                       Wasm.LocalGet i
-                       Wasm.LocalGet size
-                       Wasm.I32GeU
-                       Wasm.BrIf 1u
-
-                        
-                       // Destination
-                       Wasm.LocalGet cloned
-                       Wasm.LocalGet i
-                       Wasm.I32Add
-
-                       // Source
-                       Wasm.LocalGet thisPointer
-                       Wasm.LocalGet i
-                       Wasm.I32Add
-
-                       // Copy
-                       Wasm.I32Load {align = 0u; offset = 0u}
-                       Wasm.I32Store {align = 0u; offset = 0u}
-
-                       // i+=4
-                       Wasm.LocalGet i
-                       Wasm.I32Const 4
-                       Wasm.I32Add
-                       Wasm.LocalSet i
-
-                       // Continue
-                       Wasm.Br 0u
-                       ])
-                    ])
-            ]            
-            [
-                Wasm.LocalGet cloned
-            ]
-
-              
-                    
-          ]
-          |> List.concat }
-
-let apply stdFuncTypeIdx =     
-    let thisPointer = 0u
-    let arg = 1u
-    let argsRemaining = 2u
-    { name = Apply
-      functype = [ Wasm.I32; Wasm.I32 ], [ Wasm.I32 ]
-      indirect = false
-      func =
-          [ Wasm.I32 ],
-          [
-              // Get argsRemaining
-              Wasm.LocalGet thisPointer
-              Wasm.I32Load
-                { align = 0u
-                  offset = 0u }
-              Wasm.LocalSet argsRemaining                  
-
-              Wasm.LocalGet argsRemaining
-              Wasm.LocalGet thisPointer
-              Wasm.I32Add
-              // Calculate position of next arg
-
-              Wasm.LocalGet arg
-              Wasm.I32Store { align = 0u; offset = 4u }
-              // Store the next argument
-
-              Wasm.LocalGet argsRemaining
-              Wasm.I32Const -4
-              Wasm.I32Add
-              Wasm.LocalSet argsRemaining
-              // Calculate next arg position
-
-              Wasm.LocalGet argsRemaining
-              Wasm.I32Eqz
-              
-              Wasm.IfElse([Wasm.I32], 
-                [                    
-                    // Function now has enough argument to be called
-                    Wasm.LocalGet thisPointer
-                    Wasm.LocalGet thisPointer
-                    Wasm.I32Load
-                      { align = 0u
-                        offset = 4u }
-                    Wasm.CallIndirect(stdFuncTypeIdx)
-                ],
-                [
-                    
-                    // Update next arg pointer
-                    Wasm.LocalGet thisPointer
-                    
-                    Wasm.LocalGet argsRemaining
-                    Wasm.I32Store
-                      { align = 0u
-                        offset = 0u }
-                    Wasm.LocalGet thisPointer    
-                ]              
-              )
-          ] }
 
 
 let genProgram (program: Program<Vars.Var>) =
@@ -648,8 +482,11 @@ let genProgram (program: Program<Vars.Var>) =
               |> List.map (fun x ->
                   { name = x.name
                     functype = x.functype
-                    indirect = x.indirect })
+                    indirect = x.indirect
+                    caf = false })
               program |> List.collect (genTopLevelFuncs) ]
+
+
 
     let typeSec =
         topLevelFuncs
@@ -681,10 +518,22 @@ let genProgram (program: Program<Vars.Var>) =
 
     let indirectFuncsVars = indirectFuncs |> List.map (fun x -> x.name)
 
+    let indirectFuncEnv = 
+        Seq.initInfinite (uint32 >> IndirectFunc) |> Seq.zip (indirectFuncsVars) |> Map.ofSeq
+
     let funcenv =
         Seq.initInfinite (uint32 >> Func)
         |> Seq.zip (topLevelFuncVars)
         |> Map.ofSeq
+
+    
+    let cafs = topLevelFuncs |> List.filter(fun x -> x.caf)
+    let dataInit = cafs |> List.collect (genCafData indirectFuncEnv) |> Array.ofList
+    let cafenv =
+        Seq.initInfinite (fun i -> uint32 (4+i*16) |> Data)
+        |> Seq.zip (cafs |> List.map (fun x -> x.name))
+        |> Map.ofSeq
+    let heapStart = (cafs |> List.length) * 16
 
     let indirectElems = indirectFuncs |> List.map (fun x -> getFunc funcenv x.name)
 
@@ -696,7 +545,9 @@ let genProgram (program: Program<Vars.Var>) =
     let env =
         Seq.concat
             [ funcenv |> Map.toSeq
-              Seq.initInfinite (uint32 >> IndirectFunc) |> Seq.zip (indirectFuncsVars) ]
+              indirectFuncEnv |> Map.toSeq
+              cafenv |> Map.toSeq
+            ]
         |> Map.ofSeq
 
     let codeSec =
@@ -705,16 +556,19 @@ let genProgram (program: Program<Vars.Var>) =
         |> List.concat
 
 
+
+
     [ Wasm.TypeSec typeSec
       Wasm.FuncSec(funcSec)
       Wasm.TableSec [ Wasm.Table(Wasm.FuncRef, Wasm.MinMax(indirectElemsLen, indirectElemsLen)) ]
       Wasm.MemSec [ Wasm.Min 1u ]
       Wasm.GlobalSec
           [ { gt = Wasm.I32, Wasm.Var
-              init = [ Wasm.I32Const 0 ] } ]
+              init = [ Wasm.I32Const heapStart ] } ]
       Wasm.ExportSec({ nm = "Memory"; exportdesc = Wasm.ExportMem 0u}::exportSec)
       Wasm.ElemSec
           [ { table = 0u
               offset = [ Wasm.I32Const 0 ]
               init = indirectElems } ]
-      Wasm.CodeSec(codeSec) ]
+      Wasm.CodeSec(codeSec) 
+      Wasm.DataSec [{data=0u; offset=[Wasm.I32Const 0]; init=dataInit}]]

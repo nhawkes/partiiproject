@@ -41,6 +41,7 @@ and LambdaForm<'b> =
       expr: Expr<'b> }
 
 type TopLevel<'b> =
+    |TopCaf of LambdaForm<'b>
     |TopLam of LambdaForm<'b>
     |TopConstr of 'b list      
 

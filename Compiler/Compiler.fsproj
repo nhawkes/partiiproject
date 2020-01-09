@@ -15,6 +15,7 @@
     <Compile Include="Renamer.fs" />
     <Compile Include="CoreGen.fs" />
     <Compile Include="StgGen.fs" />
+    <Compile Include="RuntimeFunctions.fs" />
     <Compile Include="WasmGen.fs" />
     <Compile Include="Emit.fs" />
     <Compile Include="Program.fs" />
