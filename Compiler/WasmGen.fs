@@ -79,11 +79,7 @@ let genAtom tenv env =
         | Some(Local i) -> [ Wasm.LocalGet i ]
         | Some(Func i) -> [ Wasm.Call i ]
         | Some(Lambda(i, _, _, _)) -> [ Wasm.LocalGet i ]
-        | Some(Data(i)) -> [ 
-              Wasm.I32Const 0
-              Wasm.I32Load
-                  { align = 0u
-                    offset = uint32 i } ]
+        | Some(Data(i)) -> [ Wasm.I32Const (int i) ]
         | Some(Unreachable) -> failwith "Error"
         | None -> failwithf "Variable %A not in environment" v
     | ALit w -> [ w ]
@@ -463,7 +459,7 @@ let genCafData env (caf:Func) =
         System.BitConverter.GetBytes(0u) |> Array.toList
 
         // Func 
-        System.BitConverter.GetBytes(func) |> Array.toList
+        System.BitConverter.GetBytes(func : uint32) |> Array.toList
 
         // Reserved
         System.BitConverter.GetBytes(0u) |> Array.toList
