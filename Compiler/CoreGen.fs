@@ -25,7 +25,7 @@ let rec genExpr =
 and genLit =
     function
     | Ast.Box(Ast.Integer i) -> Core.App(Core.Var(Vars.integerConstr), Core.Lit(Core.I32 i))
-    | _ -> failwith "TODO"
+    | Ast.Raw(l) -> Core.Lit(l)
 
 and genCall f =
     function
@@ -46,7 +46,7 @@ and genManyMatch def es (cases: (Ast.Pattern<Vars.Var> list * Ast.Expr<Vars.Var>
     | (matchexpr, typ) :: es -> genCases (def, (matchexpr, typ), es, None) [] [] cases
     | [] ->
         match cases with
-        | [ [], e ] -> genExpr e
+        | ([], e)::_ -> genExpr e
         | [] -> def
 
 
