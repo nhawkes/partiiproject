@@ -1,17 +1,23 @@
 module Types
 
+type FuncKind =
+    |DirectFunc
+    |IndirectFunc
+    |ConstrFunc
+    |ExportFunc
+
 type Typ =
-    |FuncT of Typ * Typ
+    |FuncT of FuncKind * Typ * Typ
     |IntT    
     |ValueT
 
 let rec applyArgs f args = 
     match f, args with
     |t, [] -> t
-    |FuncT(a1, b), a2::xs when a1=a2 -> applyArgs b xs
+    |FuncT(_, a1, b), a2::xs when a1=a2 -> applyArgs b xs
     |_ -> failwith "Incorrect types"
     
-let rec createFuncT args ret =
+let rec createFuncT funcKind args ret =
     match args with
-    |a::args -> FuncT(a, createFuncT args ret)
-    |[] -> ret    
+    |a::args -> FuncT(funcKind, a, createFuncT funcKind args ret)
+    |[] -> ret   

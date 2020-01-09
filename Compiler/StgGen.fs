@@ -1,5 +1,19 @@
 module StgGen
 
+let rec forcedCallArityWithKind k = function 
+    |Types.FuncT(k2, a, b) when k = k2 ->
+        1 + forcedCallArityWithKind k b    
+    |_ -> 0
+
+let forcedCallArity = function
+    |Types.FuncT(k, a, b) ->
+        match k with
+        |Types.DirectFunc -> forcedCallArityWithKind k b + 1 |> Some
+        |Types.IndirectFunc -> None
+        |Types.ConstrFunc -> forcedCallArityWithKind k b + 1 |> Some   
+        |Types.ExportFunc -> failwithf "Cannot internally call export function internally"
+    |_ -> 0 |> Some
+
 
 let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
 
@@ -39,38 +53,44 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
     and genLet e =
         function
         | Core.NonRec [] -> genExpr e
-        | Core.NonRec ls ->
-            let lf = genExpr e
-            let newLets = ls |> List.map(fun (v,e) -> v, genExpr e)
-            let vs = newLets |> List.map fst
-            let lfs = newLets |> List.map snd
+        | Core.NonRec ls -> genBindings (fun (vs, expr) -> Stg.Let(Stg.NonRec vs, expr)) ls e
+        | Core.Rec ls -> genBindings (fun (vs, expr) -> Stg.Let(Stg.Rec vs, expr)) ls e
+            
+            
+            
+    and genBindings mapExpr ls e =
+        let lf = genExpr e
+        let newLets = ls |> List.map(fun (v,e) -> v, genExpr e)
+        let vs = newLets |> List.map fst
+        let lfs = newLets |> List.map snd
 
-            let innerFrees =
-                lfs 
-                |> List.collect(fun lf -> lf.frees) 
-                |> List.distinct
-                |> List.filter (fun free -> not (lf.locals |> List.contains free))
-                |> List.filter (fun free -> not (lf.args |> List.contains free))
-                |> List.filter (fun free ->
-                    not
-                        (lf.lets
-                         |> List.map fst
-                         |> List.contains free))
+        let innerFrees =
+            lfs 
+            |> List.collect(fun lf -> lf.frees) 
+            |> List.distinct
+            |> List.filter (fun free -> not (lf.locals |> List.contains free))
+            |> List.filter (fun free -> not (lf.args |> List.contains free))
+            |> List.filter (fun free ->
+                not
+                    (lf.lets
+                     |> List.map fst
+                     |> List.contains free))
 
-            let lets =
-                List.concat
-                    [ newLets
-                      lf.lets ]
+        let lets =
+            List.concat
+                [ newLets
+                  lf.lets ]
 
-            let frees =
-                lf.frees
-                |> List.append innerFrees
-                |> List.filter (fun v -> not(vs |> List.contains v))
+        let frees =
+            lf.frees
+            |> List.append innerFrees
+            |> List.filter (fun v -> not(vs |> List.contains v))
 
-            { lf with
-                  frees = frees
-                  lets = lets
-                  expr = Stg.Let(Stg.NonRec vs, lf.expr) }
+        { lf with
+              frees = frees
+              lets = lets
+              expr = mapExpr(vs, lf.expr) }
+    
 
     and genCase e v alts =
         let lf = genExpr e
@@ -136,7 +156,7 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
         | Core.Var v -> genAppWithArgs v args
 
     and genAppWithArgs f args =
-        match f.callArity with 
+        match forcedCallArity f.typ with 
         |None -> 
             genAtoms (genAppWithAtoms f) [] args
         |Some i when i = (args |> List.length) -> 
@@ -168,17 +188,17 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
         let lf = Stg.lambdaForm e
         { lf with frees = lf.frees |> addFree f }
 
-    and genAtoms f xs =
+    and genAtoms mapAtoms xs =
         function
         | (Core.Var arg) :: args ->
-            let (lf:Stg.LambdaForm<_>) = genAtoms f (Stg.AVar arg :: xs) args
+            let (lf:Stg.LambdaForm<_>) = genAtoms mapAtoms (Stg.AVar arg :: xs) args
             let frees = lf.frees |> addFree arg
             { lf with frees = frees }
-        | (Core.Prim [ Stg.ALit arg ]) :: args -> genAtoms f (Stg.ALit arg :: xs) args
-        | (Core.Lit arg) :: args -> genAtoms f (Stg.ALit(genLit arg) :: xs) args
+        | (Core.Prim [ Stg.ALit arg ]) :: args -> genAtoms mapAtoms (Stg.ALit arg :: xs) args
+        | (Core.Lit arg) :: args -> genAtoms mapAtoms (Stg.ALit(genLit arg) :: xs) args
         | arg :: args ->
-            genAtom (fun var -> genAtoms f (Stg.AVar var :: xs) args) (genExpr arg)
-        | [] -> f (xs |> List.rev)
+            genAtom (fun var -> genAtoms mapAtoms (Stg.AVar var :: xs) args) (genExpr arg)
+        | [] -> mapAtoms (xs |> List.rev)
 
     and genAtom f (arg) =    
         let var = Vars.generateVar Types.ValueT

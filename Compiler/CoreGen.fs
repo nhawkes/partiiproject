@@ -114,7 +114,7 @@ and genBlock returnValue lets =
     | [] ->
         match returnValue with
             | None -> failwith "No return value of block"
-            | Some value -> Core.Let(Core.NonRec lets, value)
+            | Some value -> Core.Let(Core.Rec lets, value)
         
 
 and genRhs (rhs:Core.Expr<_>) = function
@@ -151,7 +151,7 @@ let genDeclaration =
     | Ast.GlobalDecl(lhs : Vars.Var, args, rhs) ->
         [lhs, Core.TopExpr(genRhs (genExpr rhs) args)]
     | Ast.ExportDecl((exportName, exportArgs), (lhs, args), rhs) ->
-        let exportTyp = Types.createFuncT (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
+        let exportTyp = Types.createFuncT Types.ExportFunc (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
         let exportVar = Vars.exportVar exportName exportTyp
         let exportArgs = exportArgs |> List.map (fun arg -> Vars.userVar arg Types.IntT)
         [

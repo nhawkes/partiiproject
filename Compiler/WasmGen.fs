@@ -116,7 +116,12 @@ and genLet tenv env binds e =
 
 and genBinds tenv env = function
     | NonRec xs -> xs |> List.collect (genNonRec tenv env)
-        
+    | Rec xs -> 
+        List.concat 
+            [
+                xs |> List.collect(genRecStart tenv env)
+                xs |> List.collect(genRecEnd tenv env)
+            ]  
 
 and genNonRec tenv env  x =     
     let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
@@ -153,6 +158,45 @@ and genNonRec tenv env  x =
         ]
         storeFrees
     ] |> List.concat
+
+and genRecStart tenv env x =     
+    let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
+    let size = 2 + List.length args + List.length frees
+    [ 
+        Wasm.I32Const (4 * size)
+        Wasm.Call(getFunc env Malloc)
+        Wasm.LocalSet localidx
+        
+        // Args remaining
+        Wasm.LocalGet localidx
+        Wasm.I32Const(4 * (args |> List.length))
+        Wasm.I32Store
+          { align = 0u
+            offset = 0u }
+            
+        // Function
+        Wasm.LocalGet localidx
+        Wasm.I32Const(int32 funcidx)
+        Wasm.I32Store
+          { align = 0u
+            offset = 4u}                 
+       
+    ]
+
+and genRecEnd tenv env x =     
+    let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
+    let freeOffset = 2 + List.length args
+    let storeFrees = (frees |> List.mapi(fun i free -> 
+        [
+            [Wasm.LocalGet localidx]
+            genAtom tenv env (AVar free)
+            [Wasm.I32Store
+              { align = 0u
+                offset = 4u * uint32 (freeOffset+i) }]
+        ]) |> List.concat |> List.concat)
+    storeFrees
+
+
 and genApp tenv env v args =
     let whnf =
         [
