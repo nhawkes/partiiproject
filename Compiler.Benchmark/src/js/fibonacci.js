@@ -1,7 +1,7 @@
 /**
  * @param {number} n
  */
-export default function fibonacci(n) {
+export function fibonacci(n) {
     if (n == 0) {
         return 1;
     }

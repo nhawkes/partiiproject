@@ -18,9 +18,8 @@ take(n, list) = {
         }
     }
 }
-answer = take(7, fibonacciList(1,1))
 export fibonacci(x) = {
-    return answer
+    return take(x, fibonacciList(1, 1))
 }
 """
 

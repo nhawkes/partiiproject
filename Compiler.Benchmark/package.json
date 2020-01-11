@@ -3,12 +3,11 @@
   "version": "1.0.0",
   "main": "benchmark.js",
   "scripts": {
-    "start": "node --experimental-modules --experimental-wasm-modules benchmark.js",
+    "start": "node --experimental-modules --experimental-wasm-modules benchmark.mjs",
     "build:js": "babel src -d out",
     "build:wat": "wat2wasm src/wat/fibonacci.wat -o out/wasm/baseline.wasm",
     "test": "jest"
   },
-  "type": "module",
   "license": "MIT",
   "devDependencies": {
     "@babel/cli": "^7.6.4",
