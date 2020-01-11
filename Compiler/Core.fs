@@ -14,6 +14,7 @@ type Expr<'b> =
 and Binds<'b> =
     | Rec of Bind<'b> list
     | NonRec of Bind<'b> list
+    | Join of Bind<'b>
 
 
 and Bind<'b> = 'b * Expr<'b>

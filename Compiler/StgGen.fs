@@ -52,12 +52,20 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
 
     and genLet e =
         function
-        | Core.NonRec [] -> genExpr e
-        | Core.Rec [] -> genExpr e
-        | Core.NonRec ls -> genBindings (fun (vs, expr) -> Stg.Let(Stg.NonRec vs, expr)) ls e
-        | Core.Rec ls -> genBindings (fun (vs, expr) -> Stg.Let(Stg.Rec vs, expr)) ls e
+        | Core.NonRec ls -> genBindings genNonRec ls e
+        | Core.Rec ls -> genBindings genRec ls e
+        | Core.Join j -> genLetJoin j e
             
-            
+    and genNonRec (vs, expr) =
+        match vs with
+        |[] -> expr
+        |v::vs -> Stg.Let(Stg.NonRec v, genNonRec (vs, expr))
+     
+    and genRec (vs, expr) = 
+        match vs with
+        |[] -> expr
+        |vs -> Stg.Let(Stg.Rec vs, expr)
+
             
     and genBindings mapExpr ls e =
         let lf = genExpr e
@@ -91,7 +99,47 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
               frees = frees
               lets = lets
               expr = mapExpr(vs, lf.expr) }
-    
+
+    and genLetJoin (j, eJ) e =
+        let lf = genExpr e
+        let lfJ = genExpr eJ
+        let args = lfJ.args
+
+        let innerFrees =
+            lfJ.frees
+            |> List.distinct
+            |> List.filter (fun free -> not (lf.locals |> List.contains free))
+            |> List.filter (fun free -> not (lf.args |> List.contains free))
+            |> List.filter (fun free ->
+                not
+                    (lf.lets
+                     |> List.map fst
+                     |> List.contains free))
+
+        let frees =
+            lf.frees
+            |> List.append innerFrees
+            |> List.filter ((<>)j)
+
+        let expr =
+            Stg.Let(
+                Stg.Join(j, args, lfJ.expr),
+                lf.expr
+            )
+        
+        {
+                lets = List.concat [lf.lets; lfJ.lets]
+                locals = List.concat [lf.locals; lfJ.locals]
+                args = lf.args
+                frees = frees
+                expr = expr
+        }
+
+        
+
+
+
+
 
     and genCase e v alts =
         let lf = genExpr e
@@ -210,7 +258,7 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
         { lfInner with
               lets = lets
               frees = frees
-              expr = Stg.Let(Stg.NonRec [ var ], lfInner.expr) }
+              expr = Stg.Let(Stg.NonRec var, lfInner.expr) }
 
     and genPrim ps =
         let vars =

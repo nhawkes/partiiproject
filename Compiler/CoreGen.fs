@@ -56,10 +56,14 @@ and genCases (def, (matchexpr, typ), es, bind) subCases otherCases = function
     |case::cases -> 
         genCases (def, (matchexpr, typ), es, bind) (subCases) (case::otherCases) cases
     |[] ->
-        let def =
+        let defVar = Vars.generateVar Types.ValueT
+        let defaultExpr =
             genManyMatch def es subCases
-        genCasesWithDefault (def, [], (matchexpr, typ), es, bind |> Option.defaultWith(fun () -> Vars.generateVar Types.ValueT)) otherCases 
-    
+        Core.Let(
+            Core.Join(defVar, defaultExpr),
+            genCasesWithDefault (def, [], (matchexpr, typ), es, bind |> Option.defaultWith(fun () -> Vars.generateVar Types.ValueT)) otherCases 
+        )
+        
 
 
 and genCasesWithDefault (def, alts, (matchexpr, typ), es, bind) cases =

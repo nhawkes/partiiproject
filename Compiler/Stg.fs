@@ -19,7 +19,8 @@ type Expr<'b> =
 
 and Binds<'b> =
     | Rec of 'b list
-    | NonRec of 'b list
+    | NonRec of 'b
+    | Join of 'b * 'b list * Expr<'b>
 
 and Bind<'b> = 'b * LambdaForm<'b>
 

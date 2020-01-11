@@ -36,6 +36,7 @@ type Placement =
     | IndirectFunc of Wasm.TableIdx
     | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args<Var> * Free<Var>
     | Data of uint32
+    | Jump of uint32
     | Unreachable
 
 type Func =
@@ -98,18 +99,20 @@ let rec genExpr tenv (env:Map<Var, Placement>) =
     | Prim(atoms) -> genPrim tenv env atoms
 
 and genLet tenv env binds e =
-    [ genBinds tenv env binds
-      genExpr tenv env e ]
+    [ genBinds tenv env (fun env -> genExpr tenv env e) binds
+    ]
     |> List.concat
 
-and genBinds tenv env = function
-    | NonRec xs -> xs |> List.collect (genNonRec tenv env)
+and genBinds tenv env e = function
+    | NonRec x -> List.concat [x |> genNonRec tenv env; e env]
     | Rec xs -> 
         List.concat 
             [
                 xs |> List.collect(genRecStart tenv env)
                 xs |> List.collect(genRecEnd tenv env)
+                e env
             ]  
+    | Join (j, [], je) -> genLetJoin tenv env j je e 
 
 and genNonRec tenv env  x =     
     let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
@@ -184,11 +187,21 @@ and genRecEnd tenv env x =
         ]) |> List.concat |> List.concat)
     storeFrees
 
+and genLetJoin tenv env j je e =
+    let newEnv = env |> Map.add ( StgVar j ) (Jump 0u)
+    [
+        Wasm.Block([Wasm.I32], [
+            [Wasm.Block([Wasm.I32], [
+                ( e newEnv )
+                [Wasm.Br 1u]
+            ] |> List.concat)]
+            genExpr tenv env je
+        ] |> List.concat)
+    ]
 
 and genApp tenv env v args =
     let whnf =
-        [
-            
+        [            
             // Check if thunk and call if so
 
             genAtom tenv env (AVar (StgVar v))
