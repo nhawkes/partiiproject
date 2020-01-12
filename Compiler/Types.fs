@@ -1,10 +1,8 @@
 module Types
 
 type FuncKind =
-    |DirectFunc
-    |IndirectFunc
-    |ConstrFunc
-    |ExportFunc
+    |SatFunc
+    |UnSatFunc
 
 type Typ =
     |FuncT of FuncKind * Typ * Typ

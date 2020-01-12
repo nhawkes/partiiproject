@@ -36,7 +36,7 @@ type Placement =
     | IndirectFunc of Wasm.TableIdx
     | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args<Var> * Free<Var>
     | Data of uint32
-    | Jump of uint32
+    | Block of uint32
     | Unreachable
 
 type Func =
@@ -68,7 +68,12 @@ let getLambda env v =
     | Lambda(localidx, funcidx, args, frees) -> (localidx, funcidx, args, frees)
     | _ -> failwith "Error"
 
-let genAtom tenv env =
+let getBlock env depth v =
+    match env |> Map.find v with
+    | Block(i) -> [Wasm.Br (depth - i)]
+    | _ -> failwith "Error"    
+
+let genAtom tenv env depth =
     function
     | AVar v ->
         match env |> Map.tryFind (v) with
@@ -85,43 +90,45 @@ let genAtom tenv env =
         | None -> failwithf "Variable %A not in environment" v
     | ALit w -> [ w ]
 
-let genStgVarAtom tenv env = function
-    |AVar v -> genAtom tenv env (AVar (StgVar v))
-    |ALit w -> genAtom tenv env (ALit w)
+
+let genStgVarAtom tenv env depth = function
+    |AVar v -> genAtom tenv env depth (AVar (StgVar v))
+    |ALit w -> genAtom tenv env depth (ALit w)
 
 
-let rec genExpr tenv (env:Map<Var, Placement>) =
+let rec genExpr tenv (env:Map<Var, Placement>) depth =
     function
-    | Let(binds, e) -> genLet tenv env binds e
-    | Case(e, v, alts) -> genCase tenv env v e alts
-    | App(v, atoms) -> genApp tenv env v atoms
-    | Call(constr, atoms) -> genPrim tenv env (AVar constr :: (atoms |> List.rev))
-    | Prim(atoms) -> genPrim tenv env atoms
+    | Let(binds, e) -> genLet tenv env depth binds e
+    | Case(e, v, alts) -> genCase tenv env depth v e alts
+    | App(v, atoms) -> genApp tenv env depth v atoms
+    | Call(constr, atoms) -> genPrim tenv env depth (AVar constr :: (atoms |> List.rev))
+    | Jump(j, atoms) -> genJump tenv env depth j atoms
+    | Prim(atoms) -> genPrim tenv env depth atoms
 
-and genLet tenv env binds e =
-    [ genBinds tenv env (fun env -> genExpr tenv env e) binds
+and genLet tenv env depth binds e =
+    [ genBinds tenv env depth (fun env depth -> genExpr tenv env depth e) binds
     ]
     |> List.concat
 
-and genBinds tenv env e = function
-    | NonRec x -> List.concat [x |> genNonRec tenv env; e env]
+and genBinds tenv env depth e = function
+    | NonRec x -> List.concat [x |> genNonRec tenv env depth; e env depth]
     | Rec xs -> 
         List.concat 
             [
-                xs |> List.collect(genRecStart tenv env)
-                xs |> List.collect(genRecEnd tenv env)
-                e env
+                xs |> List.collect(genRecStart tenv env depth)
+                xs |> List.collect(genRecEnd tenv env depth)
+                e env depth
             ]  
-    | Join (j, [], je) -> genLetJoin tenv env j je e 
+    | Join (j, [], je) -> genLetJoin tenv env depth j je e 
 
-and genNonRec tenv env  x =     
+and genNonRec tenv env depth  x =     
     let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
     let size = 2 + List.length args + List.length frees
     let freeOffset = 2 + List.length args
     let storeFrees = (frees |> List.mapi(fun i free -> 
         [
             [Wasm.LocalGet localidx]
-            genAtom tenv env (AVar free)
+            genAtom tenv env depth (AVar free)
             [Wasm.I32Store
               { align = 0u
                 offset = 4u * uint32 (freeOffset+i) }]
@@ -150,7 +157,7 @@ and genNonRec tenv env  x =
         storeFrees
     ] |> List.concat
 
-and genRecStart tenv env x =     
+and genRecStart tenv env depth x =     
     let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
     let size = 2 + List.length args + List.length frees
     [ 
@@ -174,44 +181,45 @@ and genRecStart tenv env x =
        
     ]
 
-and genRecEnd tenv env x =     
+and genRecEnd tenv env depth x =     
     let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
     let freeOffset = 2 + List.length args
     let storeFrees = (frees |> List.mapi(fun i free -> 
         [
             [Wasm.LocalGet localidx]
-            genAtom tenv env (AVar free)
+            genAtom tenv env depth (AVar free)
             [Wasm.I32Store
               { align = 0u
                 offset = 4u * uint32 (freeOffset+i) }]
         ]) |> List.concat |> List.concat)
     storeFrees
 
-and genLetJoin tenv env j je e =
-    let newEnv = env |> Map.add ( StgVar j ) (Jump 0u)
+and genLetJoin tenv env depth j je e =
+    let newEnv = env |> Map.add ( StgVar j ) (Block (2u+depth))
     [
         Wasm.Block([Wasm.I32], [
             [Wasm.Block([Wasm.I32], [
-                ( e newEnv )
+                ( e newEnv (depth + 2u))
                 [Wasm.Br 1u]
             ] |> List.concat)]
-            genExpr tenv env je
+            [ Wasm.Drop ]
+            genExpr tenv env (depth + 1u) je
         ] |> List.concat)
     ]
 
-and genApp tenv env v args =
+and genApp tenv env depth v args =
     let whnf =
         [            
             // Check if thunk and call if so
 
-            genAtom tenv env (AVar (StgVar v))
+            genAtom tenv env depth (AVar (StgVar v))
             [Wasm.I32Load
               { align = 0u
                 offset = 0u }]
             [Wasm.I32Eqz]
             // Args Remaining = 0
 
-            genAtom tenv env (AVar (StgVar v))
+            genAtom tenv env depth (AVar (StgVar v))
             [Wasm.I32Load
               { align = 0u
                 offset = 4u }]
@@ -223,14 +231,14 @@ and genApp tenv env v args =
 
             [
                 Wasm.IfElse([Wasm.I32],
-                    [ genAtom tenv env (AVar (StgVar v))
-                      genAtom tenv env (AVar (StgVar v))
+                    [ genAtom tenv env ( depth + 1u) (AVar (StgVar v))
+                      genAtom tenv env ( depth + 1u ) (AVar (StgVar v))
                       [ Wasm.I32Load
                           { align = 0u
                             offset = 4u } ]
                       [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
                     |> List.concat, [
-                        genAtom tenv env (AVar (StgVar v))
+                        genAtom tenv env ( depth + 1u ) (AVar (StgVar v))
                     ] |> List.concat
                 )
             ]
@@ -240,12 +248,12 @@ and genApp tenv env v args =
         if args |> List.isEmpty then
             []
         else 
-            [Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone);Wasm.Call (getFunc env Clone)]       
+            [Wasm.Call (getFunc env Clone)]       
 
     let applyArgs =
             args |> List.collect(fun arg -> 
                 [
-                    genStgVarAtom tenv env arg
+                    genStgVarAtom tenv env depth arg
                     [Wasm.Call (getFunc env Apply)]
                     
                 ] |> List.concat)
@@ -256,30 +264,37 @@ and genApp tenv env v args =
         applyArgs
     ] |> List.concat
 
-and genCase tenv env (v: Vars.Var) e alts =
+and genJump tenv env depth (j: Vars.Var) vs =
+   if vs <> [] then failwith "TODO"
+   [
+       [Wasm.I32Const 0]
+       getBlock env depth (StgVar j) 
+   ] |> List.concat
+
+and genCase tenv env depth (v: Vars.Var) e alts =
     let atom = AVar (StgVar v)
     let local = getLocal env (StgVar v)
-    [ e |> genExpr tenv env
+    [ e |> genExpr tenv env depth
       [ Wasm.LocalSet(local) ]
-      alts |> genAlts tenv env atom ]
+      alts |> genAlts tenv env depth atom ]
     |> List.concat
 
-and genAlts tenv env atom =
+and genAlts tenv env depth atom =
     function
-    | AAlts(aalts, def) -> genAAlts tenv env atom def aalts
-    | PAlts(palts, def) -> genPAlts tenv env atom def palts
+    | AAlts(aalts, def) -> genAAlts tenv env depth atom def aalts
+    | PAlts(palts, def) -> genPAlts tenv env depth atom def palts
 
-and genPAlts tenv env atom def =
+and genPAlts tenv env depth atom def =
     function
     | (lit, e) :: xs ->
-        ([ genAtom tenv env atom
+        ([ genAtom tenv env depth atom
            [ lit
              Wasm.I32Eq
-             Wasm.IfElse([ Wasm.I32 ], genExpr tenv env e, genPAlts tenv env atom def xs) ] ]
+             Wasm.IfElse([ Wasm.I32 ], genExpr tenv env ( depth + 1u ) e, genPAlts tenv env ( depth + 1u ) atom def xs) ] ]
          |> List.concat)
-    | [] -> genExpr tenv env def
+    | [] -> genExpr tenv env depth def
 
-and genAAlts tenv env atom def =
+and genAAlts tenv env depth atom def =
     function
     | ((c, vs), e) :: xs ->
         let funcIndex = getFunc env (StgVar c)
@@ -288,7 +303,7 @@ and genAAlts tenv env atom def =
             vs
             |> List.mapi (fun i v ->
                 let local = getLocal env (StgVar v)
-                [ genAtom tenv env atom
+                [ genAtom tenv env depth atom
                   [ Wasm.I32Load
                       { align = 0u
                         offset = 4u * (3u + uint32 (i)) } ]
@@ -296,7 +311,7 @@ and genAAlts tenv env atom def =
                 |> List.concat)
 
         // This must a data heap object - check Type Idx
-        [ genAtom tenv env atom
+        [ genAtom tenv env depth atom
           [ Wasm.I32Load
               { align = 0u
                 offset = 8u }
@@ -305,15 +320,15 @@ and genAAlts tenv env atom def =
             Wasm.IfElse
                 ([ Wasm.I32 ],
                  [ assignLocals |> List.concat
-                   genExpr tenv env e ]
-                 |> List.concat, genAAlts tenv env atom def xs) ] ]
+                   genExpr tenv env ( depth + 1u ) e ]
+                 |> List.concat, genAAlts tenv env ( depth + 1u ) atom def xs) ] ]
         |> List.concat
-    | [] -> genExpr tenv env def
+    | [] -> genExpr tenv env depth def
 
-and genPrim tenv env atoms =
+and genPrim tenv env depth atoms =
     atoms
     |> List.rev
-    |> List.collect (genStgVarAtom tenv env)
+    |> List.collect (genStgVarAtom tenv env depth)
 
 
 let rec genLetFuncs = function
@@ -373,7 +388,7 @@ let localsEnv env args locals (lets:(Vars.Var*LambdaForm<Vars.Var>) list) =
     |> Seq.zip wasmLocals
     |> Seq.map (fun (f, i) -> f i)
 
-let rec genLetCode tenv env = function
+let rec genLetCode tenv env depth = function
     | (_, lf: LambdaForm<Vars.Var>) ->
         let newEnv =
             Seq.concat
@@ -383,13 +398,13 @@ let rec genLetCode tenv env = function
                   |> Seq.zip (ArgsRemaining :: ThisFunction :: List.concat [ lf.args |> List.rev |> List.map StgVar; lf.frees |> List.map StgVar]) ]
             |> Map.ofSeq
 
-        [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv lf.expr ]
-          genLetsCode tenv env lf.lets ]
+        [ [ Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length)), genExpr tenv newEnv depth lf.expr ]
+          genLetsCode tenv env depth lf.lets ]
         |> List.concat
 
-and genLetsCode tenv env = List.collect (genLetCode tenv env)
+and genLetsCode tenv env depth = List.collect (genLetCode tenv env depth)
 
-let genTopBindCode tenv env (lf: LambdaForm<_>) =
+let genTopBindCode tenv env depth (lf: LambdaForm<_>) =
     if not (List.isEmpty lf.frees) then
         failwithf "Top level bindings cannot have free variables: %A" lf.frees
     else
@@ -401,11 +416,11 @@ let genTopBindCode tenv env (lf: LambdaForm<_>) =
             |> Map.ofSeq
 
         let wasmLocalTypes = Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length))
-        [ [wasmLocalTypes, genExpr tenv newEnv lf.expr ]
-          genLetsCode tenv env lf.lets ]
+        [ [wasmLocalTypes, genExpr tenv newEnv depth lf.expr ]
+          genLetsCode tenv env depth lf.lets ]
         |> List.concat
 
-let genTopConstrCode tenv env b vs =
+let genTopConstrCode tenv env depth b vs =
     let localidx =
         vs
         |> List.length
@@ -455,11 +470,11 @@ let genTopConstrCode tenv env b vs =
       [ Wasm.LocalGet localidx ] ]
     |> List.concat
 
-let genTopLevelCode tenv env =
+let genTopLevelCode tenv env depth =
     function
-    | _, TopLam lam -> genTopBindCode tenv env lam
-    | _, TopCaf lam -> genTopBindCode tenv env lam
-    | b, TopConstr(vs) -> [ genTopConstrCode tenv env b vs ]
+    | _, TopLam lam -> genTopBindCode tenv env depth lam
+    | _, TopCaf lam -> genTopBindCode tenv env depth lam
+    | b, TopConstr(vs) -> [ genTopConstrCode tenv env depth b vs ]
 
 
 let genCafData env (caf:Func) =
@@ -561,9 +576,8 @@ let genProgram (program: Program<Vars.Var>) =
 
     let codeSec =
         [ runtimeFuncs |> List.map (fun f -> f.func)
-          program |> List.collect (genTopLevelCode tenv env) ]
+          program |> List.collect (genTopLevelCode tenv env 0u) ]
         |> List.concat
-
 
 
 

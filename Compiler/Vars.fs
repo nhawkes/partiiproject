@@ -15,49 +15,62 @@ type Unique =
     |BuiltIn of BuiltIn
     |Internal of string
     |InternalField of int
+    |JoinPoint of int
 
-type Var = {unique:Unique; name:string; typ:Typ}
+type CallType =
+    |JoinCall
+    |DirectCall
+    |ConstrCall
+
+type Var = {unique:Unique; name:string; typ:Typ; callType:CallType option}
 
 let anonymousVar =
     let i = ref 0
     fun typ -> 
         let next = !i
         i := !i+1
-        {unique=Anonymous next; name=""; typ=typ}
+        {unique=Anonymous next; name=""; typ=typ; callType=None}
 
 let userVar =
     let i = ref 0
     fun name typ -> 
         let next = !i
         i := !i+1
-        {unique=User next; name=name; typ=typ}        
+        {unique=User next; name=name; typ=typ; callType=None}      
 
 let generateVar =
     let i = ref 0
     fun typ -> 
         let next = !i
         i := !i+1
-        {unique=Generated next; name=""; typ=typ}
+        {unique=Generated next; name=""; typ=typ; callType=None}
         
 
-let exportVar s typ = {unique=Export s; name=s; typ=typ}  
+let generateJoin =
+    let i = ref 0
+    fun typ -> 
+        let next = !i
+        i := !i+1
+        {unique=JoinPoint next; name=""; typ=typ; callType=Some JoinCall}
+
+let exportVar s typ = {unique=Export s; name=s; typ=typ; callType=None}  
 
 let integerConstr = 
-    {unique=BuiltIn IntegerConstr;  name="Int"; typ=createFuncT ConstrFunc [ValueT] ValueT}
+    {unique=BuiltIn IntegerConstr;  name="Int"; typ=createFuncT SatFunc [ValueT] ValueT; callType=Some ConstrCall}
 let addOp = 
-    {unique=BuiltIn AddOp;  name=""; typ=createFuncT DirectFunc [ValueT; ValueT] ValueT}
+    {unique=BuiltIn AddOp;  name=""; typ=createFuncT SatFunc [ValueT; ValueT] ValueT; callType=Some DirectCall}
 let subOp = 
-    {unique=BuiltIn SubOp;  name=""; typ=createFuncT DirectFunc [ValueT; ValueT] ValueT}
+    {unique=BuiltIn SubOp;  name=""; typ=createFuncT SatFunc [ValueT; ValueT] ValueT; callType=Some DirectCall}
 
 let xInt = 
-    {unique=Internal "xInt";  name=""; typ=IntT}
+    {unique=Internal "xInt";  name=""; typ=IntT; callType=None}
 let yInt = 
-    {unique=Internal "yInt";  name=""; typ=IntT}
+    {unique=Internal "yInt";  name=""; typ=IntT; callType=None}
 let rInt = 
-    {unique=Internal "rInt";  name=""; typ=IntT}
+    {unique=Internal "rInt";  name=""; typ=IntT; callType=None}
 let xValue = 
-    {unique=Internal "xValue";  name=""; typ=ValueT}
+    {unique=Internal "xValue";  name=""; typ=ValueT; callType=None}
 let yValue = 
-    {unique=Internal "yValue";  name=""; typ=ValueT}
+    {unique=Internal "yValue";  name=""; typ=ValueT; callType=None}
 let rValue = 
-    {unique=Internal "rValue";  name=""; typ=ValueT}
+    {unique=Internal "rValue";  name=""; typ=ValueT; callType=None}

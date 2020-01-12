@@ -73,7 +73,7 @@ and renameCases env = List.map (renameCase env)
 
 and renameBlock env assigns ret = function
     |Assign(b, bs, e)::xs -> 
-        let typ =  createFuncT IndirectFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
+        let typ =  createFuncT Types.UnSatFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
         let v = newVar typ b
         let vs = bs |> List.map (newVar ValueT)
         let newEnv = put env v
@@ -95,20 +95,20 @@ and renameReturn env e = Return(renameExpr env e)
 
 let rec renameDecls env exportDecls globalDecls typeDecls = function
     | ExportDecl(n, (b, bs), e)::xs -> 
-        let typ =  createFuncT DirectFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
-        let v = newVar typ b
+        let typ =  createFuncT SatFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
+        let v = {newVar typ b with callType=Some DirectCall}
         let vs = bs |> List.map (newVar ValueT)
         let newEnv = put env v
         renameDecls newEnv ((n, (v,vs), e)::exportDecls) globalDecls typeDecls xs
     | GlobalDecl(b, bs, e)::xs ->
-        let typ =  createFuncT DirectFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
-        let v = newVar typ b
+        let typ =  createFuncT SatFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
+        let v = { newVar typ b with callType=Some DirectCall }
         let vs = bs |> List.map (newVar ValueT)
         let newEnv = put env v
         renameDecls newEnv exportDecls ((v, vs, e)::globalDecls) typeDecls xs
     | TypeDecl(b, bs)::xs -> 
-        let typ =  createFuncT ConstrFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
-        let v = newVar typ b
+        let typ =  createFuncT SatFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
+        let v = { newVar typ b with callType=Some ConstrCall }
         let vs = bs |> List.map (newVar ValueT)
         let newEnv = put env v
         renameDecls newEnv exportDecls globalDecls ((v,vs)::typeDecls) xs

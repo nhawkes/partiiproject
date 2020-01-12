@@ -63,7 +63,7 @@ let memoryToArray (memory:WebAssembly.Runtime.UnmanagedMemory) =
 [<Fact>]
 let Malloc() =
     let wasmModule =
-        [ TypeSec [ WasmGen.malloc.functype ]
+        [ TypeSec [ RuntimeFunctions.malloc.functype ]
           FuncSec [ 0u ]
           MemSec [ Min 1u ]
           GlobalSec
@@ -74,7 +74,7 @@ let Malloc() =
                   exportdesc = ExportFunc 0u }
                 { nm = "Memory"
                   exportdesc = ExportMem 0u } ]
-          CodeSec [ WasmGen.malloc.func ] ]
+          CodeSec [ RuntimeFunctions.malloc.func ] ]
 
     let mallocProgram = emitWasmModule wasmModule |> compile
     let (memory:WebAssembly.Runtime.UnmanagedMemory) = mallocProgram.Exports?Memory()
@@ -85,7 +85,7 @@ let Malloc() =
 [<Fact>]
 let Clone() =
     let wasmModule =
-        [ TypeSec [ (WasmGen.clone 1u).functype; WasmGen.malloc.functype ]
+        [ TypeSec [ (RuntimeFunctions.clone 1u).functype; RuntimeFunctions.malloc.functype ]
           FuncSec [ 0u; 1u ]
           MemSec [ Min 1u ]
           GlobalSec
@@ -98,7 +98,7 @@ let Clone() =
                   exportdesc = ExportFunc 1u }
                 { nm = "Memory"
                   exportdesc = ExportMem 0u } ]
-          CodeSec [ (WasmGen.clone 1u).func; WasmGen.malloc.func  ] ]
+          CodeSec [ (RuntimeFunctions.clone 1u).func; RuntimeFunctions.malloc.func  ] ]
 
     let cloneProgram = emitWasmModule wasmModule |> compile
     let (memory:WebAssembly.Runtime.UnmanagedMemory) = cloneProgram.Exports?Memory()
@@ -112,7 +112,7 @@ let Clone() =
 [<Fact>]
 let Apply() =
     let wasmModule =
-        [ TypeSec [ stdFuncType; (WasmGen.apply 0u).functype; ]
+        [ TypeSec [ RuntimeFunctions.stdFuncType; (RuntimeFunctions.apply 0u).functype; ]
           FuncSec [ 1u ]
           TableSec [ Wasm.Table(Wasm.FuncRef, Wasm.MinMax(1u, 1u)) ]
           MemSec [ Min 1u ]
@@ -124,7 +124,7 @@ let Apply() =
                   exportdesc = ExportFunc 0u }                   
                 { nm = "Memory"
                   exportdesc = ExportMem 0u } ]
-          CodeSec [ (WasmGen.apply 0u).func ]
+          CodeSec [ (RuntimeFunctions.apply 0u).func ]
         ]
 
     let applyProgram = emitWasmModule wasmModule |> compile

@@ -8,10 +8,8 @@ let rec forcedCallArityWithKind k = function
 let forcedCallArity = function
     |Types.FuncT(k, a, b) ->
         match k with
-        |Types.DirectFunc -> forcedCallArityWithKind k b + 1 |> Some
-        |Types.IndirectFunc -> None
-        |Types.ConstrFunc -> forcedCallArityWithKind k b + 1 |> Some   
-        |Types.ExportFunc -> failwithf "Cannot internally call export function internally"
+        |Types.SatFunc -> forcedCallArityWithKind k b + 1 |> Some
+        |Types.UnSatFunc -> None
     |_ -> 0 |> Some
 
 
@@ -210,7 +208,7 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
             genAtoms (genAppWithAtoms f) [] args
         |Some i when i = (args |> List.length) -> 
             // Saturated
-            genAtoms (fun xs -> Stg.lambdaForm (Stg.Call(f, xs))) [] args
+            genAtoms (fun xs -> Stg.lambdaForm (genCallWithAtoms f xs)) [] args
         |Some i when i < (args |> List.length) -> 
             // Oversaturated
             let firstArgs = args |> List.take i
@@ -224,18 +222,25 @@ let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
             let frees = lf.frees |> List.filter(fun v -> not(extraArgs |> List.contains(v)))
             {lf with args=List.concat[extraArgs; lf.args]; frees=frees}
         
-    and genAppWithAtoms (f:Vars.Var) atoms =        
-        let e =
-            match f.typ with
-            | Types.ValueT -> Stg.App(f, atoms)
-            | Types.FuncT _ -> Stg.App(f, atoms)
-            | Types.IntT -> 
-                if atoms |> List.isEmpty then
-                    Stg.Prim [ Stg.AVar f ]
-                else failwith "Literal cannot take arguments"
-
+    and genAppWithAtoms (f:Vars.Var) atoms =
+        let e = genCallWithAtoms f atoms
         let lf = Stg.lambdaForm e
         { lf with frees = lf.frees |> addFree f }
+
+    and genCallWithAtoms (f:Vars.Var) atoms =   
+        match f.callType with
+        |Some Vars.JoinCall -> Stg.Jump(f, atoms)
+        |Some Vars.DirectCall -> Stg.Call(f, atoms)
+        |Some Vars.ConstrCall -> Stg.Call(f, atoms)
+        |_ ->
+        match f.typ with
+        | Types.ValueT -> Stg.App(f, atoms)
+        | Types.FuncT _ -> Stg.App(f, atoms)
+        | Types.IntT -> 
+            if atoms |> List.isEmpty then
+                Stg.Prim [ Stg.AVar f ]
+            else failwith "Literal cannot take arguments"
+
 
     and genAtoms mapAtoms xs =
         function

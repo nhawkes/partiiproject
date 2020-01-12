@@ -5,7 +5,7 @@ open Types
 
 let rec fieldsForType i = function
     |FuncT(_, t, b) -> 
-        {unique=InternalField i;  name=""; typ=t;}::fieldsForType (i+1) b
+        {unique=InternalField i;  name=""; typ=t; callType=None}::fieldsForType (i+1) b
     |ValueT -> []
 
 

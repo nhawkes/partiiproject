@@ -6,12 +6,6 @@ type GuardRHS = Ast.Pattern<Vars.Var>
 
 type GuardedCases = GuardLHS list * (GuardRHS list * Core.Expr<Vars.Var>) list
 
-type Default =
-    | NoDefault
-    | DefaultExpr of Core.Expr<Vars.Var>
-    | DefaultVar of Vars.Var
-
-
 let rec genExpr =
     function
     | Ast.Lit l -> genLit l
@@ -39,7 +33,7 @@ and genBinOp x y = function
 
 and genMatch e cases =
     let manyCases = (cases |> List.map (fun (pat, expr) -> ([ pat ], expr)))
-    genManyMatch (Core.Prim[Stg.ALit Wasm.Unreachable; Stg.ALit (Wasm.I32Const -1)]) [ e ] manyCases
+    genManyMatch ((Core.Prim[Stg.ALit Wasm.Unreachable; Stg.ALit (Wasm.I32Const -1)])) [ e ] manyCases
 
 and genManyMatch def es (cases: (Ast.Pattern<Vars.Var> list * Ast.Expr<Vars.Var>) list) =
     match es with
@@ -55,13 +49,14 @@ and genCases (def, (matchexpr, typ), es, bind) subCases otherCases = function
         genCases (def, (matchexpr, typ), es, Some bindV) ((xs, e)::subCases) otherCases cases
     |case::cases -> 
         genCases (def, (matchexpr, typ), es, bind) (subCases) (case::otherCases) cases
-    |[] ->
-        let defVar = Vars.generateVar Types.ValueT
+    |[] ->        
+        let defVar = Vars.generateJoin Types.ValueT
         let defaultExpr =
             genManyMatch def es subCases
+        let d = Core.Var defVar
         Core.Let(
             Core.Join(defVar, defaultExpr),
-            genCasesWithDefault (def, [], (matchexpr, typ), es, bind |> Option.defaultWith(fun () -> Vars.generateVar Types.ValueT)) otherCases 
+            genCasesWithDefault (d, [], (matchexpr, typ), es, bind |> Option.defaultWith(fun () -> Vars.generateVar Types.ValueT)) otherCases 
         )
         
 
@@ -155,7 +150,7 @@ let genDeclaration =
     | Ast.GlobalDecl(lhs : Vars.Var, args, rhs) ->
         [lhs, Core.TopExpr(genRhs (genExpr rhs) args)]
     | Ast.ExportDecl((exportName, exportArgs), (lhs, args), rhs) ->
-        let exportTyp = Types.createFuncT Types.ExportFunc (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
+        let exportTyp = Types.createFuncT Types.SatFunc (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
         let exportVar = Vars.exportVar exportName exportTyp
         let exportArgs = exportArgs |> List.map (fun arg -> Vars.userVar arg Types.IntT)
         [
