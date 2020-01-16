@@ -4,16 +4,18 @@
     <TargetFramework>netcoreapp3.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Vars.fs" />
     <Compile Include="Wasm.fs" />
     <Compile Include="Stg.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Ast.fs" />
-    <Compile Include="Vars.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="BuiltIns.fs" />
     <Compile Include="Renamer.fs" />
     <Compile Include="CoreGen.fs" />
+    <Compile Include="Analysis.fs" />
+    <Compile Include="Transform.fs" />
     <Compile Include="StgGen.fs" />
     <Compile Include="RuntimeFunctions.fs" />
     <Compile Include="WasmGen.fs" />
