@@ -6,7 +6,6 @@ open Emit
 open Wasm
 open Stg
 open WasmGen
-open RuntimeFunctions
 open Analysis
 
 let arrayFromTuple =
@@ -158,15 +157,13 @@ let StrictnessAnalysis() =
     let if1ExprAnalysis = Analysis.analyseExpr Map.empty 0 if1Expr
     let if2Expr = Core.Case(Core.Var "a", "_", ([
         (Core.Lit(Core.I32 0), []), Core.Var "b"
-        (Core.Lit(Core.I32 1), []), Core.Var "b"
-    ], Core.Lit(Core.I32 0)))
+    ], Core.Var "b"))
     let if2ExprAnalysis = Analysis.analyseExpr Map.empty 0 if2Expr
     let app1Expr = Core.Case(Core.Var "a", "_", ([
-        (Core.Lit(Core.I32 0), []), Core.App(Core.Var "f", Core.Var "b")
-        (Core.Lit(Core.I32 1), []), Core.App(Core.Var "f", Core.Var "b")
-    ], Core.Lit(Core.I32 0)))
+        (Core.Lit(Core.I32 0), []), Core.App(Core.Var "f", Core.Var "b")        
+    ], Core.App(Core.Var "f", Core.Var "b")))
     let app1ExprAnalysis = Analysis.analyseExpr Map.empty 0 app1Expr
-    let app2Expr = Core.App(Core.Lam ("V", Core.Var "b"), Core.Var "a")
+    let app2Expr = Core.App(Core.Lam ("b", Core.Var "b"), Core.Var "a")
     let app2ExprAnalysis = Analysis.analyseExpr Map.empty 0 app2Expr
     let letExpr = Core.Let(Core.NonRec ["f", Core.Lam ("b", Core.Var "b")], Core.App(Core.Var "f", Core.Var "a"))
     let letExprAnalysis = Analysis.analyseExpr Map.empty 0 letExpr
@@ -176,20 +173,29 @@ let StrictnessAnalysis() =
         Core.Let(
             Core.Rec [
                 "f", Core.Lam ("b", 
-                    Core.Case(Core.Var "a", "_", ([
-                        (Core.Lit(Core.I32 0), []), Core.App(Core.Var "f", Core.Var "a")
-                    ], Core.App(Core.Var "f", Core.Var "a"))))
+                    Core.Case(Core.Var "b", "_", ([
+                        (Core.Lit(Core.I32 0), []), Core.Var "c"
+                    ], Core.App(Core.Var "f", Core.Var "b-"))))
             ], Core.App(Core.Var "f", Core.Var "a"))
-    let letRecExprAnalysis = Analysis.analyseExpr Map.empty 0 letRecExpr
+    let letRecExprAnalysis = Analysis.analyseExpr Map.empty 0 letRecExpr n
     printfn "%A" if1Expr
     printfn "%A" if1ExprAnalysis
+    Assert.Equal({ args = TopArgStrictness; frees = (Lazy, Map.ofList [("a", Strict 0)]) }, if1ExprAnalysis)
     printfn "%A" if2Expr
     printfn "%A" if2ExprAnalysis
+    Assert.Equal({ args = TopArgStrictness; frees = (Lazy, Map.ofList [("a", Strict 0); ("b", Strict 0)]) }, if2ExprAnalysis)
     printfn "%A" app1Expr
     printfn "%A" app1ExprAnalysis
+    Assert.Equal({ args = TopArgStrictness; frees = (Lazy, Map.ofList [("a", Strict 0); ("f", Strict 1)]) }, app1ExprAnalysis)
     printfn "%A" app2Expr
     printfn "%A" app2ExprAnalysis
+    Assert.Equal({ args = TopArgStrictness; frees = (Lazy, Map.ofList [("a", Strict 0)]) }, app2ExprAnalysis)
     printfn "%A" letExpr
     printfn "%A" letExprAnalysis
+    Assert.Equal({ args = TopArgStrictness; frees = (Lazy, Map.ofList [("a", Strict 0)]) }, letExprAnalysis)
     printfn "%A" bottomExpr
     printfn "%A" bottomExprAnalysis
+    Assert.Equal({ args = BottomArgStrictness; frees = (HyperStrict, Map.ofList []) }, bottomExprAnalysis)
+    printfn "%A" letRecExpr
+    printfn "%A" letRecExprAnalysis
+    Assert.Equal({ args = TopArgStrictness; frees = (Lazy, Map.ofList [("a", Strict 0); ("c", Strict 0)]) }, letRecExprAnalysis)

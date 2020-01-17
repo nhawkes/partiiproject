@@ -26,6 +26,15 @@ type StrictnessValue<'v when 'v: comparison> =
     { arity: int
       strictness: StrictnessResult<'v> }
 
+let rec normalizeArgStrictness = function
+    |TopArgStrictness -> TopArgStrictness
+    |BottomArgStrictness -> BottomArgStrictness
+    |ArgsStrictness(x, xs) ->
+        match x, normalizeArgStrictness xs with
+        |Lazy, TopArgStrictness -> TopArgStrictness
+        |HyperStrict, BottomArgStrictness -> BottomArgStrictness
+        |x, xs -> ArgsStrictness(x, xs)
+
 
 let lookup k (d, map) =
     match map |> Map.tryFind k with
@@ -87,11 +96,11 @@ let combineFrees combine ((d1, map1), (d2, map2)) =
             [ getKeys map1
               getKeys map2 ]
         |> List.distinct
-    let def = orStrictness (d1, d2)
+    let def = combine (d1, d2)
     let map =
         keys
         |> List.map (fun key -> key, combine ((d1, map1) |> lookup key, (d2, map2) |> lookup key))
-        |> List.filter(fun (_, value) -> value=def)
+        |> List.filter(fun (_, value) -> value<>def)
         |> Map.ofList
 
     def, map
@@ -107,8 +116,6 @@ let andResult a b =
     { args = andArgs (a.args, b.args)
       frees = andFrees (a.frees, b.frees) }
 
-
-
 let defaultStrictness =
     { args = TopArgStrictness
       frees = (Lazy, Map.empty) }
@@ -123,7 +130,7 @@ let maxStrictnessValue =
 
 let evaluate incomingArity value =
     match value with
-    | Some { arity = arity; strictness = strictness } when incomingArity > arity -> strictness
+    | Some { arity = arity; strictness = strictness } when incomingArity >= arity -> strictness
     | _ -> defaultStrictness
 
 let rec manifestArity =
@@ -149,7 +156,7 @@ let rec analyseExpr (env: Map<_, _>) incomingArity =
 
         let argStrictness = innerResult.frees |> lookup x
         let frees = innerResult.frees |> remove x
-        let args = ArgsStrictness(argStrictness, innerResult.args)
+        let args = ArgsStrictness(argStrictness, innerResult.args) |> normalizeArgStrictness        
         { args = args
           frees = frees }
     | Core.Let(bs, e) ->
@@ -172,7 +179,7 @@ let rec analyseExpr (env: Map<_, _>) incomingArity =
             | Strict n -> analyseExpr env n b
             | HyperStrict -> analyseExpr env System.Int32.MaxValue b
 
-        aResult |> andResult bResult
+        {aResult with args=argsStrictness} |> andResult bResult
     | Core.Prim atoms -> analysePrims env incomingArity atoms
 
 and analyseNonRec env incomingArity e =
@@ -225,11 +232,6 @@ and analyseApprox (env:Map<'a, StrictnessValue<'a>>) = function
         let rhsResult = analyseExpr env arity rhs
         ((v, rhs), {arity=arity; strictness=rhsResult})::analyseApprox env bs
     | [] -> []
-
-
-    
-    
-    
 
 and analyseCase env incomingArity e v (alts, def) =
     let innerResult = analyseExpr env 0 e
