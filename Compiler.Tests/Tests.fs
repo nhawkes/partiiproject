@@ -6,6 +6,8 @@ open Emit
 open Wasm
 open Stg
 open WasmGen
+open RuntimeFunctions
+open Analysis
 
 let arrayFromTuple =
     function
@@ -15,10 +17,9 @@ let arrayFromTuple =
 
 let (?) (self: 'Source) (prop: string): obj -> 'Result =
     let p = self.GetType().GetMethod(prop)
-    if (isNull p) then
-        fun _ -> self.GetType().GetProperty(prop).GetValue(self) :?> 'Result
-    else
-        fun x -> p.Invoke(self, arrayFromTuple x) :?> 'Result
+    if (isNull p)
+    then fun _ -> self.GetType().GetProperty(prop).GetValue(self) :?> 'Result
+    else fun x -> p.Invoke(self, arrayFromTuple x) :?> 'Result
 
 let compile byteList =
     let bytes = byteList |> List.toArray
@@ -54,9 +55,9 @@ let ``Fibinacci 7``() =
         Assert.Equal(21, output)
 
 
-let memoryToArray (memory:WebAssembly.Runtime.UnmanagedMemory) =
+let memoryToArray (memory: WebAssembly.Runtime.UnmanagedMemory) =
     let size = 10
-    let (array:int array) = Array.create size 0
+    let (array: int array) = Array.create size 0
     System.Runtime.InteropServices.Marshal.Copy(memory.Start, array, 0, size)
     array
 
@@ -77,7 +78,7 @@ let Malloc() =
           CodeSec [ RuntimeFunctions.malloc.func ] ]
 
     let mallocProgram = emitWasmModule wasmModule |> compile
-    let (memory:WebAssembly.Runtime.UnmanagedMemory) = mallocProgram.Exports?Memory()
+    let (memory: WebAssembly.Runtime.UnmanagedMemory) = mallocProgram.Exports?Memory ()
     let output1 = mallocProgram.Exports?Malloc (12)
     let output2 = mallocProgram.Exports?Malloc (12)
     Assert.Equal(20, output2)
@@ -85,7 +86,9 @@ let Malloc() =
 [<Fact>]
 let Clone() =
     let wasmModule =
-        [ TypeSec [ (RuntimeFunctions.clone 1u).functype; RuntimeFunctions.malloc.functype ]
+        [ TypeSec
+            [ (RuntimeFunctions.clone 1u).functype
+              RuntimeFunctions.malloc.functype ]
           FuncSec [ 0u; 1u ]
           MemSec [ Min 1u ]
           GlobalSec
@@ -98,13 +101,15 @@ let Clone() =
                   exportdesc = ExportFunc 1u }
                 { nm = "Memory"
                   exportdesc = ExportMem 0u } ]
-          CodeSec [ (RuntimeFunctions.clone 1u).func; RuntimeFunctions.malloc.func  ] ]
+          CodeSec
+              [ (RuntimeFunctions.clone 1u).func
+                RuntimeFunctions.malloc.func ] ]
 
     let cloneProgram = emitWasmModule wasmModule |> compile
-    let (memory:WebAssembly.Runtime.UnmanagedMemory) = cloneProgram.Exports?Memory()
-    printfn("%A") memory
+    let (memory: WebAssembly.Runtime.UnmanagedMemory) = cloneProgram.Exports?Memory ()
+    printfn ("%A") memory
     let output1 = cloneProgram.Exports?Malloc (12)
-    System.Runtime.InteropServices.Marshal.Copy([|12;1;2;3|], 0, memory.Start, 4)
+    System.Runtime.InteropServices.Marshal.Copy([| 12; 1; 2; 3 |], 0, memory.Start, 4)
     let output2 = cloneProgram.Exports?Clone (4)
     let output1 = cloneProgram.Exports?Malloc (12)
     Assert.Equal(20, output2)
@@ -112,7 +117,9 @@ let Clone() =
 [<Fact>]
 let Apply() =
     let wasmModule =
-        [ TypeSec [ RuntimeFunctions.stdFuncType; (RuntimeFunctions.apply 0u).functype; ]
+        [ TypeSec
+            [ RuntimeFunctions.stdFuncType
+              (RuntimeFunctions.apply 0u).functype ]
           FuncSec [ 1u ]
           TableSec [ Wasm.Table(Wasm.FuncRef, Wasm.MinMax(1u, 1u)) ]
           MemSec [ Min 1u ]
@@ -121,16 +128,15 @@ let Apply() =
                   init = [ I32Const 0 ] } ]
           ExportSec
               [ { nm = "Apply"
-                  exportdesc = ExportFunc 0u }                   
+                  exportdesc = ExportFunc 0u }
                 { nm = "Memory"
                   exportdesc = ExportMem 0u } ]
-          CodeSec [ (RuntimeFunctions.apply 0u).func ]
-        ]
+          CodeSec [ (RuntimeFunctions.apply 0u).func ] ]
 
     let applyProgram = emitWasmModule wasmModule |> compile
-    let (memory:WebAssembly.Runtime.UnmanagedMemory) = applyProgram.Exports?Memory()
-    printfn("%A") memory
-    System.Runtime.InteropServices.Marshal.Copy([|12; 20; 1; 0|], 0, memory.Start, 4)
+    let (memory: WebAssembly.Runtime.UnmanagedMemory) = applyProgram.Exports?Memory ()
+    printfn ("%A") memory
+    System.Runtime.InteropServices.Marshal.Copy([| 12; 20; 1; 0 |], 0, memory.Start, 4)
     printfn "%A" (memoryToArray memory)
     let output2 = applyProgram.Exports?Apply (4, 14)
     printfn "%A" (memoryToArray memory)
@@ -141,3 +147,49 @@ let Apply() =
     let output2 = applyProgram.Exports?Apply (4, 11)
     printfn "%A" (memoryToArray memory)
     Assert.Equal(4, output2)
+
+
+[<Fact>]
+let StrictnessAnalysis() =
+    let if1Expr = Core.Case(Core.Var "a", "_", ([
+        (Core.Lit(Core.I32 0), []), Core.Var "b"
+        (Core.Lit(Core.I32 1), []), Core.Var "c"
+    ], Core.Lit(Core.I32 0)))
+    let if1ExprAnalysis = Analysis.analyseExpr Map.empty 0 if1Expr
+    let if2Expr = Core.Case(Core.Var "a", "_", ([
+        (Core.Lit(Core.I32 0), []), Core.Var "b"
+        (Core.Lit(Core.I32 1), []), Core.Var "b"
+    ], Core.Lit(Core.I32 0)))
+    let if2ExprAnalysis = Analysis.analyseExpr Map.empty 0 if2Expr
+    let app1Expr = Core.Case(Core.Var "a", "_", ([
+        (Core.Lit(Core.I32 0), []), Core.App(Core.Var "f", Core.Var "b")
+        (Core.Lit(Core.I32 1), []), Core.App(Core.Var "f", Core.Var "b")
+    ], Core.Lit(Core.I32 0)))
+    let app1ExprAnalysis = Analysis.analyseExpr Map.empty 0 app1Expr
+    let app2Expr = Core.App(Core.Lam ("V", Core.Var "b"), Core.Var "a")
+    let app2ExprAnalysis = Analysis.analyseExpr Map.empty 0 app2Expr
+    let letExpr = Core.Let(Core.NonRec ["f", Core.Lam ("b", Core.Var "b")], Core.App(Core.Var "f", Core.Var "a"))
+    let letExprAnalysis = Analysis.analyseExpr Map.empty 0 letExpr
+    let bottomExpr = Core.Let(Core.Rec ["f", Core.Lam ("b", Core.App (Core.Var "f", Core.Var "b"))], Core.App(Core.Var "f", Core.Var "a"))
+    let bottomExprAnalysis = Analysis.analyseExpr Map.empty 0 bottomExpr
+    let letRecExpr = 
+        Core.Let(
+            Core.Rec [
+                "f", Core.Lam ("b", 
+                    Core.Case(Core.Var "a", "_", ([
+                        (Core.Lit(Core.I32 0), []), Core.App(Core.Var "f", Core.Var "a")
+                    ], Core.App(Core.Var "f", Core.Var "a"))))
+            ], Core.App(Core.Var "f", Core.Var "a"))
+    let letRecExprAnalysis = Analysis.analyseExpr Map.empty 0 letRecExpr
+    printfn "%A" if1Expr
+    printfn "%A" if1ExprAnalysis
+    printfn "%A" if2Expr
+    printfn "%A" if2ExprAnalysis
+    printfn "%A" app1Expr
+    printfn "%A" app1ExprAnalysis
+    printfn "%A" app2Expr
+    printfn "%A" app2ExprAnalysis
+    printfn "%A" letExpr
+    printfn "%A" letExprAnalysis
+    printfn "%A" bottomExpr
+    printfn "%A" bottomExprAnalysis

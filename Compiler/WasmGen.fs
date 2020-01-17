@@ -593,5 +593,6 @@ let genProgram (program: Program<Vars.Var>) =
           [ { table = 0u
               offset = [ Wasm.I32Const 0 ]
               init = indirectElems } ]
-      Wasm.CodeSec(codeSec) 
-      Wasm.DataSec [{data=0u; offset=[Wasm.I32Const 0]; init=dataInit}]]
+      Wasm.CodeSec(codeSec)
+      if dataInit.Length>0 then Wasm.DataSec [{data=0u; offset=[Wasm.I32Const 0]; init=dataInit}]
+    ]

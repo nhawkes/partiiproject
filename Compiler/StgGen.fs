@@ -13,7 +13,7 @@ let forcedCallArity = function
     |_ -> 0 |> Some
 
 
-let genProgram (core: Core.Program<Vars.Var>): Stg.Program<Vars.Var> =
+let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
     let globals = core |> List.map fst
 

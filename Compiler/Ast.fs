@@ -2,10 +2,9 @@ module Ast
 
 
 
-type Boxed =
-    | Integer of int32
+type Boxed = Integer of int32
 
-type Lit = 
+type Lit =
     | Raw of Core.Lit
     | Box of Boxed
 
@@ -14,9 +13,9 @@ type Pattern<'b> =
     | PatBind of 'b
     | PatConstr of 'b * Pattern<'b> list
 
-type Op = 
-    |Add
-    |Sub
+type Op =
+    | Add
+    | Sub
 
 type Expr<'b> =
     | Lit of Lit
@@ -29,28 +28,19 @@ type Expr<'b> =
 
 and Prim<'b> =
     | PrimVar of 'b
-    | PrimWasm of Wasm.Instr    
+    | PrimWasm of Wasm.Instr
 
 and Case<'b> = Pattern<'b> * Expr<'b>
 
-and Block<'b> = Statement<'b> list    
+and Block<'b> = Statement<'b> list
 
 and Statement<'b> =
     | Assign of 'b * 'b list * Expr<'b>
-    | Return of Expr<'b>    
+    | Return of Expr<'b>
 
-type Declaration<'b> =  
+type Declaration<'b> =
     | ExportDecl of (string * string list) * ('b * 'b list) * Expr<'b>
     | GlobalDecl of 'b * 'b list * Expr<'b>
     | TypeDecl of 'b * 'b list
 
-type Program<'b> =
-    Declaration<'b> list
-
-
-
-
-    
-    
-
-
+type Program<'b> = Declaration<'b> list
