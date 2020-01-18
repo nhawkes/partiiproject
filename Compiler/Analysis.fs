@@ -1,8 +1,6 @@
 module Analysis
 
-open Vars
 
-type Path = int list
 
 type Args = int
 
@@ -26,6 +24,8 @@ type StrictnessValue<'v when 'v: comparison> =
     { arity: int
       strictness: StrictnessResult<'v> }
 
+type AnalysedVar<'v when 'v: comparison> = {var:'v; analysis:Strictness}  
+
 let rec normalizeArgStrictness = function
     |TopArgStrictness -> TopArgStrictness
     |BottomArgStrictness -> BottomArgStrictness
@@ -40,6 +40,9 @@ let lookup k (d, map) =
     match map |> Map.tryFind k with
     | None -> d
     | Some v -> v
+
+let lookupAnalysis k map =
+    {var=k; analysis=lookup k map}
 
 let update k v (d, map) = 
     if v=d then
@@ -138,7 +141,8 @@ let rec manifestArity =
     | Core.Lam(_, e) -> 1 + manifestArity e
     | _ -> 0
 
-let rec analyseExpr (env: Map<_, _>) incomingArity =
+let rec analyseExpr (env: Map<_, _>) incomingArity : 
+    Core.Expr<'v, 'v> -> StrictnessResult<'v> * Core.Expr<'v, AnalysedVar<'v>> =
     function
     | Core.Var v -> 
         let innerResult = evaluate incomingArity (env |> Map.tryFind v)
@@ -146,26 +150,42 @@ let rec analyseExpr (env: Map<_, _>) incomingArity =
             frees=(Lazy, Map.ofList[v, Strict incomingArity])
             args=TopArgStrictness
         } 
-        unitResult |> andResult innerResult        
-    | Core.Lit l -> defaultStrictness
+        unitResult |> andResult innerResult,
+        Core.Var v       
+    | Core.Lit l -> 
+        defaultStrictness,
+        Core.Lit l
     | Core.Lam(x, e) ->
-        let innerResult =
+        let innerResult, innerExpr =
             match incomingArity with
-            | 0 -> defaultStrictness
+            | 0 -> defaultStrictness, Core.mapExpr (fun v -> {var=v; analysis=Lazy}) e
             | _ -> analyseExpr env (incomingArity - 1) e
 
         let argStrictness = innerResult.frees |> lookup x
+        let varAnalysis = innerResult.frees |> lookupAnalysis x
         let frees = innerResult.frees |> remove x
         let args = ArgsStrictness(argStrictness, innerResult.args) |> normalizeArgStrictness        
         { args = args
-          frees = frees }
+          frees = frees },
+        Core.Lam(varAnalysis, innerExpr)
+
     | Core.Let(bs, e) ->
         match bs with
-        | Core.NonRec bs -> analyseNonRec env incomingArity e bs
-        | Core.Rec bs -> analyseRec env incomingArity e bs
+        | Core.NonRec bs -> 
+            let analysis, binds, eExpr = analyseNonRec env incomingArity e bs
+            analysis, 
+            Core.Let(Core.NonRec binds, eExpr)
+        | Core.Rec bs -> 
+            let analysis, binds, eExpr = analyseRec env incomingArity e bs
+            analysis, 
+            Core.Let(Core.Rec binds, eExpr)
+        | Core.Join b -> 
+            let analysis, binds, eExpr = analyseNonRec env incomingArity e [b]
+            analysis, 
+            Core.Let(Core.NonRec binds, eExpr)
     | Core.Case(e, v, alts) -> analyseCase env incomingArity e v alts
     | Core.App(a, b) ->
-        let aResult = analyseExpr env (incomingArity + 1) a
+        let aResult, aExpr = analyseExpr env (incomingArity + 1) a
 
         let argStrictness, argsStrictness =
             match aResult.args with
@@ -173,79 +193,100 @@ let rec analyseExpr (env: Map<_, _>) incomingArity =
             | ArgsStrictness(x, xs) -> x, xs
             | BottomArgStrictness -> HyperStrict, BottomArgStrictness
 
-        let bResult =
+        let bResult, bExpr =
             match argStrictness with
-            | Lazy -> defaultStrictness
+            | Lazy -> defaultStrictness, Core.mapExpr (fun v -> {var=v; analysis=Lazy}) b
             | Strict n -> analyseExpr env n b
             | HyperStrict -> analyseExpr env System.Int32.MaxValue b
 
-        {aResult with args=argsStrictness} |> andResult bResult
-    | Core.Prim atoms -> analysePrims env incomingArity atoms
+        {aResult with args=argsStrictness} |> andResult bResult,
+        Core.App(aExpr, bExpr)
+    | Core.Prim atoms -> 
+        analysePrims env incomingArity atoms,
+        Core.Prim atoms
+    | Core.Unreachable -> maxStrictnessResult, Core.Unreachable
 
 and analyseNonRec env incomingArity e =
     function
     | (b, rhs) :: bs ->
         let arity = manifestArity rhs
-        let rhsResult = analyseExpr env arity rhs
-
+        let rhsResult, rhsExpr = analyseExpr env arity rhs
         let newEnv =
             env
             |> Map.add b
                    { arity = arity
                      strictness = rhsResult }
-        let innerResult = analyseNonRec newEnv incomingArity e bs
+        let innerResult, innerBinds, innerExpr = analyseNonRec newEnv incomingArity e bs
+        let analysisVar = innerResult.frees |> lookupAnalysis b
         let frees = innerResult.frees |> remove b
-        { innerResult with frees = frees }
-    | [] -> analyseExpr env incomingArity e
+        { innerResult with frees = frees }, ((analysisVar, rhsExpr)::innerBinds), innerExpr
+    | [] -> 
+        let analysis, expr = analyseExpr env incomingArity e
+        analysis, [], expr
 
 and analyseRec env incomingArity e bs = 
     let newEnv = getRecEnv env bs
-    let innerResult = analyseExpr newEnv incomingArity e
+    let innerResult, innerExpr = analyseExpr newEnv incomingArity e
+    let binds = bs |> List.map(fun (v,rhs) ->
+        let _, innerRhs = analyseRhs env rhs 
+        (innerResult.frees |> lookupAnalysis v, innerRhs))
     let frees = innerResult.frees |> removeAll(bs|>List.map fst)
-    { innerResult with frees = frees }
+    { innerResult with frees = frees }, binds, innerExpr
 
 
-and getRecEnv env bs =
+and getRecEnv env (bs:Core.Bind<_,_> list) =
     let approximation =  bs |> List.map (fun b -> b, maxStrictnessValue)
     fixRec env [] approximation
 
 and fixRec env bs approx =
     let newApprox = getNextApprox env bs approx
     if approx = newApprox then
+        let newApproxMapping = (approx |> List.map (fun ((v, _), result) -> (v, result)))
         env 
             |> Map.toList
-            |> List.append (approx |> List.map (fun ((v, _), result) -> (v, result)))
+            |> List.append newApproxMapping
             |> Map.ofList
-    else
+    else 
         fixRec env bs newApprox
 
 and getNextApprox env bs = function
     |((v, rhs:Core.Expr<_,_>), approx)::xs ->
-        let (newEnv:Map<'a, StrictnessValue<'a>>) = env |> Map.add v approx
+        let (newEnv:Map<_, StrictnessValue<_>>) = env |> Map.add v approx
         getNextApprox newEnv ((v,rhs)::bs) xs
     |[] ->
-        analyseApprox env bs
+        analyseApprox env (bs|>List.rev)
 
-and analyseApprox (env:Map<'a, StrictnessValue<'a>>) = function
+and analyseApprox (env:Map<_, StrictnessValue<_>>) = function
     |(v,rhs)::bs ->
-        let arity = manifestArity rhs
-        let rhsResult = analyseExpr env arity rhs
-        ((v, rhs), {arity=arity; strictness=rhsResult})::analyseApprox env bs
+        let rhsValue, _ = analyseRhs env rhs
+        ((v, rhs), rhsValue)::analyseApprox env bs
     | [] -> []
 
-and analyseCase env incomingArity e v (alts, def) =
-    let innerResult = analyseExpr env 0 e
-    let defResult = analyseExpr env incomingArity def
-    analyseAlts env incomingArity defResult alts |> andResult innerResult
+and analyseRhs env rhs :StrictnessValue<_> * Core.Expr<_,_> =
+    let arity = manifestArity rhs
+    let rhsResult, rhsExpr = analyseExpr env arity rhs
+    {arity=arity; strictness=rhsResult}, rhsExpr
+
+
+and analyseCase env incomingArity e b (alts, def) =
+    let innerResult, innerExpr = analyseExpr env 0 e
+    let defResult, defExpr = analyseExpr env incomingArity def
+    let altsResult, newAlts = analyseAlts env incomingArity defResult alts
+    let analysisVar = innerResult.frees |> lookupAnalysis b
+    let frees = innerResult.frees |> remove b
+    altsResult |> andResult {innerResult with frees=frees},
+    Core.Case(innerExpr, analysisVar, (newAlts, defExpr))
 
 and analyseAlts env incomingArity defResult =
     function
     | ((pat, vs), e) :: alts ->
-        let innerResult = analyseExpr env incomingArity e
-        let frees = vs |> List.fold (fun frees v -> frees |> remove v) innerResult.frees
-        let altsResult = analyseAlts env incomingArity defResult alts
-        { innerResult with frees = frees } |> orResult altsResult
-    | [] -> defResult
+        let innerResult, innerExpr = analyseExpr env incomingArity e
+        let analysedVars = vs |> List.map(fun v -> innerResult.frees |> lookupAnalysis v)
+        let frees = innerResult.frees |> removeAll vs
+        let altsResult, newAlts = analyseAlts env incomingArity defResult alts
+        { innerResult with frees = frees } |> orResult altsResult,
+        ((pat, analysedVars), innerExpr)::newAlts
+    | [] -> defResult, []
 
 and analysePrims env incomingArity =
     function
@@ -255,4 +296,22 @@ and analysePrims env incomingArity =
     | _ :: atoms -> analysePrims env incomingArity atoms
     | [] -> defaultStrictness
 
-let analyse e = analyseExpr Map.empty 0 e
+
+let rec analyseProgram binds constrs = function
+    |(b, Core.TopExpr e)::xs -> 
+        let env, program = analyseProgram ((b, e)::binds) constrs xs
+        let _, innerRhs = analyseRhs env e 
+        env,
+        ({var=b; analysis=Lazy}, Core.TopExpr innerRhs)::program
+    |(v, Core.TopConstr vs)::xs -> 
+        let env, program = analyseProgram binds ((v,vs)::constrs) xs
+        let analysedVars = vs |> List.map (fun v -> {var=v; analysis=Lazy})
+        env,
+        ({var=v; analysis=Lazy}, Core.TopConstr analysedVars)::program
+    |[] -> 
+        getRecEnv Map.empty binds,
+        []
+
+let analyse e = 
+    let _env, program = analyseProgram [] [] e
+    program

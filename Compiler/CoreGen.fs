@@ -35,9 +35,7 @@ and genBinOp x y =
 and genMatch e cases =
     let manyCases = (cases |> List.map (fun (pat, expr) -> ([ pat ], expr)))
     genManyMatch
-        ((Core.Prim
-            [ Stg.ALit Wasm.Unreachable
-              Stg.ALit(Wasm.I32Const -1) ])) [ e ] manyCases
+        ((Core.Unreachable)) [ e ] manyCases
 
 and genManyMatch def es (cases: (Ast.Pattern<Vars.Var> list * Ast.Expr<Vars.Var>) list) =
     match es with
@@ -95,7 +93,7 @@ and genPatConstr state v (vs: Vars.Var list) (subCases: (Ast.Pattern<Vars.Var> l
         let vsExprs = vs |> List.map (fun v -> (Ast.Var v, v.typ))
         let subEs = List.concat [ vsExprs; es ]
         let e = genManyMatch def subEs subCases
-        let alt = ((Core.Var v, vs), e)
+        let alt = ((Core.DataAlt v, vs), e)
         genCasesWithDefault (def, alt :: alts, (matchexpr, typ), es, bind) otherCases
 
 and genPatLit state (l: Core.Lit) (subCases: (Ast.Pattern<Vars.Var> list * Ast.Expr<Vars.Var>) list) otherCases =
@@ -106,7 +104,7 @@ and genPatLit state (l: Core.Lit) (subCases: (Ast.Pattern<Vars.Var> list * Ast.E
     | [] ->
         let (alts, (matchexpr, typ), es, def, bind) = state
         let e = genManyMatch def es subCases
-        let alt = ((Core.Lit l, []), e)
+        let alt = ((Core.LitAlt l, []), e)
         genCasesWithDefault (def, alt :: alts, (matchexpr, typ), es, bind) otherCases
 
 and genBlock returnValue lets =
@@ -143,7 +141,7 @@ let rec genExport call args rhs =
         Core.Case
             (call, resultVar,
              Core.Alts
-                 ([ (Core.Var(Vars.integerConstr), [ returnVar ]), Core.Var(returnVar) ],
+                 ([ (Core.DataAlt(Vars.integerConstr), [ returnVar ]), Core.Var(returnVar) ],
                   Core.Prim
                       [ Stg.ALit Wasm.Unreachable
                         Stg.ALit(Wasm.I32Const -1) ]))

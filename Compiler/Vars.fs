@@ -22,6 +22,7 @@ type CallType =
     | DirectCall
     | ConstrCall
 
+[<StructuredFormatDisplay("{unique}${name} ")>]
 type Var =
     { unique: Unique
       name: string

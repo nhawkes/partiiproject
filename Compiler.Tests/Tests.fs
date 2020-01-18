@@ -151,33 +151,33 @@ let Apply() =
 [<Fact>]
 let StrictnessAnalysis() =
     let if1Expr = Core.Case(Core.Var "a", "_", ([
-        (Core.Lit(Core.I32 0), []), Core.Var "b"
-        (Core.Lit(Core.I32 1), []), Core.Var "c"
+        (Core.LitAlt(Core.I32 0), []), Core.Var "b"
+        (Core.LitAlt(Core.I32 1), []), Core.Var "c"
     ], Core.Lit(Core.I32 0)))
-    let if1ExprAnalysis = Analysis.analyseExpr Map.empty 0 if1Expr
+    let if1ExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 if1Expr
     let if2Expr = Core.Case(Core.Var "a", "_", ([
-        (Core.Lit(Core.I32 0), []), Core.Var "b"
+        (Core.LitAlt(Core.I32 0), []), Core.Var "b"
     ], Core.Var "b"))
-    let if2ExprAnalysis = Analysis.analyseExpr Map.empty 0 if2Expr
+    let if2ExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 if2Expr
     let app1Expr = Core.Case(Core.Var "a", "_", ([
-        (Core.Lit(Core.I32 0), []), Core.App(Core.Var "f", Core.Var "b")        
+        (Core.LitAlt(Core.I32 0), []), Core.App(Core.Var "f", Core.Var "b")        
     ], Core.App(Core.Var "f", Core.Var "b")))
-    let app1ExprAnalysis = Analysis.analyseExpr Map.empty 0 app1Expr
+    let app1ExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 app1Expr
     let app2Expr = Core.App(Core.Lam ("b", Core.Var "b"), Core.Var "a")
-    let app2ExprAnalysis = Analysis.analyseExpr Map.empty 0 app2Expr
+    let app2ExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 app2Expr
     let letExpr = Core.Let(Core.NonRec ["f", Core.Lam ("b", Core.Var "b")], Core.App(Core.Var "f", Core.Var "a"))
-    let letExprAnalysis = Analysis.analyseExpr Map.empty 0 letExpr
+    let letExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 letExpr
     let bottomExpr = Core.Let(Core.Rec ["f", Core.Lam ("b", Core.App (Core.Var "f", Core.Var "b"))], Core.App(Core.Var "f", Core.Var "a"))
-    let bottomExprAnalysis = Analysis.analyseExpr Map.empty 0 bottomExpr
+    let bottomExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 bottomExpr
     let letRecExpr = 
         Core.Let(
             Core.Rec [
                 "f", Core.Lam ("b", 
                     Core.Case(Core.Var "b", "_", ([
-                        (Core.Lit(Core.I32 0), []), Core.Var "c"
+                        (Core.LitAlt(Core.I32 0), []), Core.Var "c" 
                     ], Core.App(Core.Var "f", Core.Var "b-"))))
             ], Core.App(Core.Var "f", Core.Var "a"))
-    let letRecExprAnalysis = Analysis.analyseExpr Map.empty 0 letRecExpr n
+    let letRecExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 letRecExpr
     printfn "%A" if1Expr
     printfn "%A" if1ExprAnalysis
     Assert.Equal({ args = TopArgStrictness; frees = (Lazy, Map.ofList [("a", Strict 0)]) }, if1ExprAnalysis)

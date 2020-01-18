@@ -15,7 +15,7 @@ export fibonacci(x) = {
 }
 """
 
-[<EntryPoint>]
+[<EntryPoint>] 
 let main argv =
     match Parser.parse program with
     |Error err -> failwith err
@@ -25,6 +25,8 @@ let main argv =
         astModule 
          |> Renamer.renameProgram
          |> CoreGen.genProgram
+    let analysis = coreModule |> Analysis.analyse
+    printfn "Analysis %A:" analysis
     printfn "Core: %A" coreModule
     let stgModule = 
         coreModule

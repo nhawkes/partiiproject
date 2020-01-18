@@ -35,6 +35,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
             | Core.Case(e, v, alts) -> genCase e v alts
             | Core.App(a, b) -> genApp [ b ] a
             | Core.Prim ps -> genPrim ps
+            | Core.Unreachable -> genPrim [ Stg.ALit Wasm.Unreachable; Stg.ALit(Wasm.I32Const -1) ]
         Stg.normLf lf
 
 
@@ -154,10 +155,10 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
     and genAlts =
         function
-        | ((Core.Var(v), vs), e) :: xs, def ->
+        | ((Core.DataAlt v, vs), e) :: xs, def -> 
             let lfDef = genExpr def
             genAAlt lfDef lfDef.expr [] v vs e xs
-        | ((Core.Lit l, []), e) :: xs, def ->
+        | ((Core.LitAlt l, []), e) :: xs, def ->
             let lfDef = genExpr def
             genPAlt lfDef lfDef.expr [] l e xs
         | [], def ->
@@ -181,7 +182,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
     and genAAlts lfAcc def aalts =
         function
-        | ((Core.Var(v), vs), e) :: xs -> genAAlt lfAcc def aalts v vs e xs
+        | ((Core.DataAlt v, vs), e) :: xs -> genAAlt lfAcc def aalts v vs e xs
         | [] -> Stg.AAlts(aalts, def), lfAcc
 
     and genPAlt lfAcc def palts l e xs =
@@ -194,7 +195,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
     and genPAlts lfAcc def (palts: Stg.PAlts<_>) =
         function
-        | ((Core.Lit l, []), e) :: xs -> genPAlt lfAcc def palts l e xs
+        | ((Core.LitAlt l, []), e) :: xs -> genPAlt lfAcc def palts l e xs
         | [] -> Stg.PAlts(palts, def), lfAcc
 
     and genApp args =
