@@ -26,10 +26,13 @@ let main argv =
          |> Renamer.renameProgram
          |> CoreGen.genProgram
     let analysis = coreModule |> Analysis.analyse
-    printfn "Analysis %A:" analysis
+    let ww = analysis |> Transform.wwTransform
+    let optimized = ww |> Core.mapProgram (fun v -> v.var)
     printfn "Core: %A" coreModule
+    printfn "Analysis: %A" analysis
+    printfn "Optimized: %A" optimized
     let stgModule = 
-        coreModule
+        optimized
          |> StgGen.genProgram   
     printfn "Stg: %A" stgModule
     let wasmModule =

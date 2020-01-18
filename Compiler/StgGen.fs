@@ -51,9 +51,9 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
     and genLet e =
         function
-        | Core.NonRec ls -> genBindings genNonRec ls e
-        | Core.Rec ls -> genBindings genRec ls e
+        | Core.NonRec x -> genBindings genNonRec [x] e
         | Core.Join j -> genLetJoin j e
+        | Core.Rec ls -> genBindings genRec ls e
             
     and genNonRec (vs, expr) =
         match vs with

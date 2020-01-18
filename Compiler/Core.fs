@@ -14,7 +14,7 @@ type Expr<'v, 'b> =
 
 and Binds<'v, 'b> =
     | Rec of Bind<'v, 'b> list
-    | NonRec of Bind<'v, 'b> list
+    | NonRec of Bind<'v, 'b>
     | Join of Bind<'v, 'b>
  
 and Pat<'v> =
@@ -47,11 +47,12 @@ let rec mapExpr (f:'a->'b) : Expr<'v, 'a> -> Expr<'v, 'b> =
     | Case(e, b, alts) -> Case(mapExpr f e, f b, mapAlts f alts)
     | App(a, b) -> App(mapExpr f a, mapExpr f b)
     | Prim ps -> Prim(ps |> List.map (mapPrim f))
+    | Unreachable -> Unreachable
 
 and mapBinds f =
     function
     | Rec bs -> Rec(bs |> List.map (fun (b, e) -> (f b, mapExpr f e)))
-    | NonRec bs -> Rec(bs |> List.map (fun (b, e) -> (f b, mapExpr f e)))
+    | NonRec(b, e) -> NonRec(f b, mapExpr f e)
     | Join(b, e) -> Join(f b, mapExpr f e)
 
 

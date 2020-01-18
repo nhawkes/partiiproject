@@ -16,6 +16,7 @@ type Unique =
     | Internal of string
     | InternalField of int
     | JoinPoint of int
+    | Worker of Unique
 
 type CallType =
     | JoinCall
@@ -74,7 +75,7 @@ let exportVar s typ =
     { unique = Export s
       name = s
       typ = typ
-      callType = None }
+      callType = Some DirectCall }
 
 let integerConstr =
     { unique = BuiltIn IntegerConstr

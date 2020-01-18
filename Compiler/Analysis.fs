@@ -171,18 +171,18 @@ let rec analyseExpr (env: Map<_, _>) incomingArity :
 
     | Core.Let(bs, e) ->
         match bs with
-        | Core.NonRec bs -> 
-            let analysis, binds, eExpr = analyseNonRec env incomingArity e bs
+        | Core.NonRec b -> 
+            let analysis, binds, eExpr = analyseNonRec env incomingArity e b
             analysis, 
             Core.Let(Core.NonRec binds, eExpr)
+        | Core.Join b -> 
+            let analysis, binds, eExpr = analyseNonRec env incomingArity e b
+            analysis, 
+            Core.Let(Core.Join binds, eExpr)
         | Core.Rec bs -> 
             let analysis, binds, eExpr = analyseRec env incomingArity e bs
             analysis, 
             Core.Let(Core.Rec binds, eExpr)
-        | Core.Join b -> 
-            let analysis, binds, eExpr = analyseNonRec env incomingArity e [b]
-            analysis, 
-            Core.Let(Core.NonRec binds, eExpr)
     | Core.Case(e, v, alts) -> analyseCase env incomingArity e v alts
     | Core.App(a, b) ->
         let aResult, aExpr = analyseExpr env (incomingArity + 1) a
@@ -208,7 +208,7 @@ let rec analyseExpr (env: Map<_, _>) incomingArity :
 
 and analyseNonRec env incomingArity e =
     function
-    | (b, rhs) :: bs ->
+    | (b, rhs) ->
         let arity = manifestArity rhs
         let rhsResult, rhsExpr = analyseExpr env arity rhs
         let newEnv =
@@ -216,13 +216,10 @@ and analyseNonRec env incomingArity e =
             |> Map.add b
                    { arity = arity
                      strictness = rhsResult }
-        let innerResult, innerBinds, innerExpr = analyseNonRec newEnv incomingArity e bs
+        let innerResult, innerExpr = analyseExpr env incomingArity e
         let analysisVar = innerResult.frees |> lookupAnalysis b
         let frees = innerResult.frees |> remove b
-        { innerResult with frees = frees }, ((analysisVar, rhsExpr)::innerBinds), innerExpr
-    | [] -> 
-        let analysis, expr = analyseExpr env incomingArity e
-        analysis, [], expr
+        { innerResult with frees = frees }, ((analysisVar, rhsExpr)), innerExpr
 
 and analyseRec env incomingArity e bs = 
     let newEnv = getRecEnv env bs
