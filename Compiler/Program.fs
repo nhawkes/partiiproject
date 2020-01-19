@@ -25,7 +25,7 @@ let main argv =
          |> Renamer.renameProgram
          |> CoreGen.genProgram
     let optimized = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
-    printfn "Optimized: %A" optimized
+    let output = sprintf "%A" optimized
     let stgModule = 
         optimized
          |> StgGen.genProgram   
