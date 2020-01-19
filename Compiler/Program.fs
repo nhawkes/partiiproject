@@ -20,18 +20,15 @@ let main argv =
     match Parser.parse program with
     |Error err -> failwith err
     |Ok astModule ->
-    printfn "Ast: %A" astModule    
     let coreModule =
         astModule 
          |> Renamer.renameProgram
          |> CoreGen.genProgram
     let optimized = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
-    printfn "Core: %A" coreModule
     printfn "Optimized: %A" optimized
     let stgModule = 
         optimized
          |> StgGen.genProgram   
-    printfn "Stg: %A" stgModule
     let wasmModule =
         stgModule          
          |> WasmGen.genProgram

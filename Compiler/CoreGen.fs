@@ -1,11 +1,5 @@
 module CoreGen
 
-type GuardLHS = Vars.Var
-
-type GuardRHS = Ast.Pattern<Vars.Var>
-
-type GuardedCases = GuardLHS list * (GuardRHS list * Core.Expr<Vars.Var, Vars.Var>) list
-
 let rec genExpr =
     function
     | Ast.Lit l -> genLit l
@@ -52,13 +46,14 @@ and genCases (def, (matchexpr, typ), es, bind) subCases otherCases =
         genCases (def, (matchexpr, typ), es, Some bindV) ((xs, e) :: subCases) otherCases cases
     | case :: cases -> genCases (def, (matchexpr, typ), es, bind) (subCases) (case :: otherCases) cases
     | [] ->
-        let defVar = Vars.generateJoin Types.ValueT
+        let bindV = bind |> Option.defaultWith (fun () -> Vars.generateVar Types.ValueT)
+        let defVar = Vars.generateJoin (Types.FuncT(Types.SatFunc, Types.ValueT, bindV.typ))
         let defaultExpr = genManyMatch def es subCases
-        let d = Core.Var defVar
+        let d = Core.App(Core.Var defVar, Core.Var bindV)
         Core.Let
-            (Core.Join(defVar, defaultExpr),
+            (Core.Join(defVar, Core.Lam(bindV, defaultExpr)),
              genCasesWithDefault
-                 (d, [], (matchexpr, typ), es, bind |> Option.defaultWith (fun () -> Vars.generateVar Types.ValueT))
+                 (d, [], (matchexpr, typ), es, bindV)
                  otherCases)
 
 

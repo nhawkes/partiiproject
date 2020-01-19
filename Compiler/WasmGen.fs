@@ -119,7 +119,7 @@ and genBinds tenv env depth e = function
                 xs |> List.collect(genRecEnd tenv env depth)
                 e env depth
             ]  
-    | Join (j, [], je) -> genLetJoin tenv env depth j je e 
+    | Join (j, [arg], je) -> genLetJoin tenv env depth j arg je e 
 
 and genNonRec tenv env depth  x =     
     let (localidx, funcidx, args, frees) = getLambda env (StgVar x)
@@ -194,7 +194,7 @@ and genRecEnd tenv env depth x =
         ]) |> List.concat |> List.concat)
     storeFrees
 
-and genLetJoin tenv env depth j je e =
+and genLetJoin tenv env depth j arg je e =
     let newEnv = env |> Map.add ( StgVar j ) (Block (2u+depth))
     [
         Wasm.Block([Wasm.I32], [
@@ -202,7 +202,7 @@ and genLetJoin tenv env depth j je e =
                 ( e newEnv (depth + 2u))
                 [Wasm.Br 1u]
             ] |> List.concat)]
-            [ Wasm.Drop ]
+            [ Wasm.LocalSet (getLocal env (StgVar arg)) ]
             genExpr tenv env (depth + 1u) je
         ] |> List.concat)
     ]
@@ -265,11 +265,13 @@ and genApp tenv env depth v args =
     ] |> List.concat
 
 and genJump tenv env depth (j: Vars.Var) vs =
-   if vs <> [] then failwith "TODO"
-   [
-       [Wasm.I32Const 0]
-       getBlock env depth (StgVar j) 
-   ] |> List.concat
+   match vs with
+   | [arg] ->
+       [
+           genStgVarAtom tenv env depth arg
+           getBlock env depth (StgVar j) 
+       ] |> List.concat
+    |_ -> failwith "Jumps only support one variable"
 
 and genCase tenv env depth (v: Vars.Var) e alts =
     let atom = AVar (StgVar v)

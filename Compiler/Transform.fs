@@ -50,7 +50,8 @@ let rec wwTransform  = function
 let shouldInlineTopLevel b =
     match b.var.unique with
     |BuiltIn _ -> true
-    |Worker _ -> false
+    |Worker (BuiltIn _) -> true
+    |Worker (_) -> false
     |_ -> true
 
 let rec getTopInlineMap = function
@@ -113,7 +114,7 @@ and renameBoundVarsInAlts env f = function
     | (cases, def) -> cases |> List.map (renameBoundVarsInAlt env f), renameBoundVarsInExpr env f def
 
 and renameBoundVarsInAlt env f = function
-    | (ev, vs), e -> 
+    | (p, vs), e -> 
         let vsMapping = vs |> List.map (fun v -> v, {v with var=f v.var}) |> Map.ofList
         let newEnv = 
             vs |> 
@@ -122,7 +123,7 @@ and renameBoundVarsInAlt env f = function
                     env |> Map.add v.var (vsMapping |> Map.find v).var
             ) env
         let newVs = vs |> List.map (fun v -> (vsMapping |> Map.find v))
-        (renameBoundVarsInPat newEnv f ev, newVs), renameBoundVarsInExpr env f e
+        (renameBoundVarsInPat newEnv f p, newVs), renameBoundVarsInExpr newEnv f e
 
 and renameBoundVarsInPat env f = function
     | Core.DataAlt v -> Core.DataAlt v
@@ -130,7 +131,10 @@ and renameBoundVarsInPat env f = function
     
 and renameBoundVarsInPrim env f =
     function
-    | Stg.AVar v -> Stg.AVar(v)
+    | Stg.AVar v ->         
+        match env |> Map.tryFind v with
+        |Some v2 -> Stg.AVar(v2)
+        |None ->Stg.AVar(v)        
     | Stg.ALit l -> Stg.ALit l
 
 
