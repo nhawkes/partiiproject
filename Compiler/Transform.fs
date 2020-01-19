@@ -137,10 +137,16 @@ and renameBoundVarsInPrim env f =
         |None ->Stg.AVar(v)        
     | Stg.ALit l -> Stg.ALit l
 
-let isSmall = function
+let rec isSmall = function
+    |Core.Unreachable
     |Core.Var _ -> true
-    |Core.Lam(_, Core.Unreachable) -> true
-    |Core.App(Core.Var({callType=Some callType}), _) when callType = ConstrCall -> true
+    |Core.Lam(_, b) -> isSmall b
+    |Core.App(a, b) ->
+        if isSmall a && isSmall b then true
+        else 
+        match a with 
+        |Core.Var({callType=Some callType}) when callType = ConstrCall -> true
+        |_ -> false
     |_ -> false
 
 let rec simplifyExpr (inlineMap:Map<Vars.Var, Core.Expr<Vars.Var, AnalysedVar<_>>>) = function    
@@ -149,14 +155,15 @@ let rec simplifyExpr (inlineMap:Map<Vars.Var, Core.Expr<Vars.Var, AnalysedVar<_>
         |Some e -> 
             let inliner = inlineVar()
             let newE = e |> renameBoundVarsInExpr Map.empty inliner
-            simplifyExpr inlineMap newE
+            newE
         |None ->
             Core.Var v
     | Core.Lit l -> Core.Lit l
     | Core.Lam(v, e) -> Core.Lam(v, simplifyExpr inlineMap e)
     | Core.Let(bs, e) -> 
         simplifyBinds inlineMap e bs 
-    | Core.Case(e, b, alts) -> Core.Case(simplifyExpr inlineMap e, b, simplifyAlts inlineMap alts)
+    | Core.Case(e, b, alts) -> 
+        simplifyCase inlineMap (e, b, alts)
     | Core.App(a, b) -> 
         let newA = simplifyExpr inlineMap a
         let newB = simplifyExpr inlineMap b
@@ -196,14 +203,20 @@ and simplifyBinds inlineMap e = function
         // Inline small values
         if isSmall newRhs then
             printfn "Inlining: %A" newRhs
-            let newsimplifyMap = inlineMap |> Map.add v.var newRhs
-            simplifyExpr newsimplifyMap e
+            let newInlineMap = inlineMap |> Map.add v.var newRhs
+            simplifyExpr newInlineMap e
         else
             Core.Let(Core.Join (v, newRhs), (simplifyExpr inlineMap e))
     |Core.Rec [] -> simplifyExpr inlineMap e
     |Core.Rec bs -> 
         Core.Let(Core.Rec (bs |> List.map (fun (v,rhs) -> v, simplifyExpr inlineMap rhs)), (simplifyExpr inlineMap e))
 
+and simplifyCase inlineMap = function
+    |e, v, ([], def) when e |> isSmall ->
+        let newInlineMap = inlineMap |> Map.add v.var (simplifyExpr inlineMap e)
+        simplifyExpr newInlineMap def
+    |e, b, (alts, def) ->
+        Core.Case(simplifyExpr inlineMap e, b, simplifyAlts inlineMap (alts, def))
 
 
 
