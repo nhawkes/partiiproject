@@ -216,7 +216,7 @@ and analyseNonRec env incomingArity e =
             |> Map.add b
                    { arity = arity
                      strictness = rhsResult }
-        let innerResult, innerExpr = analyseExpr env incomingArity e
+        let innerResult, innerExpr = analyseExpr newEnv incomingArity e
         let analysisVar = innerResult.frees |> lookupAnalysis b
         let frees = innerResult.frees |> remove b
         { innerResult with frees = frees }, ((analysisVar, rhsExpr)), innerExpr

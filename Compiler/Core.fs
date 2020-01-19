@@ -38,11 +38,11 @@ type Program<'v, 'b> = TopBind<'v, 'b> list
 
 
 
-let rec mapExpr (f:'a->'b) : Expr<'v, 'a> -> Expr<'v, 'b> =
+let rec mapExpr f : Expr<'v, 'a> -> Expr<'v, 'b> =
     function
-    | Var v -> Var(v)
+    | Var v -> Var v
     | Lit l -> Lit l
-    | Lam(v, e) -> Lam(f v, mapExpr f e)
+    | Lam(b, e) -> Lam(f b, mapExpr f e)
     | Let(bs, e) -> Let(mapBinds f bs, mapExpr f e)
     | Case(e, b, alts) -> Case(mapExpr f e, f b, mapAlts f alts)
     | App(a, b) -> App(mapExpr f a, mapExpr f b)
@@ -79,3 +79,4 @@ let mapTopLevel f =
 let mapTopBind f (b, e) = (f b, mapTopLevel f e)
 
 let mapProgram f p = p |> List.map (mapTopBind f)
+

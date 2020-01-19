@@ -17,6 +17,7 @@ type Unique =
     | InternalField of int
     | JoinPoint of int
     | Worker of Unique
+    | Inline of int * Unique
 
 type CallType =
     | JoinCall
@@ -76,6 +77,14 @@ let exportVar s typ =
       name = s
       typ = typ
       callType = Some DirectCall }
+
+let inlineVar = 
+    let i = ref 0
+    fun () -> 
+        let next = !i
+        i := !i + 1
+        fun var -> {var with unique=Inline(next, var.unique)}
+
 
 let integerConstr =
     { unique = BuiltIn IntegerConstr
