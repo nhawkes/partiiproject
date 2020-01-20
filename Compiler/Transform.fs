@@ -40,6 +40,22 @@ and makeWrapperCall call : List<_> -> Core.Expr<Var, AnalysedVar<_>> = function
     |[] -> Core.Var (call.var)
 
 
+
+let rec getSpecializations args = function
+    | Core.Var v -> Map.empty
+    | Core.Lit l -> Map.empty
+    | Core.Lam(v, e) -> getSpecializations args e
+    | Core.Let(bs, e) -> 
+        getSpecializations args e
+    | Core.Case(Core.Var(v), _, (alts, def)) when args |> List.contains v ->
+        Map.ofList[v, alts |> List.map(fun (p, e) -> p)]
+    | Core.Case(_, b, ([_, e], Core.Unreachable)) -> 
+        getSpecializations args e
+    | Core.Case(_, b, (_, e)) -> 
+        getSpecializations args e
+    | Core.App(a, b) -> 
+        getSpecializations args b
+        
 let rec wwTransform  = function
     |(b, Core.TopExpr e)::xs when isBuiltIn b ->
         (b, Core.TopExpr e)::wwTransform xs
@@ -165,15 +181,26 @@ let rec simplifyExpr (inlineMap:Map<Vars.Var, Core.Expr<Vars.Var, AnalysedVar<_>
         |Core.Case(e, v, ([], def)) when false ->
             Core.Case(e, v, ([], Core.App(def, b))) |> simplifyExpr inlineMap
         |_ ->
-            Core.App(newA, newB)
+        Core.App(newA, newB) |> factorApp
     | Core.Prim ps -> 
         simplifyPrims inlineMap [] ps
     | Core.Unreachable -> Core.Unreachable
 
+and factorApp = function
+    |Core.App(f, Core.Case(e, b, ([p, pe], Core.Unreachable))) when f |> isSmall ->
+        Core.Case(e, b, ([p, Core.App(f, pe) |> factorApp], Core.Unreachable))
+    |Core.App(f, Core.Case(e, b, ([], def))) when f |> isSmall ->
+        Core.Case(e, b, ([], Core.App(f, def) |> factorApp))
+    |x -> x
+
+
+
 and simplifyAlts inlineMap (alts, def) = 
     let newAlts = alts |> List.map(fun (p,e) -> (p, simplifyExpr inlineMap e))
-    let newDef = simplifyExpr inlineMap def
+    let newDef = simplifyExpr inlineMap def    
     (newAlts, newDef)
+
+
 
 and simplifyBinds inlineMap e = function
     |Core.NonRec (v, rhs) ->
@@ -226,6 +253,12 @@ and simplifyCase inlineMap (e, b, (alts, def)) =
         |_ -> simplifyExpr (Map.ofList [v.var, value]) newDef
     |(e, b, (alts, def))  -> Core.Case(e, b, (alts, def))
 
+and isConstr = function
+    |Core.Var{callType=Some ConstrCall} -> true
+    |_ -> false
+
+
+
 and simplifyPrims inlineMap newPs = function
     |Core.AVar v::ps ->
         match inlineMap |> Map.tryFind v with
@@ -271,10 +304,13 @@ let rec getTopInlineMap shouldInline = function
     |(v, Core.TopConstr vs)::xs -> getTopInlineMap shouldInline xs
     |[] -> Map.empty
 
+
+
+
 let transform program =     
     let analysis = program |> Analysis.analyse
     let ww = analysis |> wwTransform
-    let topInlineMap = getTopInlineMap isBuiltIn ww
+    let topInlineMap = getTopInlineMap isBuiltIn analysis
     System.IO.File.WriteAllText("./Compiler/input.core", sprintf "%A" ww)
     let result = simplify topInlineMap ww
     System.IO.File.WriteAllText("./Compiler/output.core", sprintf "%A" result)
