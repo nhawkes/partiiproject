@@ -35,7 +35,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
             | Core.Case(e, v, alts) -> genCase e v alts
             | Core.App(a, b) -> genApp [ b ] a
             | Core.Prim ps -> genPrim ps
-            | Core.Unreachable -> genPrim [ Stg.ALit Wasm.Unreachable; Stg.ALit(Wasm.I32Const -1) ]
+            | Core.Unreachable -> genPrim [ Core.AWasm Wasm.Unreachable; Core.AWasm(Wasm.I32Const -1) ]
         Stg.normLf lf
 
 
@@ -249,7 +249,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
             let (lf:Stg.LambdaForm<_>) = genAtoms mapAtoms (Stg.AVar arg :: xs) args
             let frees = lf.frees |> addFree arg
             { lf with frees = frees }
-        | (Core.Prim [ Stg.ALit arg ]) :: args -> genAtoms mapAtoms (Stg.ALit arg :: xs) args
+        | (Core.Prim [ Core.ALit arg ]) :: args -> genAtoms mapAtoms (Stg.ALit (genLit arg) :: xs) args
         | (Core.Lit arg) :: args -> genAtoms mapAtoms (Stg.ALit(genLit arg) :: xs) args
         | arg :: args ->
             genAtom (fun var -> genAtoms mapAtoms (Stg.AVar var :: xs) args) (genExpr arg)
@@ -270,10 +270,16 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
         let vars =
             ps
             |> List.choose (function
-                | (Stg.AVar v) -> Some v
+                | (Core.AVar v) -> Some v
                 | _ -> None)
-
-        let lf = Stg.lambdaForm (Stg.Prim ps)
+        let stgPrims = 
+            ps |>
+            List.map(function 
+                |Core.AWasm w -> Stg.ALit w
+                |Core.ALit l -> Stg.ALit (genLit l)
+                |Core.AVar v -> Stg.AVar v            
+            )
+        let lf = Stg.lambdaForm (Stg.Prim stgPrims)
         let frees = vars |> List.fold (fun frees v -> frees |> addFree v) []
         { lf with frees = frees }
 

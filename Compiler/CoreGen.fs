@@ -123,8 +123,8 @@ and genRhs (rhs: Core.Expr<_, _>) =
 
 and genPrim xs =
     function
-    | Ast.PrimVar v :: ps -> genPrim (Stg.AVar v :: xs) ps
-    | Ast.PrimWasm w :: ps -> genPrim (Stg.ALit w :: xs) ps
+    | Ast.PrimVar v :: ps -> genPrim (Core.AVar v :: xs) ps
+    | Ast.PrimWasm w :: ps -> genPrim (Core.AWasm w :: xs) ps
     | [] -> Core.Prim(xs |> List.rev)
 
 let rec genExport call args rhs =
@@ -137,9 +137,7 @@ let rec genExport call args rhs =
             (call, resultVar,
              Core.Alts
                  ([ (Core.DataAlt(Vars.integerConstr), [ returnVar ]), Core.Var(returnVar) ],
-                  Core.Prim
-                      [ Stg.ALit Wasm.Unreachable
-                        Stg.ALit(Wasm.I32Const -1) ]))
+                  Core.Unreachable))
 
 let genDeclaration =
     function

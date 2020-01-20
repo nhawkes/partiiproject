@@ -24,7 +24,11 @@ type StrictnessValue<'v when 'v: comparison> =
     { arity: int
       strictness: StrictnessResult<'v> }
 
-type AnalysedVar<'v when 'v: comparison> = {var:'v; analysis:Strictness}  
+[<StructuredFormatDisplay("{AsString}")>]
+type AnalysedVar<'v when 'v: comparison> = 
+    {var:'v; analysis:Strictness} 
+    member m.AsString = sprintf "%A" m.var 
+    
 
 let rec normalizeArgStrictness = function
     |TopArgStrictness -> TopArgStrictness
@@ -287,7 +291,7 @@ and analyseAlts env incomingArity defResult =
 
 and analysePrims env incomingArity =
     function
-    | Stg.AVar v :: atoms ->
+    | Core.AVar v :: atoms ->
         let innerResult = analysePrims env incomingArity atoms
         evaluate incomingArity (env |> Map.tryFind v) |> andResult innerResult
     | _ :: atoms -> analysePrims env incomingArity atoms

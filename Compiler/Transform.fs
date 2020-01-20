@@ -123,16 +123,18 @@ and renameBoundVarsInPat env f = function
     
 and renameBoundVarsInPrim env f =
     function
-    | Stg.AVar v ->         
+    | Core.AVar v ->         
         match env |> Map.tryFind v with
-        |Some v2 -> Stg.AVar(v2)
-        |None ->Stg.AVar(v)        
-    | Stg.ALit l -> Stg.ALit l
+        |Some v2 -> Core.AVar(v2)
+        |None ->Core.AVar(v)        
+    | Core.ALit l -> Core.ALit l
+    | Core.AWasm l -> Core.AWasm l
 
 let rec isSmall = function
     |Core.Unreachable
     |Core.Var _ -> true
     |Core.Lam(_, Core.Unreachable) -> true
+    |Core.Lit _ -> true
     |_ -> false
 
 let rec simplifyExpr (inlineMap:Map<Vars.Var, Core.Expr<Vars.Var, AnalysedVar<_>>>) = function    
@@ -164,7 +166,8 @@ let rec simplifyExpr (inlineMap:Map<Vars.Var, Core.Expr<Vars.Var, AnalysedVar<_>
             Core.Case(e, v, ([], Core.App(def, b))) |> simplifyExpr inlineMap
         |_ ->
             Core.App(newA, newB)
-    | Core.Prim ps -> Core.Prim(ps)
+    | Core.Prim ps -> 
+        simplifyPrims inlineMap [] ps
     | Core.Unreachable -> Core.Unreachable
 
 and simplifyAlts inlineMap (alts, def) = 
@@ -202,21 +205,45 @@ and simplifyBinds inlineMap e = function
     |Core.Rec bs -> 
         Core.Let(Core.Rec (bs |> List.map (fun (v,rhs) -> v, simplifyExpr inlineMap rhs)), (simplifyExpr inlineMap e))
 
-and simplifyCase inlineMap = function
-    |Core.App(Core.Var(v), value), b, (alts, def) when v.callType=Some ConstrCall ->
-        
+and simplifyCase inlineMap (e, b, (alts, def)) =
+    let newE = simplifyExpr inlineMap e
+    let (newAlts, newDef) = simplifyAlts inlineMap (alts, def)
+    match newE, b, (newAlts, newDef) with
+    |Core.App(Core.Var(v), value), b, (alts, def) when v.callType=Some ConstrCall ->        
         match alts |> List.tryPick(function ((Core.DataAlt v2, [bs1]), e) -> Some(bs1, e) |_ -> None) with
-        |Some(bs1, e) -> 
-            Core.Case(value, bs1, ([], e))
+        |Some(bs1, altE) -> 
+            if value |> isSmall then
+                simplifyExpr (Map.ofList [bs1.var, value]) altE
+            else
+                Core.Case(value, bs1, ([], altE))
         |None ->  
             simplifyExpr inlineMap def
-    |e, v, ([], def) when false && e |> isSmall ->
-        let newInlineMap = inlineMap |> Map.add v.var (simplifyExpr inlineMap e)
-        simplifyExpr newInlineMap def
-    |e, b, (alts, def) ->
-        Core.Case(simplifyExpr inlineMap e, b, simplifyAlts inlineMap (alts, def))
+    |value, v, ([], _) when value |> isSmall ->
+        match def with
+        |Core.Prim _ ->
+            // The case around prim is needed 
+            Core.Case(value, v, (alts, newDef))
+        |_ -> simplifyExpr (Map.ofList [v.var, value]) newDef
+    |(e, b, (alts, def))  -> Core.Case(e, b, (alts, def))
 
+and simplifyPrims inlineMap newPs = function
+    |Core.AVar v::ps ->
+        match inlineMap |> Map.tryFind v with
+        |None -> simplifyPrims inlineMap (Core.AVar v::newPs) ps
+        |Some(Core.Lit l) ->             
+            simplifyPrims inlineMap (Core.ALit l::newPs) ps 
+        |Some(x) -> 
+            let inliner = inlineVar()
+            let newV = {var=inliner v; analysis=Analysis.Strict 0}
+            let inner = simplifyPrims inlineMap (Core.AVar newV.var::newPs) ps 
+            Core.Case(x, newV, ([], inner))
+    |Core.ALit l::ps -> 
+        simplifyPrims inlineMap (Core.ALit l::newPs) ps
+    |Core.AWasm w::ps -> 
+        simplifyPrims inlineMap (Core.AWasm w::newPs) ps
+    |[] -> Core.Prim (newPs |> List.rev)
 
+    
 
 let rec simplify inlineMap = function
     |(b, Core.TopExpr e)::xs -> 

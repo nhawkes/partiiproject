@@ -2,6 +2,11 @@ module Core
 
 type Lit = I32 of int32
 
+type Prim<'v> =
+    |AWasm of Wasm.Instr
+    |ALit of Lit
+    |AVar of 'v
+
 type Expr<'v, 'b> =
     | Var of 'v
     | Lit of Lit
@@ -9,7 +14,7 @@ type Expr<'v, 'b> =
     | Let of Binds<'v, 'b> * Expr<'v, 'b>
     | Case of Expr<'v, 'b> * 'b * Alts<'v, 'b>
     | App of Expr<'v, 'b> * Expr<'v, 'b>
-    | Prim of Stg.Atom<'v> list
+    | Prim of Prim<'v> list
     | Unreachable
 
 and Binds<'v, 'b> =
@@ -68,8 +73,9 @@ and mapPat f = function
     
 and mapPrim f =
     function
-    | Stg.AVar v -> Stg.AVar(v)
-    | Stg.ALit l -> Stg.ALit l
+    | AVar v -> AVar v
+    | ALit l -> ALit l
+    | AWasm w -> AWasm w
 
 let mapTopLevel f =
     function
