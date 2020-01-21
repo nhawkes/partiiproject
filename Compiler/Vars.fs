@@ -18,6 +18,7 @@ type Unique =
     | JoinPoint of int
     | Worker of Unique
     | Inline of int * Unique
+    | Specialized of int * Unique
 
 type CallType =
     | JoinCall
@@ -84,6 +85,13 @@ let inlineVar =
         let next = !i
         i := !i + 1
         fun var -> {var with unique=Inline(next, var.unique)}
+
+let specializeVar = 
+    let i = ref 0
+    fun () -> 
+        let next = !i
+        i := !i + 1
+        fun var -> {var with unique=Specialized(next, var.unique)}
 
 
 let integerConstr =

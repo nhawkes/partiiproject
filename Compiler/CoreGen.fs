@@ -48,10 +48,13 @@ and genCases (def, (matchexpr, typ), es, bind) subCases otherCases =
     | [] ->
         let bindV = bind |> Option.defaultWith (fun () -> Vars.generateVar Types.ValueT)
         let defVar = Vars.generateJoin (Types.FuncT(Types.SatFunc, Types.ValueT, bindV.typ))
-        let defaultExpr = genManyMatch def es subCases
+        let bindVArg = Vars.generateVar bindV.typ
+        let defaultExpr = 
+            genManyMatch def es subCases |> 
+            Core.mapVarsExpr(function |v when v=bindV -> bindVArg |v -> v)
         let d = Core.App(Core.Var defVar, Core.Var bindV)
         Core.Let
-            (Core.Join(defVar, Core.Lam(bindV, defaultExpr)),
+            (Core.Join(defVar, Core.Lam(bindVArg, defaultExpr)),
              genCasesWithDefault
                  (d, [], (matchexpr, typ), es, bindV)
                  otherCases)

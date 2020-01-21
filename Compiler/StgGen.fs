@@ -128,8 +128,8 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
         
         {
                 lets = List.concat [lf.lets; lfJ.lets]
-                locals = List.concat [lf.locals; lfJ.locals]
-                args = lf.args
+                locals = List.concat [args; lf.locals; lfJ.locals]
+                args = []
                 frees = frees
                 expr = expr
         }

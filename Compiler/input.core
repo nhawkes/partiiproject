@@ -1,0 +1,183 @@
+[(BuiltIn IntegerConstr$Int , TopConstr [InternalField 0$ ]);
+ (BuiltIn AddOp$ ,
+  TopExpr
+    (Lam
+       (Internal "xValue"$ ,
+        Lam
+          (Internal "yValue"$ ,
+           Let
+             (Rec [],
+              Let
+                (Join (JoinPoint 0$ , Lam (Generated 1$ ,Unreachable)),
+                 Case
+                   (Var Internal "xValue"$ ,Generated 0$ ,
+                    ([((DataAlt BuiltIn IntegerConstr$Int , [Internal "xInt"$ ]),
+                       Let
+                         (Join
+                            (JoinPoint 1$ ,
+                             Lam
+                               (Generated 2$ ,
+                                Let
+                                  (Join
+                                     (JoinPoint 2$ ,
+                                      Lam (Generated 4$ ,Unreachable)),
+                                   Case
+                                     (Var Internal "yValue"$ ,Generated 3$ ,
+                                      ([((DataAlt BuiltIn IntegerConstr$Int ,
+                                          [Internal "yInt"$ ]),
+                                         Let
+                                           (Join
+                                              (JoinPoint 3$ ,
+                                               Lam
+                                                 (Generated 5$ ,
+                                                  Let
+                                                    (Join
+                                                       (JoinPoint 4$ ,
+                                                        Lam
+                                                          (Generated 6$ ,
+                                                           App
+                                                             (Var
+                                                                BuiltIn
+                                                                  IntegerConstr$
+                                                                Int ,
+                                                              Var Generated 6$ ))),
+                                                     Case
+                                                       (Prim
+                                                          [AWasm I32Add;
+                                                           AVar Generated 5$ ;
+                                                           AVar Generated 2$ ],
+                                                        Internal "rInt"$ ,
+                                                        ([],
+                                                         App
+                                                           (Var JoinPoint 4$ ,
+                                                            Var
+                                                              Internal "rInt"$ )))))),
+                                            Case
+                                              (Var Internal "yInt"$ ,
+                                               Internal "yInt"$ ,
+                                               ([],
+                                                App
+                                                  (Var JoinPoint 3$ ,
+                                                   Var Internal "yInt"$ )))))],
+                                       App (Var JoinPoint 2$ ,Var Generated 3$ )))))),
+                          Case
+                            (Var Internal "xInt"$ ,Internal "xInt"$ ,
+                             ([], App (Var JoinPoint 1$ ,Var Internal "xInt"$ )))))],
+                     App (Var JoinPoint 0$ ,Var Generated 0$ )))))))));
+ (BuiltIn SubOp$ ,
+  TopExpr
+    (Lam
+       (Internal "xValue"$ ,
+        Lam
+          (Internal "yValue"$ ,
+           Let
+             (Rec [],
+              Let
+                (Join (JoinPoint 5$ , Lam (Generated 8$ ,Unreachable)),
+                 Case
+                   (Var Internal "xValue"$ ,Generated 7$ ,
+                    ([((DataAlt BuiltIn IntegerConstr$Int , [Internal "xInt"$ ]),
+                       Let
+                         (Join
+                            (JoinPoint 6$ ,
+                             Lam
+                               (Generated 9$ ,
+                                Let
+                                  (Join
+                                     (JoinPoint 7$ ,
+                                      Lam (Generated 11$ ,Unreachable)),
+                                   Case
+                                     (Var Internal "yValue"$ ,Generated 10$ ,
+                                      ([((DataAlt BuiltIn IntegerConstr$Int ,
+                                          [Internal "yInt"$ ]),
+                                         Let
+                                           (Join
+                                              (JoinPoint 8$ ,
+                                               Lam
+                                                 (Generated 12$ ,
+                                                  Let
+                                                    (Join
+                                                       (JoinPoint 9$ ,
+                                                        Lam
+                                                          (Generated 13$ ,
+                                                           App
+                                                             (Var
+                                                                BuiltIn
+                                                                  IntegerConstr$
+                                                                Int ,
+                                                              Var Generated 13$ ))),
+                                                     Case
+                                                       (Prim
+                                                          [AWasm I32Sub;
+                                                           AVar Generated 12$ ;
+                                                           AVar Generated 9$ ],
+                                                        Internal "rInt"$ ,
+                                                        ([],
+                                                         App
+                                                           (Var JoinPoint 9$ ,
+                                                            Var
+                                                              Internal "rInt"$ )))))),
+                                            Case
+                                              (Var Internal "yInt"$ ,
+                                               Internal "yInt"$ ,
+                                               ([],
+                                                App
+                                                  (Var JoinPoint 8$ ,
+                                                   Var Internal "yInt"$ )))))],
+                                       App
+                                         (Var JoinPoint 7$ ,Var Generated 10$ )))))),
+                          Case
+                            (Var Internal "xInt"$ ,Internal "xInt"$ ,
+                             ([], App (Var JoinPoint 6$ ,Var Internal "xInt"$ )))))],
+                     App (Var JoinPoint 5$ ,Var Generated 7$ )))))))));
+ (User 0$fibonacci ,
+  TopExpr
+    (Lam
+       (User 1$x ,
+        Let
+          (Rec [],
+           Let
+             (Join
+                (JoinPoint 10$ ,
+                 Lam
+                   (Generated 14$ ,
+                    App
+                      (App
+                         (Var BuiltIn AddOp$ ,
+                          App
+                            (Var User 0$fibonacci ,
+                             App
+                               (App (Var BuiltIn SubOp$ ,Var User 1$x ),
+                                App (Var BuiltIn IntegerConstr$Int ,Lit (I32 1))))),
+                       App
+                         (Var User 0$fibonacci ,
+                          App
+                            (App (Var BuiltIn SubOp$ ,Var User 1$x ),
+                             App (Var BuiltIn IntegerConstr$Int ,Lit (I32 2))))))),
+              Case
+                (Var User 1$x ,Anonymous 0$ ,
+                 ([((DataAlt BuiltIn IntegerConstr$Int , [Generated 15$ ]),
+                    Let
+                      (Join
+                         (JoinPoint 11$ ,
+                          Lam
+                            (Generated 17$ ,
+                             App (Var JoinPoint 10$ ,Var Anonymous 0$ ))),
+                       Case
+                         (Var Generated 15$ ,Generated 16$ ,
+                          ([((LitAlt (I32 0), []),
+                             App (Var BuiltIn IntegerConstr$Int ,Lit (I32 1)));
+                            ((LitAlt (I32 1), []),
+                             App (Var BuiltIn IntegerConstr$Int ,Lit (I32 1)))],
+                           App (Var JoinPoint 11$ ,Var Generated 16$ )))))],
+                  App (Var JoinPoint 10$ ,Var Anonymous 0$ ))))))));
+ (Export "fibonacci"$fibonacci ,
+  TopExpr
+    (Lam
+       (User 2$x ,
+        Case
+          (App
+             (Var User 0$fibonacci ,
+              App (Var BuiltIn IntegerConstr$Int ,Var User 2$x )),Generated 18$ ,
+           ([((DataAlt BuiltIn IntegerConstr$Int , [Generated 19$ ]),
+              Var Generated 19$ )], Unreachable)))))]

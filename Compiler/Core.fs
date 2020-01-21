@@ -86,3 +86,47 @@ let mapTopBind f (b, e) = (f b, mapTopLevel f e)
 
 let mapProgram f p = p |> List.map (mapTopBind f)
 
+
+let rec mapVarsExpr f : Expr<'u, 'b> -> Expr<'v, 'b> =
+    function
+    | Var v -> Var (f v)
+    | Lit l -> Lit l
+    | Lam(b, e) -> Lam(b, mapVarsExpr f e)
+    | Let(bs, e) -> Let(mapVarsBinds f bs, mapVarsExpr f e)
+    | Case(e, b, alts) -> Case(mapVarsExpr f e, b, mapVarsAlts f alts)
+    | App(a, b) -> App(mapVarsExpr f a, mapVarsExpr f b)
+    | Prim ps -> Prim(ps |> List.map (mapVarsPrim f))
+    | Unreachable -> Unreachable
+
+and mapVarsBinds f =
+    function
+    | Rec bs -> Rec(bs |> List.map (fun (b, e) -> (b, mapVarsExpr f e)))
+    | NonRec(b, e) -> NonRec(b, mapVarsExpr f e)
+    | Join(b, e) -> Join(b, mapVarsExpr f e)
+
+
+and mapVarsAlts f = function
+    | (cases, def) -> cases |> List.map (mapVarsAlt f), mapVarsExpr f def
+
+and mapVarsAlt f = function
+    | (ev, vs), e -> (mapVarsPat f ev, vs), mapVarsExpr f e
+
+and mapVarsPat f = function
+    |DataAlt v -> DataAlt (f v)
+    |LitAlt l -> LitAlt l
+    
+and mapVarsPrim f =
+    function
+    | AVar v -> AVar (f v)
+    | ALit l -> ALit l
+    | AWasm w -> AWasm w
+
+let mapVarsTopLevel f =
+    function
+    | TopExpr e -> TopExpr(mapVarsExpr f e)
+    | TopConstr vs -> TopConstr(vs |> List.map f)
+
+let mapVarsTopBind f (b, e) = (f b, mapVarsTopLevel f e)
+
+let mapVarsProgram f p = p |> List.map (mapVarsTopBind f)
+

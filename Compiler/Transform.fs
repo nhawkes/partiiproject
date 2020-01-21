@@ -7,40 +7,6 @@ let isBuiltIn b =
     |BuiltIn _ -> true
     |_ -> false
     
-let rec makeWrapper call vs = function
-    |Core.Lam(v, e) -> makeWrapper call (v::vs) e
-    |_ ->
-        makeWrapperLambda call [] (vs |> List.rev)
-
-and makeWrapperLambda call lams = function
-    |v::vs -> Core.Lam(v, makeWrapperLambda call (v::lams) vs)
-    |[] ->
-        makeWrapperBind call [] (lams |> List.rev)
-
-and makeWrapperBind call binds = function
-    |v::vs -> 
-        match v.analysis with
-        |Lazy ->
-            makeWrapperBind call (v::binds) vs
-        |Strict _ ->
-            let newUnique = (generateVar v.var.typ).unique
-            let var = {var={v.var with unique=newUnique}; analysis=v.analysis} 
-            Core.Case(Core.Var(v.var), var, ([], makeWrapperBind call (var::binds) vs))
-        |HyperStrict ->
-            let var = {var=generateVar v.var.typ; analysis=v.analysis} 
-            Core.Case(Core.Var(v.var), var, ([], makeWrapperBind call (var::binds) vs))
-    |[] ->
-        makeWrapperCall call (binds)
-
-
-
-and makeWrapperCall call : List<_> -> Core.Expr<Var, AnalysedVar<_>> = function
-    |v::vs ->
-        Core.App(makeWrapperCall call vs, Core.Var v.var)
-    |[] -> Core.Var (call.var)
-
-
-
 let rec getSpecializations args = function
     | Core.Var v -> Map.empty
     | Core.Lit l -> Map.empty
@@ -54,16 +20,77 @@ let rec getSpecializations args = function
     | Core.Case(_, b, (_, e)) -> 
         getSpecializations args e
     | Core.App(a, b) -> 
-        getSpecializations args b
+        getSpecializations args b    
+
+let rec makeWrapper call vs = function
+    |Core.Lam(v, e) -> makeWrapper call (v::vs) e
+    |e ->
+        let toSpecialize = getSpecializations (vs |> List.map (fun v -> v.var)) e
+        let specializations, extraProgram =
+            match vs with
+            |[] -> Map.empty, []
+            |v::_ ->
+                match toSpecialize |> Map.tryFind v.var with
+                |Some([Core.DataAlt(c), [value]]) ->
+                    let specCall = {var=specializeVar() call.var; analysis=call.analysis} 
+                    Map.ofList [v, [c, value, specCall.var]], [(specCall, Core.TopExpr (makeSpecialization e [v,c, value]))]
+                |None -> Map.empty, []
+        makeWrapperLambda call specializations [] (vs |> List.rev), extraProgram
+
+and makeSpecialization e = function
+    |[v, c, value] ->
+        let newUnique = (generateVar value.var.typ).unique
+        let lam = {var={value.var with unique=newUnique}; analysis=value.analysis} 
+        Core.Lam(lam, Core.Case(Core.App(Core.Var(c), Core.Var(lam.var)), v, ([], e)))
+
+and makeWrapperLambda call specializations lams = function
+    |v::vs -> Core.Lam(v, makeWrapperLambda call specializations (v::lams) vs)
+    |[] ->
+        makeWrapperBind call specializations [] (lams |> List.rev)
+
+and makeWrapperBind call specializations binds = function
+    |v::vs -> 
+        match v.analysis with
+        |Lazy ->
+            makeWrapperBind call specializations (v::binds) vs
+        |Strict _ ->
+            let newUnique = (generateVar v.var.typ).unique
+            let var = {var={v.var with unique=newUnique}; analysis=v.analysis} 
+            let alts = specializations |> Map.tryFind v |> Option.defaultValue [] |> specializationAlts
+            Core.Case(Core.Var(v.var), var, (alts, makeWrapperBind call specializations (var::binds) vs))
+        |HyperStrict ->
+            let newUnique = (generateVar v.var.typ).unique
+            let var = {var={v.var with unique=newUnique}; analysis=v.analysis} 
+            Core.Case(Core.Var(v.var), var, ([], makeWrapperBind call specializations (var::binds) vs))
+    |[] ->
+        makeWrapperCall call (binds)
+
+and specializationAlts = function
+    |(c, value, specCall)::specs ->
+        let alts = specializationAlts specs
+        let v = {var=specializeVar() value.var; analysis=value.analysis} 
+        ((Core.DataAlt(c), [v]), Core.App(Core.Var(specCall), Core.Var(v.var)))::alts
+    |[] -> []     
+
+
+
+
+and makeWrapperCall call : List<_> -> Core.Expr<Var, AnalysedVar<_>> = function
+    |v::vs ->
+        Core.App(makeWrapperCall call vs, Core.Var v.var)
+    |[] -> Core.Var (call.var)
+
+
         
 let rec wwTransform  = function
     |(b, Core.TopExpr e)::xs when isBuiltIn b ->
         (b, Core.TopExpr e)::wwTransform xs
     |(b, Core.TopExpr (e:Core.Expr<Var, AnalysedVar<_>>))::xs -> 
         let workerVar = {b with var = {b.var with Vars.unique = Worker b.var.unique}}
-        let wrapper = b, Core.TopExpr(makeWrapper workerVar [] e)
+        let wrapperE, extraProgram = makeWrapper workerVar [] e
+        let wrapper = b, Core.TopExpr(wrapperE)
         let worker = workerVar, Core.TopExpr e
-        wrapper::worker::wwTransform xs
+        List.concat[[worker;wrapper]; extraProgram; wwTransform xs]
     |(v, Core.TopConstr vs)::xs -> 
         (v, Core.TopConstr vs)::wwTransform xs
     |[] -> 
@@ -223,7 +250,7 @@ and simplifyBinds inlineMap e = function
         |_ ->
         let newRhs = simplifyExpr inlineMap rhs 
         // Inline small values
-        if isSmall newRhs then
+        if false && isSmall newRhs then
             let newInlineMap = inlineMap |> Map.add b1.var newRhs
             simplifyExpr newInlineMap e
         else
@@ -237,21 +264,26 @@ and simplifyCase inlineMap (e, b, (alts, def)) =
     let (newAlts, newDef) = simplifyAlts inlineMap (alts, def)
     match newE, b, (newAlts, newDef) with
     |Core.App(Core.Var(v), value), b, (alts, def) when v.callType=Some ConstrCall ->        
-        match alts |> List.tryPick(function ((Core.DataAlt v2, [bs1]), e) -> Some(bs1, e) |_ -> None) with
-        |Some(bs1, altE) -> 
-            if value |> isSmall then
-                simplifyExpr (Map.ofList [bs1.var, value]) altE
+        match alts |> List.tryPick(function ((Core.DataAlt v2, [bs1]), e) when v = v2 -> Some(bs1, e) |_ -> None) with
+        |Some(bs1, altE)  -> 
+            if false && value |> isSmall then
+                printfn "%A" bs1.var
+                printfn "%A" b.var
+                simplifyExpr (Map.ofList [bs1.var, value; b.var, Core.App(Core.Var(v), value)]) altE
             else
-                Core.Case(value, bs1, ([], altE))
+                Core.Case(newE, b, ([((Core.DataAlt v, [bs1]), altE)], Core.Unreachable))
         |None ->  
-            simplifyExpr inlineMap def
-    |value, v, ([], _) when value |> isSmall ->
+            if value |> isSmall then
+                simplifyExpr (Map.ofList [b.var, Core.App(Core.Var(v), value)]) def
+            else
+                Core.Case(newE, b, ([], def))
+    |value, v, ([], _) when false && value |> isSmall ->
         match def with
         |Core.Prim _ ->
             // The case around prim is needed 
             Core.Case(value, v, (alts, newDef))
         |_ -> simplifyExpr (Map.ofList [v.var, value]) newDef
-    |(e, b, (alts, def))  -> Core.Case(e, b, (alts, def))
+    |_  -> Core.Case(newE, b, (newAlts, newDef))
 
 and isConstr = function
     |Core.Var{callType=Some ConstrCall} -> true
@@ -286,11 +318,12 @@ let rec simplify inlineMap = function
     |[] -> 
         []
 
-let shouldInlineTopLevel b =
+let isWrapper b =
     match b.var.unique with
-    |BuiltIn _ -> true
-    |Worker (BuiltIn _) -> true
+    |BuiltIn _ -> false
+    |Worker (BuiltIn _) -> false
     |Worker (_) -> false
+    |Specialized(_) -> false
     |_ -> true
 
 
@@ -309,9 +342,11 @@ let rec getTopInlineMap shouldInline = function
 
 let transform program =     
     let analysis = program |> Analysis.analyse
-    let ww = analysis |> wwTransform
-    let topInlineMap = getTopInlineMap isBuiltIn analysis
-    System.IO.File.WriteAllText("./Compiler/input.core", sprintf "%A" ww)
-    let result = simplify topInlineMap ww
+    let builtinInlineMap = getTopInlineMap isBuiltIn analysis
+    let simplified = simplify builtinInlineMap analysis
+    let ww = simplified |> wwTransform
+    let wrapperInlineMap = getTopInlineMap isWrapper ww
+    let result = simplify Map.empty ww
+    System.IO.File.WriteAllText("./Compiler/input.core", sprintf "%A" analysis)
     System.IO.File.WriteAllText("./Compiler/output.core", sprintf "%A" result)
-    result
+    analysis
