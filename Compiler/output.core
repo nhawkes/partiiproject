@@ -1,992 +1,217 @@
-[(BuiltIn IntegerConstr$Int , TopConstr [InternalField 0$ ]);
- (BuiltIn AddOp$ ,
+[(IntegerConstr , TopConstr [intern_0 ]);
+ (AddOp ,
   TopExpr
     (Lam
-       (Internal "xValue"$ ,
+       (intern_xValue ,
         Lam
-          (Internal "yValue"$ ,
-           Let
-             (Join (JoinPoint 0$ , Lam (Generated 1$ ,Unreachable)),
-              Case
-                (Var Internal "xValue"$ ,Generated 0$ ,
-                 ([((DataAlt BuiltIn IntegerConstr$Int , [Internal "xInt"$ ]),
-                    Let
-                      (Join
-                         (JoinPoint 1$ ,
-                          Lam
-                            (Generated 2$ ,
-                             Let
-                               (Join
-                                  (JoinPoint 2$ ,
-                                   Lam (Generated 4$ ,Unreachable)),
-                                Case
-                                  (Var Internal "yValue"$ ,Generated 3$ ,
-                                   ([((DataAlt BuiltIn IntegerConstr$Int ,
-                                       [Internal "yInt"$ ]),
-                                      Let
-                                        (Join
-                                           (JoinPoint 3$ ,
-                                            Lam
-                                              (Generated 5$ ,
-                                               Let
-                                                 (Join
-                                                    (JoinPoint 4$ ,
-                                                     Lam
-                                                       (Generated 6$ ,
-                                                        App
-                                                          (Var
-                                                             BuiltIn
-                                                               IntegerConstr$
-                                                             Int ,
-                                                           Var Generated 6$ ))),
-                                                  Case
-                                                    (Prim
-                                                       [AWasm I32Add;
-                                                        AVar Generated 5$ ;
-                                                        AVar Generated 2$ ],
-                                                     Internal "rInt"$ ,
-                                                     ([],
-                                                      App
-                                                        (Var JoinPoint 4$ ,
-                                                         Var Internal "rInt"$ )))))),
-                                         Case
-                                           (Var Internal "yInt"$ ,
-                                            Internal "yInt"$ ,
-                                            ([],
-                                             App
-                                               (Var JoinPoint 3$ ,
-                                                Var Internal "yInt"$ )))))],
-                                    App (Var JoinPoint 2$ ,Var Generated 3$ )))))),
+          (intern_yValue ,
+           Case
+             (Var intern_xValue ,gen_0 ,
+              ([((DataAlt IntegerConstr , [intern_xInt ]),
+                 Case
+                   (Var intern_yValue ,gen_3 ,
+                    ([((DataAlt IntegerConstr , [intern_yInt ]),
                        Case
-                         (Var Internal "xInt"$ ,Internal "xInt"$ ,
-                          ([], App (Var JoinPoint 1$ ,Var Internal "xInt"$ )))))],
-                  App (Var JoinPoint 0$ ,Var Generated 0$ ))))))));
- (BuiltIn SubOp$ ,
+                         (Case
+                            (Var intern_yInt ,gen_5 ,
+                             ([],
+                              Case
+                                (Var intern_xInt ,gen_2 ,
+                                 ([],
+                                  Prim [AWasm I32Add; AVar gen_5 ; AVar gen_2 ])))),
+                          intern_rInt ,
+                          ([], App (Var IntegerConstr ,Var intern_rInt ))))],
+                     Unreachable)))], Unreachable))))));
+ (SubOp ,
   TopExpr
     (Lam
-       (Internal "xValue"$ ,
+       (intern_xValue ,
         Lam
-          (Internal "yValue"$ ,
-           Let
-             (Join (JoinPoint 5$ , Lam (Generated 8$ ,Unreachable)),
-              Case
-                (Var Internal "xValue"$ ,Generated 7$ ,
-                 ([((DataAlt BuiltIn IntegerConstr$Int , [Internal "xInt"$ ]),
-                    Let
-                      (Join
-                         (JoinPoint 6$ ,
-                          Lam
-                            (Generated 9$ ,
-                             Let
-                               (Join
-                                  (JoinPoint 7$ ,
-                                   Lam (Generated 11$ ,Unreachable)),
-                                Case
-                                  (Var Internal "yValue"$ ,Generated 10$ ,
-                                   ([((DataAlt BuiltIn IntegerConstr$Int ,
-                                       [Internal "yInt"$ ]),
-                                      Let
-                                        (Join
-                                           (JoinPoint 8$ ,
-                                            Lam
-                                              (Generated 12$ ,
-                                               Let
-                                                 (Join
-                                                    (JoinPoint 9$ ,
-                                                     Lam
-                                                       (Generated 13$ ,
-                                                        App
-                                                          (Var
-                                                             BuiltIn
-                                                               IntegerConstr$
-                                                             Int ,
-                                                           Var Generated 13$ ))),
-                                                  Case
-                                                    (Prim
-                                                       [AWasm I32Sub;
-                                                        AVar Generated 12$ ;
-                                                        AVar Generated 9$ ],
-                                                     Internal "rInt"$ ,
-                                                     ([],
-                                                      App
-                                                        (Var JoinPoint 9$ ,
-                                                         Var Internal "rInt"$ )))))),
-                                         Case
-                                           (Var Internal "yInt"$ ,
-                                            Internal "yInt"$ ,
-                                            ([],
-                                             App
-                                               (Var JoinPoint 8$ ,
-                                                Var Internal "yInt"$ )))))],
-                                    App (Var JoinPoint 7$ ,Var Generated 10$ )))))),
+          (intern_yValue ,
+           Case
+             (Var intern_xValue ,gen_7 ,
+              ([((DataAlt IntegerConstr , [intern_xInt ]),
+                 Case
+                   (Var intern_yValue ,gen_10 ,
+                    ([((DataAlt IntegerConstr , [intern_yInt ]),
                        Case
-                         (Var Internal "xInt"$ ,Internal "xInt"$ ,
-                          ([], App (Var JoinPoint 6$ ,Var Internal "xInt"$ )))))],
-                  App (Var JoinPoint 5$ ,Var Generated 7$ ))))))));
- (Worker (User 0)$fibonacci ,
+                         (Case
+                            (Var intern_yInt ,gen_12 ,
+                             ([],
+                              Case
+                                (Var intern_xInt ,gen_9 ,
+                                 ([],
+                                  Prim [AWasm I32Sub; AVar gen_12 ; AVar gen_9 ])))),
+                          intern_rInt ,
+                          ([], App (Var IntegerConstr ,Var intern_rInt ))))],
+                     Unreachable)))], Unreachable))))));
+ (work_fibonacci ,
   TopExpr
     (Lam
-       (User 1$x ,
-        Let
-          (Join
-             (JoinPoint 10$ ,
-              Lam
-                (Generated 14$ ,
-                 Let
-                   (Join
-                      (Inline (0,JoinPoint 0)$ ,
-                       Lam (Inline (0,Generated 1)$ ,Unreachable)),
-                    Case
-                      (App
-                         (Var User 0$fibonacci ,
-                          Let
-                            (Join
-                               (Inline (4,Inline (1,JoinPoint 5))$ ,
-                                Lam
-                                  (Inline (4,Inline (1,Generated 8))$ ,
-                                   Unreachable)),
-                             Case
-                               (Var User 1$x ,
-                                Inline (4,Inline (1,Generated 7))$ ,
-                                ([((DataAlt BuiltIn IntegerConstr$Int ,
-                                    [Inline (4,Inline (1,Internal "xInt"))$ ]),
-                                   Let
-                                     (Join
-                                        (Inline (4,Inline (1,JoinPoint 6))$ ,
-                                         Lam
-                                           (Inline (4,Inline (1,Generated 9))$ ,
-                                            Let
-                                              (Join
-                                                 (Inline (4,Inline (1,JoinPoint 7))$ ,
-                                                  Lam
-                                                    (Inline (4,Inline (1,Generated 11))$ ,
-                                                     Unreachable)),
-                                               Case
-                                                 (App
-                                                    (Var
-                                                       BuiltIn IntegerConstr$
-                                                       Int ,Lit (I32 1)),
-                                                  Inline (4,Inline (1,Generated 10))$ ,
-                                                  ([((DataAlt
-                                                        BuiltIn IntegerConstr$
-                                                        Int ,
-                                                      [Inline (4,Inline (1,Internal "yInt"))$ ]),
-                                                     Let
-                                                       (Join
-                                                          (Inline (4,Inline (1,JoinPoint 8))$ ,
-                                                           Lam
-                                                             (Inline (4,Inline (1,Generated 12))$ ,
-                                                              Let
-                                                                (Join
-                                                                   (Inline (4,Inline (1,JoinPoint 9))$ ,
-                                                                    Lam
-                                                                      (Inline (4,Inline (1,Generated 13))$ ,
-                                                                       App
-                                                                         (Var
-                                                                            BuiltIn
-                                                                              IntegerConstr$
-                                                                            Int ,
-                                                                          Var
-                                                                            Inline
-                                                                              (4,
-                                                                               Inline
-                                                                                 (1,
-                                                                                  Generated
-                                                                                    13))$
-                                                                             ))),
-                                                                 Case
-                                                                   (Prim
-                                                                      [AWasm
-                                                                         I32Sub;
-                                                                       AVar
-                                                                         Inline
-                                                                           (4,
-                                                                            Inline
-                                                                              (1,
-                                                                               Generated
-                                                                                 12))$
-                                                                          ;
-                                                                       AVar
-                                                                         Inline
-                                                                           (4,
-                                                                            Inline
-                                                                              (1,
-                                                                               Generated
-                                                                                 9))$
-                                                                          ],
-                                                                    Inline (4,Inline (1,Internal "rInt"))$ ,
-                                                                    ([],
-                                                                     App
-                                                                       (Var
-                                                                          Inline
-                                                                            (4,
-                                                                             Inline
-                                                                               (1,
-                                                                                JoinPoint
-                                                                                  9))$
-                                                                           ,
-                                                                        Var
-                                                                          Inline
-                                                                            (4,
-                                                                             Inline
-                                                                               (1,
-                                                                                Internal
-                                                                                  "rInt"))$
-                                                                           )))))),
-                                                        Case
-                                                          (Var
-                                                             Inline
-                                                               (4,
-                                                                Inline
-                                                                  (1,
-                                                                   Internal
-                                                                     "yInt"))$ ,
-                                                           Inline (4,Inline (1,Internal "yInt"))$ ,
-                                                           ([],
-                                                            App
-                                                              (Var
-                                                                 Inline
-                                                                   (4,
-                                                                    Inline
-                                                                      (1,
-                                                                       JoinPoint
-                                                                         8))$ ,
-                                                               Var
-                                                                 Inline
-                                                                   (4,
-                                                                    Inline
-                                                                      (1,
-                                                                       Internal
-                                                                         "yInt"))$
-                                                                  )))))],
-                                                   Unreachable))))),
-                                      Case
-                                        (Var
-                                           Inline (4,Inline (1,Internal "xInt"))$
-                                            ,
-                                         Inline (4,Inline (1,Internal "xInt"))$ ,
-                                         ([],
-                                          App
-                                            (Var
-                                               Inline (4,Inline (1,JoinPoint 6))$
-                                                ,
-                                             Var
-                                               Inline
-                                                 (4,Inline (1,Internal "xInt"))$
-                                                )))))],
-                                 App
-                                   (Var Inline (4,Inline (1,JoinPoint 5))$ ,
-                                    Var Inline (4,Inline (1,Generated 7))$ ))))),
-                       Inline (0,Generated 0)$ ,
-                       ([((DataAlt BuiltIn IntegerConstr$Int ,
-                           [Inline (0,Internal "xInt")$ ]),
-                          Let
-                            (Join
-                               (Inline (0,JoinPoint 1)$ ,
-                                Lam
-                                  (Inline (0,Generated 2)$ ,
-                                   Let
-                                     (Join
-                                        (Inline (0,JoinPoint 2)$ ,
-                                         Lam
-                                           (Inline (0,Generated 4)$ ,Unreachable)),
-                                      Case
-                                        (App
-                                           (Var User 0$fibonacci ,
-                                            Let
-                                              (Join
-                                                 (Inline (8,Inline (5,JoinPoint 5))$ ,
-                                                  Lam
-                                                    (Inline (8,Inline (5,Generated 8))$ ,
-                                                     Unreachable)),
-                                               Case
-                                                 (Var User 1$x ,
-                                                  Inline (8,Inline (5,Generated 7))$ ,
-                                                  ([((DataAlt
-                                                        BuiltIn IntegerConstr$
-                                                        Int ,
-                                                      [Inline (8,Inline (5,Internal "xInt"))$ ]),
-                                                     Let
-                                                       (Join
-                                                          (Inline (8,Inline (5,JoinPoint 6))$ ,
-                                                           Lam
-                                                             (Inline (8,Inline (5,Generated 9))$ ,
-                                                              Let
-                                                                (Join
-                                                                   (Inline (8,Inline (5,JoinPoint 7))$ ,
-                                                                    Lam
-                                                                      (Inline (8,Inline (5,Generated 11))$ ,
-                                                                       Unreachable)),
-                                                                 Case
-                                                                   (App
-                                                                      (Var
-                                                                         BuiltIn
-                                                                           IntegerConstr$
-                                                                         Int ,
-                                                                       Lit
-                                                                         (I32 2)),
-                                                                    Inline (8,Inline (5,Generated 10))$ ,
-                                                                    ([((DataAlt
-                                                                          BuiltIn
-                                                                            IntegerConstr$
-                                                                          Int ,
-                                                                        [Inline (8,Inline (5,Internal "yInt"))$ ]),
-                                                                       Let
-                                                                         (Join
-                                                                            (Inline (8,Inline (5,JoinPoint 8))$ ,
-                                                                             Lam
-                                                                               (Inline (8,Inline (5,Generated 12))$ ,
-                                                                                Let
-                                                                                  (Join
-                                                                                     (Inline (8,Inline (5,JoinPoint 9))$ ,
-                                                                                      Lam
-                                                                                        (Inline (8,Inline (5,Generated 13))$ ,
-                                                                                         App
-                                                                                           (Var
-                                                                                              BuiltIn
-                                                                                                IntegerConstr$
-                                                                                              Int ,
-                                                                                            Var
-                                                                                              Inline
-                                                                                                (8,
-                                                                                                 Inline
-                                                                                                   (5,
-                                                                                                    Generated
-                                                                                                      13))$
-                                                                                               ))),
-                                                                                   Case
-                                                                                     (Prim
-                                                                                        [AWasm
-                                                                                           I32Sub;
-                                                                                         AVar
-                                                                                           Inline
-                                                                                             (8,
-                                                                                              Inline
-                                                                                                (5,
-                                                                                                 Generated
-                                                                                                   12))$
-                                                                                            ;
-                                                                                         AVar
-                                                                                           Inline
-                                                                                             (8,
-                                                                                              Inline
-                                                                                                (5,
-                                                                                                 Generated
-                                                                                                   9))$
-                                                                                            ],
-                                                                                      Inline (8,Inline (5,Internal "rInt"))$ ,
-                                                                                      ([],
-                                                                                       App
-                                                                                         (Var
-                                                                                            Inline
-                                                                                              (8,
-                                                                                               Inline
-                                                                                                 (5,
-                                                                                                  JoinPoint
-                                                                                                    9))$
-                                                                                             ,
-                                                                                          Var
-                                                                                            Inline
-                                                                                              (8,
-                                                                                               Inline
-                                                                                                 (5,
-                                                                                                  Internal
-                                                                                                    "rInt"))$
-                                                                                             )))))),
-                                                                          Case
-                                                                            (Var
-                                                                               Inline
-                                                                                 (8,
-                                                                                  Inline
-                                                                                    (5,
-                                                                                     Internal
-                                                                                       "yInt"))$
-                                                                                ,
-                                                                             Inline (8,Inline (5,Internal "yInt"))$ ,
-                                                                             ([],
-                                                                              App
-                                                                                (Var
-                                                                                   Inline
-                                                                                     (8,
-                                                                                      Inline
-                                                                                        (5,
-                                                                                         JoinPoint
-                                                                                           8))$
-                                                                                    ,
-                                                                                 Var
-                                                                                   Inline
-                                                                                     (8,
-                                                                                      Inline
-                                                                                        (5,
-                                                                                         Internal
-                                                                                           "yInt"))$
-                                                                                    )))))],
-                                                                     Unreachable))))),
-                                                        Case
-                                                          (Var
-                                                             Inline
-                                                               (8,
-                                                                Inline
-                                                                  (5,
-                                                                   Internal
-                                                                     "xInt"))$ ,
-                                                           Inline (8,Inline (5,Internal "xInt"))$ ,
-                                                           ([],
-                                                            App
-                                                              (Var
-                                                                 Inline
-                                                                   (8,
-                                                                    Inline
-                                                                      (5,
-                                                                       JoinPoint
-                                                                         6))$ ,
-                                                               Var
-                                                                 Inline
-                                                                   (8,
-                                                                    Inline
-                                                                      (5,
-                                                                       Internal
-                                                                         "xInt"))$
-                                                                  )))))],
-                                                   App
-                                                     (Var
-                                                        Inline
-                                                          (8,
-                                                           Inline
-                                                             (5,JoinPoint 5))$ ,
-                                                      Var
-                                                        Inline
-                                                          (8,
-                                                           Inline
-                                                             (5,Generated 7))$ ))))),
-                                         Inline (0,Generated 3)$ ,
-                                         ([((DataAlt BuiltIn IntegerConstr$Int ,
-                                             [Inline (0,Internal "yInt")$ ]),
-                                            Let
-                                              (Join
-                                                 (Inline (0,JoinPoint 3)$ ,
-                                                  Lam
-                                                    (Inline (0,Generated 5)$ ,
-                                                     Let
-                                                       (Join
-                                                          (Inline (0,JoinPoint 4)$ ,
-                                                           Lam
-                                                             (Inline (0,Generated 6)$ ,
-                                                              App
-                                                                (Var
-                                                                   BuiltIn
-                                                                     IntegerConstr$
-                                                                   Int ,
-                                                                 Var
-                                                                   Inline
-                                                                     (0,
-                                                                      Generated
-                                                                        6)$ ))),
-                                                        Case
-                                                          (Prim
-                                                             [AWasm I32Add;
-                                                              AVar
-                                                                Inline
-                                                                  (0,Generated 5)$
-                                                                 ;
-                                                              AVar
-                                                                Inline
-                                                                  (0,Generated 2)$
-                                                                 ],
-                                                           Inline (0,Internal "rInt")$ ,
-                                                           ([],
-                                                            App
-                                                              (Var
-                                                                 Inline
-                                                                   (0,
-                                                                    JoinPoint 4)$
-                                                                  ,
-                                                               Var
-                                                                 Inline
-                                                                   (0,
-                                                                    Internal
-                                                                      "rInt")$ )))))),
-                                               Case
-                                                 (Var
-                                                    Inline (0,Internal "yInt")$ ,
-                                                  Inline (0,Internal "yInt")$ ,
-                                                  ([],
-                                                   App
-                                                     (Var
-                                                        Inline (0,JoinPoint 3)$ ,
-                                                      Var
-                                                        Inline
-                                                          (0,Internal "yInt")$ )))))],
-                                          App
-                                            (Var Inline (0,JoinPoint 2)$ ,
-                                             Var Inline (0,Generated 3)$ )))))),
-                             Case
-                               (Var Inline (0,Internal "xInt")$ ,
-                                Inline (0,Internal "xInt")$ ,
-                                ([],
-                                 App
-                                   (Var Inline (0,JoinPoint 1)$ ,
-                                    Var Inline (0,Internal "xInt")$ )))))],
-                        App
-                          (Var Inline (0,JoinPoint 0)$ ,
-                           Var Inline (0,Generated 0)$ )))))),
-           Case
-             (Var User 1$x ,Anonymous 0$ ,
-              ([((DataAlt BuiltIn IntegerConstr$Int , [Generated 15$ ]),
-                 Let
-                   (Join
-                      (JoinPoint 11$ ,
-                       Lam
-                         (Generated 17$ ,
-                          App (Var JoinPoint 10$ ,Var Anonymous 0$ ))),
-                    Case
-                      (Var Generated 15$ ,Generated 16$ ,
-                       ([((LitAlt (I32 0), []),
-                          App (Var BuiltIn IntegerConstr$Int ,Lit (I32 1)));
-                         ((LitAlt (I32 1), []),
-                          App (Var BuiltIn IntegerConstr$Int ,Lit (I32 1)))],
-                        App (Var JoinPoint 11$ ,Var Generated 16$ )))))],
-               App (Var JoinPoint 10$ ,Var Anonymous 0$ )))))));
- (User 0$fibonacci ,
-  TopExpr
-    (Lam
-       (User 1$x ,
+       (x ,
         Case
-          (Var User 1$x ,Generated 21$x ,
-           ([((DataAlt BuiltIn IntegerConstr$Int ,
-               [Specialized (1,Generated 15)$ ]),
-              App
-                (Var Specialized (0,Worker (User 0))$fibonacci ,
-                 Var Specialized (1,Generated 15)$ ))],
-            App (Var Worker (User 0)$fibonacci ,Var Generated 21$x ))))));
- (Specialized (0,Worker (User 0))$fibonacci ,
+          (Var x ,anon_0 ,
+           ([((DataAlt IntegerConstr , [gen_15 ]),
+              Case
+                (Var gen_15 ,gen_16 ,
+                 ([((LitAlt (I32 0), []), App (Var IntegerConstr ,Lit (I32 1)));
+                   ((LitAlt (I32 1), []), App (Var IntegerConstr ,Lit (I32 1)))],
+                  Case
+                    (Case
+                       (Var x ,gen_7 ,
+                        ([((DataAlt IntegerConstr , [intern_xInt ]),
+                           Case
+                             (Case
+                                (Var intern_xInt ,gen_9 ,
+                                 ([],
+                                  Prim [AWasm I32Sub; ALit (I32 1); AVar gen_9 ])),
+                              intern_rInt ,
+                              ([],
+                               Case
+                                 (App
+                                    (Var spec_work_fibonacci ,Var intern_rInt ),
+                                  spec_gen_15 ,
+                                  ([], App (Var IntegerConstr ,Var spec_gen_15 ))))))],
+                         Unreachable)),gen_0 ,
+                     ([((DataAlt IntegerConstr , [intern_xInt ]),
+                        Case
+                          (Case
+                             (Var x ,gen_7 ,
+                              ([((DataAlt IntegerConstr , [intern_xInt ]),
+                                 Case
+                                   (Case
+                                      (Var intern_xInt ,gen_9 ,
+                                       ([],
+                                        Prim
+                                          [AWasm I32Sub; ALit (I32 2);
+                                           AVar gen_9 ])),intern_rInt ,
+                                    ([],
+                                     Case
+                                       (App
+                                          (Var spec_work_fibonacci ,
+                                           Var intern_rInt ),spec_gen_15 ,
+                                        ([],
+                                         App
+                                           (Var IntegerConstr ,Var spec_gen_15 ))))))],
+                               Unreachable)),gen_3 ,
+                           ([((DataAlt IntegerConstr , [intern_yInt ]),
+                              Case
+                                (Case
+                                   (Var intern_xInt ,gen_2 ,
+                                    ([],
+                                     Case
+                                       (Var intern_yInt ,gen_5 ,
+                                        ([],
+                                         Prim
+                                           [AWasm I32Add; AVar gen_5 ;
+                                            AVar gen_2 ])))),intern_rInt ,
+                                 ([], App (Var IntegerConstr ,Var intern_rInt ))))],
+                            Unreachable)))], Unreachable)))))],
+            Case
+              (Case
+                 (Var x ,gen_7 ,
+                  ([((DataAlt IntegerConstr , [intern_xInt ]),
+                     Case
+                       (Case
+                          (Var intern_xInt ,gen_9 ,
+                           ([], Prim [AWasm I32Sub; ALit (I32 1); AVar gen_9 ])),
+                        intern_rInt ,
+                        ([],
+                         Case
+                           (App (Var spec_work_fibonacci ,Var intern_rInt ),
+                            spec_gen_15 ,
+                            ([], App (Var IntegerConstr ,Var spec_gen_15 ))))))],
+                   Unreachable)),gen_0 ,
+               ([((DataAlt IntegerConstr , [intern_xInt ]),
+                  Case
+                    (Case
+                       (Var x ,gen_7 ,
+                        ([((DataAlt IntegerConstr , [intern_xInt ]),
+                           Case
+                             (Case
+                                (Var intern_xInt ,gen_9 ,
+                                 ([],
+                                  Prim [AWasm I32Sub; ALit (I32 2); AVar gen_9 ])),
+                              intern_rInt ,
+                              ([],
+                               Case
+                                 (App
+                                    (Var spec_work_fibonacci ,Var intern_rInt ),
+                                  spec_gen_15 ,
+                                  ([], App (Var IntegerConstr ,Var spec_gen_15 ))))))],
+                         Unreachable)),gen_3 ,
+                     ([((DataAlt IntegerConstr , [intern_yInt ]),
+                        Case
+                          (Case
+                             (Var intern_yInt ,gen_5 ,
+                              ([],
+                               Case
+                                 (Var intern_xInt ,gen_2 ,
+                                  ([],
+                                   Prim [AWasm I32Add; AVar gen_5 ; AVar gen_2 ])))),
+                           intern_rInt ,
+                           ([], App (Var IntegerConstr ,Var intern_rInt ))))],
+                      Unreachable)))], Unreachable)))))));
+ (fibonacci ,
   TopExpr
     (Lam
-       (Generated 20$ ,
-        Let
-          (Join
-             (JoinPoint 10$ ,
-              Lam
-                (Generated 14$ ,
-                 Let
-                   (Join
-                      (Inline (0,JoinPoint 0)$ ,
-                       Lam (Inline (0,Generated 1)$ ,Unreachable)),
-                    Case
-                      (App
-                         (Var User 0$fibonacci ,
-                          Let
-                            (Join
-                               (Inline (4,Inline (1,JoinPoint 5))$ ,
-                                Lam
-                                  (Inline (4,Inline (1,Generated 8))$ ,
-                                   Unreachable)),
-                             Case
-                               (App
-                                  (Var BuiltIn IntegerConstr$Int ,
-                                   Var Generated 20$ ),
-                                Inline (4,Inline (1,Generated 7))$ ,
-                                ([((DataAlt BuiltIn IntegerConstr$Int ,
-                                    [Inline (4,Inline (1,Internal "xInt"))$ ]),
-                                   Let
-                                     (Join
-                                        (Inline (4,Inline (1,JoinPoint 6))$ ,
-                                         Lam
-                                           (Inline (4,Inline (1,Generated 9))$ ,
-                                            Let
-                                              (Join
-                                                 (Inline (4,Inline (1,JoinPoint 7))$ ,
-                                                  Lam
-                                                    (Inline (4,Inline (1,Generated 11))$ ,
-                                                     Unreachable)),
-                                               Case
-                                                 (App
-                                                    (Var
-                                                       BuiltIn IntegerConstr$
-                                                       Int ,Lit (I32 1)),
-                                                  Inline (4,Inline (1,Generated 10))$ ,
-                                                  ([((DataAlt
-                                                        BuiltIn IntegerConstr$
-                                                        Int ,
-                                                      [Inline (4,Inline (1,Internal "yInt"))$ ]),
-                                                     Let
-                                                       (Join
-                                                          (Inline (4,Inline (1,JoinPoint 8))$ ,
-                                                           Lam
-                                                             (Inline (4,Inline (1,Generated 12))$ ,
-                                                              Let
-                                                                (Join
-                                                                   (Inline (4,Inline (1,JoinPoint 9))$ ,
-                                                                    Lam
-                                                                      (Inline (4,Inline (1,Generated 13))$ ,
-                                                                       App
-                                                                         (Var
-                                                                            BuiltIn
-                                                                              IntegerConstr$
-                                                                            Int ,
-                                                                          Var
-                                                                            Inline
-                                                                              (4,
-                                                                               Inline
-                                                                                 (1,
-                                                                                  Generated
-                                                                                    13))$
-                                                                             ))),
-                                                                 Case
-                                                                   (Prim
-                                                                      [AWasm
-                                                                         I32Sub;
-                                                                       AVar
-                                                                         Inline
-                                                                           (4,
-                                                                            Inline
-                                                                              (1,
-                                                                               Generated
-                                                                                 12))$
-                                                                          ;
-                                                                       AVar
-                                                                         Inline
-                                                                           (4,
-                                                                            Inline
-                                                                              (1,
-                                                                               Generated
-                                                                                 9))$
-                                                                          ],
-                                                                    Inline (4,Inline (1,Internal "rInt"))$ ,
-                                                                    ([],
-                                                                     App
-                                                                       (Var
-                                                                          Inline
-                                                                            (4,
-                                                                             Inline
-                                                                               (1,
-                                                                                JoinPoint
-                                                                                  9))$
-                                                                           ,
-                                                                        Var
-                                                                          Inline
-                                                                            (4,
-                                                                             Inline
-                                                                               (1,
-                                                                                Internal
-                                                                                  "rInt"))$
-                                                                           )))))),
-                                                        Case
-                                                          (Var
-                                                             Inline
-                                                               (4,
-                                                                Inline
-                                                                  (1,
-                                                                   Internal
-                                                                     "yInt"))$ ,
-                                                           Inline (4,Inline (1,Internal "yInt"))$ ,
-                                                           ([],
-                                                            App
-                                                              (Var
-                                                                 Inline
-                                                                   (4,
-                                                                    Inline
-                                                                      (1,
-                                                                       JoinPoint
-                                                                         8))$ ,
-                                                               Var
-                                                                 Inline
-                                                                   (4,
-                                                                    Inline
-                                                                      (1,
-                                                                       Internal
-                                                                         "yInt"))$
-                                                                  )))))],
-                                                   Unreachable))))),
-                                      Case
-                                        (Var
-                                           Inline (4,Inline (1,Internal "xInt"))$
-                                            ,
-                                         Inline (4,Inline (1,Internal "xInt"))$ ,
-                                         ([],
-                                          App
-                                            (Var
-                                               Inline (4,Inline (1,JoinPoint 6))$
-                                                ,
-                                             Var
-                                               Inline
-                                                 (4,Inline (1,Internal "xInt"))$
-                                                )))))], Unreachable)))),
-                       Inline (0,Generated 0)$ ,
-                       ([((DataAlt BuiltIn IntegerConstr$Int ,
-                           [Inline (0,Internal "xInt")$ ]),
-                          Let
-                            (Join
-                               (Inline (0,JoinPoint 1)$ ,
-                                Lam
-                                  (Inline (0,Generated 2)$ ,
-                                   Let
-                                     (Join
-                                        (Inline (0,JoinPoint 2)$ ,
-                                         Lam
-                                           (Inline (0,Generated 4)$ ,Unreachable)),
-                                      Case
-                                        (App
-                                           (Var User 0$fibonacci ,
-                                            Let
-                                              (Join
-                                                 (Inline (8,Inline (5,JoinPoint 5))$ ,
-                                                  Lam
-                                                    (Inline (8,Inline (5,Generated 8))$ ,
-                                                     Unreachable)),
-                                               Case
-                                                 (App
-                                                    (Var
-                                                       BuiltIn IntegerConstr$
-                                                       Int ,Var Generated 20$ ),
-                                                  Inline (8,Inline (5,Generated 7))$ ,
-                                                  ([((DataAlt
-                                                        BuiltIn IntegerConstr$
-                                                        Int ,
-                                                      [Inline (8,Inline (5,Internal "xInt"))$ ]),
-                                                     Let
-                                                       (Join
-                                                          (Inline (8,Inline (5,JoinPoint 6))$ ,
-                                                           Lam
-                                                             (Inline (8,Inline (5,Generated 9))$ ,
-                                                              Let
-                                                                (Join
-                                                                   (Inline (8,Inline (5,JoinPoint 7))$ ,
-                                                                    Lam
-                                                                      (Inline (8,Inline (5,Generated 11))$ ,
-                                                                       Unreachable)),
-                                                                 Case
-                                                                   (App
-                                                                      (Var
-                                                                         BuiltIn
-                                                                           IntegerConstr$
-                                                                         Int ,
-                                                                       Lit
-                                                                         (I32 2)),
-                                                                    Inline (8,Inline (5,Generated 10))$ ,
-                                                                    ([((DataAlt
-                                                                          BuiltIn
-                                                                            IntegerConstr$
-                                                                          Int ,
-                                                                        [Inline (8,Inline (5,Internal "yInt"))$ ]),
-                                                                       Let
-                                                                         (Join
-                                                                            (Inline (8,Inline (5,JoinPoint 8))$ ,
-                                                                             Lam
-                                                                               (Inline (8,Inline (5,Generated 12))$ ,
-                                                                                Let
-                                                                                  (Join
-                                                                                     (Inline (8,Inline (5,JoinPoint 9))$ ,
-                                                                                      Lam
-                                                                                        (Inline (8,Inline (5,Generated 13))$ ,
-                                                                                         App
-                                                                                           (Var
-                                                                                              BuiltIn
-                                                                                                IntegerConstr$
-                                                                                              Int ,
-                                                                                            Var
-                                                                                              Inline
-                                                                                                (8,
-                                                                                                 Inline
-                                                                                                   (5,
-                                                                                                    Generated
-                                                                                                      13))$
-                                                                                               ))),
-                                                                                   Case
-                                                                                     (Prim
-                                                                                        [AWasm
-                                                                                           I32Sub;
-                                                                                         AVar
-                                                                                           Inline
-                                                                                             (8,
-                                                                                              Inline
-                                                                                                (5,
-                                                                                                 Generated
-                                                                                                   12))$
-                                                                                            ;
-                                                                                         AVar
-                                                                                           Inline
-                                                                                             (8,
-                                                                                              Inline
-                                                                                                (5,
-                                                                                                 Generated
-                                                                                                   9))$
-                                                                                            ],
-                                                                                      Inline (8,Inline (5,Internal "rInt"))$ ,
-                                                                                      ([],
-                                                                                       App
-                                                                                         (Var
-                                                                                            Inline
-                                                                                              (8,
-                                                                                               Inline
-                                                                                                 (5,
-                                                                                                  JoinPoint
-                                                                                                    9))$
-                                                                                             ,
-                                                                                          Var
-                                                                                            Inline
-                                                                                              (8,
-                                                                                               Inline
-                                                                                                 (5,
-                                                                                                  Internal
-                                                                                                    "rInt"))$
-                                                                                             )))))),
-                                                                          Case
-                                                                            (Var
-                                                                               Inline
-                                                                                 (8,
-                                                                                  Inline
-                                                                                    (5,
-                                                                                     Internal
-                                                                                       "yInt"))$
-                                                                                ,
-                                                                             Inline (8,Inline (5,Internal "yInt"))$ ,
-                                                                             ([],
-                                                                              App
-                                                                                (Var
-                                                                                   Inline
-                                                                                     (8,
-                                                                                      Inline
-                                                                                        (5,
-                                                                                         JoinPoint
-                                                                                           8))$
-                                                                                    ,
-                                                                                 Var
-                                                                                   Inline
-                                                                                     (8,
-                                                                                      Inline
-                                                                                        (5,
-                                                                                         Internal
-                                                                                           "yInt"))$
-                                                                                    )))))],
-                                                                     Unreachable))))),
-                                                        Case
-                                                          (Var
-                                                             Inline
-                                                               (8,
-                                                                Inline
-                                                                  (5,
-                                                                   Internal
-                                                                     "xInt"))$ ,
-                                                           Inline (8,Inline (5,Internal "xInt"))$ ,
-                                                           ([],
-                                                            App
-                                                              (Var
-                                                                 Inline
-                                                                   (8,
-                                                                    Inline
-                                                                      (5,
-                                                                       JoinPoint
-                                                                         6))$ ,
-                                                               Var
-                                                                 Inline
-                                                                   (8,
-                                                                    Inline
-                                                                      (5,
-                                                                       Internal
-                                                                         "xInt"))$
-                                                                  )))))],
-                                                   Unreachable)))),
-                                         Inline (0,Generated 3)$ ,
-                                         ([((DataAlt BuiltIn IntegerConstr$Int ,
-                                             [Inline (0,Internal "yInt")$ ]),
-                                            Let
-                                              (Join
-                                                 (Inline (0,JoinPoint 3)$ ,
-                                                  Lam
-                                                    (Inline (0,Generated 5)$ ,
-                                                     Let
-                                                       (Join
-                                                          (Inline (0,JoinPoint 4)$ ,
-                                                           Lam
-                                                             (Inline (0,Generated 6)$ ,
-                                                              App
-                                                                (Var
-                                                                   BuiltIn
-                                                                     IntegerConstr$
-                                                                   Int ,
-                                                                 Var
-                                                                   Inline
-                                                                     (0,
-                                                                      Generated
-                                                                        6)$ ))),
-                                                        Case
-                                                          (Prim
-                                                             [AWasm I32Add;
-                                                              AVar
-                                                                Inline
-                                                                  (0,Generated 5)$
-                                                                 ;
-                                                              AVar
-                                                                Inline
-                                                                  (0,Generated 2)$
-                                                                 ],
-                                                           Inline (0,Internal "rInt")$ ,
-                                                           ([],
-                                                            App
-                                                              (Var
-                                                                 Inline
-                                                                   (0,
-                                                                    JoinPoint 4)$
-                                                                  ,
-                                                               Var
-                                                                 Inline
-                                                                   (0,
-                                                                    Internal
-                                                                      "rInt")$ )))))),
-                                               Case
-                                                 (Var
-                                                    Inline (0,Internal "yInt")$ ,
-                                                  Inline (0,Internal "yInt")$ ,
-                                                  ([],
-                                                   App
-                                                     (Var
-                                                        Inline (0,JoinPoint 3)$ ,
-                                                      Var
-                                                        Inline
-                                                          (0,Internal "yInt")$ )))))],
-                                          App
-                                            (Var Inline (0,JoinPoint 2)$ ,
-                                             Var Inline (0,Generated 3)$ )))))),
-                             Case
-                               (Var Inline (0,Internal "xInt")$ ,
-                                Inline (0,Internal "xInt")$ ,
-                                ([],
-                                 App
-                                   (Var Inline (0,JoinPoint 1)$ ,
-                                    Var Inline (0,Internal "xInt")$ )))))],
-                        App
-                          (Var Inline (0,JoinPoint 0)$ ,
-                           Var Inline (0,Generated 0)$ )))))),
-           Case
-             (App (Var BuiltIn IntegerConstr$Int ,Var Generated 20$ ),
-              Anonymous 0$ ,
-              ([((DataAlt BuiltIn IntegerConstr$Int , [Generated 15$ ]),
-                 Let
-                   (Join
-                      (JoinPoint 11$ ,
-                       Lam
-                         (Generated 17$ ,
-                          App (Var JoinPoint 10$ ,Var Anonymous 0$ ))),
-                    Case
-                      (Var Generated 15$ ,Generated 16$ ,
-                       ([((LitAlt (I32 0), []),
-                          App (Var BuiltIn IntegerConstr$Int ,Lit (I32 1)));
-                         ((LitAlt (I32 1), []),
-                          App (Var BuiltIn IntegerConstr$Int ,Lit (I32 1)))],
-                        App (Var JoinPoint 11$ ,Var Generated 16$ )))))],
-               Unreachable))))));
- (Worker (Export "fibonacci")$fibonacci ,
-  TopExpr
-    (Lam
-       (User 2$x ,
+       (x ,
         Case
-          (App
-             (Var User 0$fibonacci ,
-              App (Var BuiltIn IntegerConstr$Int ,Var User 2$x )),Generated 18$ ,
-           ([((DataAlt BuiltIn IntegerConstr$Int , [Generated 19$ ]),
-              Var Generated 19$ )], Unreachable)))));
- (Export "fibonacci"$fibonacci ,
+          (Var x ,gen_23 ,
+           ([((DataAlt IntegerConstr , [spec_gen_15 ]),
+              Case
+                (App (Var spec_work_fibonacci ,Var spec_gen_15 ),spec_gen_15 ,
+                 ([], App (Var IntegerConstr ,Var spec_gen_15 ))))],
+            App (Var work_fibonacci ,Var gen_23 ))))));
+ (spec_work_fibonacci ,
   TopExpr
     (Lam
-       (User 2$x ,App (Var Worker (Export "fibonacci")$fibonacci ,Var User 2$x ))))]
+       (gen_20 ,
+        Case
+          (Case
+             (Var gen_20 ,gen_16 ,
+              ([((LitAlt (I32 0), []), App (Var IntegerConstr ,Lit (I32 1)));
+                ((LitAlt (I32 1), []), App (Var IntegerConstr ,Lit (I32 1)))],
+               Case
+                 (Case
+                    (Var gen_20 ,gen_9 ,
+                     ([], Prim [AWasm I32Sub; ALit (I32 1); AVar gen_9 ])),
+                  intern_rInt ,
+                  ([],
+                   Case
+                     (App (Var spec_work_fibonacci ,Var intern_rInt ),
+                      spec_gen_15 ,
+                      ([],
+                       Case
+                         (Case
+                            (Var gen_20 ,gen_9 ,
+                             ([], Prim [AWasm I32Sub; ALit (I32 2); AVar gen_9 ])),
+                          intern_rInt ,
+                          ([],
+                           Case
+                             (App (Var spec_work_fibonacci ,Var intern_rInt ),
+                              spec_gen_15 ,
+                              ([],
+                               Case
+                                 (Case
+                                    (Var spec_gen_15 ,gen_2 ,
+                                     ([],
+                                      Case
+                                        (Var spec_gen_15 ,gen_5 ,
+                                         ([],
+                                          Prim
+                                            [AWasm I32Add; AVar gen_5 ;
+                                             AVar gen_2 ])))),intern_rInt ,
+                                  ([], App (Var IntegerConstr ,Var intern_rInt ))))))))))))),
+           gen_21 ,
+           ([((DataAlt IntegerConstr , [gen_22 ]), Var gen_22 )], Unreachable)))));
+ (work_E_fibonacci ,
+  TopExpr
+    (Lam
+       (x ,
+        Case
+          (Case
+             (App (Var spec_work_fibonacci ,Var x ),spec_gen_15 ,
+              ([], App (Var IntegerConstr ,Var spec_gen_15 ))),gen_18 ,
+           ([((DataAlt IntegerConstr , [gen_19 ]), Var gen_19 )], Unreachable)))));
+ (E_fibonacci , TopExpr (Lam (x ,App (Var work_E_fibonacci ,Var x ))))]

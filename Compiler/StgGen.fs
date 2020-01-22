@@ -204,7 +204,8 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
         | Core.Var v -> genAppWithArgs v args
 
     and genAppWithArgs f args =
-        match forcedCallArity f.typ with 
+        let arity = forcedCallArity f.typ
+        match arity with 
         |None -> 
             genAtoms (genAppWithAtoms f) [] args
         |Some i when i = (args |> List.length) -> 

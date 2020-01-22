@@ -25,13 +25,27 @@ type CallType =
     | DirectCall
     | ConstrCall
 
-[<StructuredFormatDisplay("{unique}${name} ")>]
+let rec uniqueToStr name = function
+      | Export s -> sprintf "E_%s" s
+      | User i -> name
+      | Generated i -> sprintf "gen_%i" i
+      | Anonymous i -> sprintf "anon_%i" i
+      | BuiltIn b -> sprintf "%A" b
+      | Internal s ->  sprintf "intern_%s" s
+      | InternalField i -> sprintf "intern_%i" i
+      | JoinPoint i -> sprintf "join_%i" i
+      | Worker u -> sprintf "work_%s" (uniqueToStr name u)
+      | Inline (_, u) -> uniqueToStr name u
+      | Specialized(_, u) -> sprintf "spec_%s" (uniqueToStr name u)
+
+[<StructuredFormatDisplay("{AsString} ")>]
 type Var =
     { unique: Unique
       name: string
       typ: Typ
       callType: CallType option }
-
+    member m.AsString = 
+      uniqueToStr m.name m.unique
 let anonymousVar =
     let i = ref 0
     fun typ ->

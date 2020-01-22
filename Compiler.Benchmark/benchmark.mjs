@@ -3,6 +3,7 @@ import * as libBaseline from './out/wasm/baseline.wasm'
 import * as libCompiler from './out/wasm/fibonacci.wasm'
 import Benchmark from 'benchmark';
 var suite = new Benchmark.Suite;
+
 suite
     .add('JS#fibonacci', function () {
         fibonacciJs.fibonacci(20)
