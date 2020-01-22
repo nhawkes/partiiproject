@@ -8,7 +8,7 @@ let rec genExpr =
     | Ast.BinOp(x, f, y) -> genBinOp x y f
     | Ast.Match(e, cases) -> genMatch e cases
     | Ast.Block(block) -> genBlock None [] block
-    | Ast.Prim ps -> genPrim [] ps
+    | Ast.Prim (w, es) -> genPrim w es
 
 and genLit =
     function
@@ -124,11 +124,8 @@ and genRhs (rhs: Core.Expr<_, _>) =
     | [] -> rhs
 
 
-and genPrim xs =
-    function
-    | Ast.PrimVar v :: ps -> genPrim (Core.AVar v :: xs) ps
-    | Ast.PrimWasm w :: ps -> genPrim (Core.AWasm w :: xs) ps
-    | [] -> Core.Prim(xs |> List.rev)
+and genPrim w es =
+    Core.Prim(w, es |> List.map (Core.Var))
 
 let rec genExport call args rhs =
     match args with

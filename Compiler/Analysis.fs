@@ -205,9 +205,10 @@ let rec analyseExpr (env: Map<_, _>) incomingArity :
 
         {aResult with args=argsStrictness} |> andResult bResult,
         Core.App(aExpr, bExpr)
-    | Core.Prim atoms -> 
-        analysePrims env incomingArity atoms,
-        Core.Prim atoms
+    | Core.Prim (w, es) -> 
+        let innerResult, innerEs = analysePrims env es
+        innerResult,
+        Core.Prim (w, innerEs)
     | Core.Unreachable -> maxStrictnessResult, Core.Unreachable
 
 and analyseNonRec env incomingArity e =
@@ -289,13 +290,14 @@ and analyseAlts env incomingArity defResult =
         ((pat, analysedVars), innerExpr)::newAlts
     | [] -> defResult, []
 
-and analysePrims env incomingArity =
+and analysePrims env =
     function
-    | Core.AVar v :: atoms ->
-        let innerResult = analysePrims env incomingArity atoms
-        evaluate incomingArity (env |> Map.tryFind v) |> andResult innerResult
-    | _ :: atoms -> analysePrims env incomingArity atoms
-    | [] -> defaultStrictness
+    | e :: es ->
+        let esResult, innerEs = analysePrims env es
+        let eResult, innerE = analyseExpr env 0 e
+        esResult |> andResult eResult,
+        innerE::innerEs
+    | [] -> defaultStrictness, []
 
 
 let rec analyseProgram binds constrs = function

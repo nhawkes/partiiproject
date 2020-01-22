@@ -27,17 +27,17 @@ type ResultSpec =
     |ResultSpec of Vars.Var
     |BotResultSpec
     
-let rec getResultSpecialization = function
+let rec getResultSpecialization recCall = function
     | Core.Var v -> TopResultSpec
     | Core.Lit l -> TopResultSpec
-    | Core.Lam(v, e) -> getResultSpecialization e
+    | Core.Lam(v, e) -> getResultSpecialization recCall e
     | Core.Let(bs, e) -> 
-        getResultSpecialization e
+        getResultSpecialization recCall e
     | Core.Case(_, b, (alts, def)) -> 
         let altsE = alts |> List.map snd
         let result = 
             def::altsE |> 
-            List.map getResultSpecialization |> 
+            List.map (getResultSpecialization recCall) |> 
             List.fold (fun x y ->
                 match x,y with
                 |TopResultSpec, _ -> TopResultSpec
@@ -49,9 +49,11 @@ let rec getResultSpecialization = function
             ) BotResultSpec
         result        
     | Core.App(Core.Var v, b) -> 
-        if v.callType = Some ConstrCall then
+        if v.unique = recCall.var.unique || Worker(v.unique) = recCall.var.unique then
+            BotResultSpec
+        else if v.callType = Some ConstrCall then
             ResultSpec v
-        else  
+        else
             TopResultSpec
     | Core.Unreachable -> BotResultSpec
 
@@ -67,7 +69,7 @@ let rec makeWrapper call vs = function
                 match toSpecialize |> Map.tryFind v.var with
                 |Some([Core.DataAlt(c), [value]]) ->
                     let specCall = {var=specializeVar() call.var; analysis=call.analysis} 
-                    let specResult = getResultSpecialization e
+                    let specResult = getResultSpecialization call e
                     Map.ofList [v, [c, value, specCall.var, specResult]], [(specCall, Core.TopExpr (makeSpecialization specResult e [v,c, value]))]
                 |None -> Map.empty, []
         makeWrapperLambda call specializations [] (vs |> List.rev), extraProgram
@@ -176,7 +178,7 @@ let rec renameBoundVarsInExpr env f : Core.Expr<Var, AnalysedVar<_>> -> Core.Exp
         let newEnv = env |> Map.add b.var newB.var
         Core.Case(renameBoundVarsInExpr env f e, newB, renameBoundVarsInAlts newEnv f alts)
     | Core.App(a, b) -> Core.App(renameBoundVarsInExpr env f a, renameBoundVarsInExpr env f b)
-    | Core.Prim ps -> Core.Prim(ps |> List.map (renameBoundVarsInPrim env f))
+    | Core.Prim (w, es) -> Core.Prim(w, es |> List.map (renameBoundVarsInExpr env f))
     | Core.Unreachable -> Core.Unreachable
 
 and renameBoundVarsInBinds env f =
@@ -265,8 +267,8 @@ let rec simplifyExpr (inlineMap:Map<Vars.Var, Core.Expr<Vars.Var, AnalysedVar<_>
             Core.Case(e, v, ([], Core.App(def, b))) |> simplifyExpr inlineMap
         |_ ->
         Core.App(newA, newB) |> factorApp
-    | Core.Prim ps -> 
-        simplifyPrims inlineMap [] ps
+    | Core.Prim (p, es) -> 
+        Core.Prim(p, es |> List.map (simplifyExpr inlineMap))
     | Core.Unreachable -> Core.Unreachable
 
 and factorApp = function
@@ -345,7 +347,6 @@ and simplifyCase inlineMap (e, b, (alts, def)) =
     |_  -> Core.Case(newE, b, (newAlts, newDef))
 
 and caseOfCase = function
-    |(Core.Case(e2, b2, (alts2, Core.Prim[_])), b, (alts, def)) as x -> x
     |(Core.Case(e2, b2, (alts2, def2)), b, (alts, def)) ->
         let newAlts2 = alts2 |> List.map (fun (p, e) -> (p, Core.Case(e, b, (alts, def))))
         let newDef = def2 |> fun def -> (Core.Case(def, b, (alts, def)))
@@ -355,26 +356,6 @@ and caseOfCase = function
 and isConstr = function
     |Core.Var{callType=Some ConstrCall} -> true
     |_ -> false
-
-
-
-and simplifyPrims inlineMap newPs = function
-    |Core.AVar v::ps ->
-        match inlineMap |> Map.tryFind v with
-        |None -> simplifyPrims inlineMap (Core.AVar v::newPs) ps
-        |Some(Core.Lit l) ->             
-            simplifyPrims inlineMap (Core.ALit l::newPs) ps 
-        |Some(x) -> 
-            let inliner = inlineVar()
-            let newV = {var=inliner v; analysis=Analysis.Strict 0}
-            let inner = simplifyPrims inlineMap (Core.AVar newV.var::newPs) ps 
-            Core.Case(x, newV, ([], inner))
-    |Core.ALit l::ps -> 
-        simplifyPrims inlineMap (Core.ALit l::newPs) ps
-    |Core.AWasm w::ps -> 
-        simplifyPrims inlineMap (Core.AWasm w::newPs) ps
-    |[] -> Core.Prim (newPs |> List.rev)
-
     
 
 let rec simplify inlineMap = function
@@ -414,6 +395,6 @@ let transform program =
     let ww = simplified |> wwTransform
     let wrapperInlineMap = getTopInlineMap isWrapper ww
     let result = simplify wrapperInlineMap ww
-    System.IO.File.WriteAllText("./Compiler/input.core", sprintf "%A" analysis)
+    System.IO.File.WriteAllText("./Compiler/input.core", sprintf "%A" ww)
     System.IO.File.WriteAllText("./Compiler/output.core", sprintf "%A" result)
     result

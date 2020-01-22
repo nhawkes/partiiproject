@@ -59,7 +59,7 @@ let rec renameExpr env = function
     | Match((e,t), cases) ->
         Match((renameExpr env e, t), renameCases env cases)
     | Block(block) -> renameBlock env [] None block
-    | Prim ps -> ps |> List.map (renamePrim env) |> Prim
+    | Prim (w, vs) -> Prim(w, vs |> List.map (lookup env))
 
 and renamePrim env = function
     | PrimVar b -> PrimVar(lookup env b)

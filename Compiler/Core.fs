@@ -14,7 +14,7 @@ type Expr<'v, 'b> =
     | Let of Binds<'v, 'b> * Expr<'v, 'b>
     | Case of Expr<'v, 'b> * 'b * Alts<'v, 'b>
     | App of Expr<'v, 'b> * Expr<'v, 'b>
-    | Prim of Prim<'v> list
+    | Prim of Wasm.Instr * Expr<'v, 'b> list
     | Unreachable
 
 and Binds<'v, 'b> =
@@ -51,7 +51,7 @@ let rec mapExpr f : Expr<'v, 'a> -> Expr<'v, 'b> =
     | Let(bs, e) -> Let(mapBinds f bs, mapExpr f e)
     | Case(e, b, alts) -> Case(mapExpr f e, f b, mapAlts f alts)
     | App(a, b) -> App(mapExpr f a, mapExpr f b)
-    | Prim ps -> Prim(ps |> List.map (mapPrim f))
+    | Prim (w, es) -> Prim(w, es |> List.map (mapExpr f))
     | Unreachable -> Unreachable
 
 and mapBinds f =
@@ -71,12 +71,6 @@ and mapPat f = function
     |DataAlt v -> DataAlt v
     |LitAlt l -> LitAlt l
     
-and mapPrim f =
-    function
-    | AVar v -> AVar v
-    | ALit l -> ALit l
-    | AWasm w -> AWasm w
-
 let mapTopLevel f =
     function
     | TopExpr e -> TopExpr(mapExpr f e)
@@ -95,7 +89,7 @@ let rec mapVarsExpr f : Expr<'u, 'b> -> Expr<'v, 'b> =
     | Let(bs, e) -> Let(mapVarsBinds f bs, mapVarsExpr f e)
     | Case(e, b, alts) -> Case(mapVarsExpr f e, b, mapVarsAlts f alts)
     | App(a, b) -> App(mapVarsExpr f a, mapVarsExpr f b)
-    | Prim ps -> Prim(ps |> List.map (mapVarsPrim f))
+    | Prim (w, es) -> Prim(w, es |> List.map (mapVarsExpr f))
     | Unreachable -> Unreachable
 
 and mapVarsBinds f =

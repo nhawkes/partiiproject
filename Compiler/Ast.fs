@@ -24,7 +24,7 @@ type Expr<'b> =
     | Call of 'b * Expr<'b> list
     | Match of (Expr<'b> * Types.Typ) * Case<'b> list
     | Block of Block<'b>
-    | Prim of Prim<'b> list
+    | Prim of Wasm.Instr * 'b list
 
 and Prim<'b> =
     | PrimVar of 'b

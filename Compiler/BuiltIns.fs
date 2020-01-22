@@ -26,7 +26,7 @@ let builtInOp builtInVar w : Declaration<Var> =
                                 [
                                     PatConstr(integerConstr, [PatBind yInt]),
                                     Match(
-                                        (Prim [PrimWasm w; PrimVar yInt; PrimVar xInt], IntT),
+                                        (Prim (w, [yInt; xInt]), IntT),
                                         [
                                             PatBind(rInt), (Call (integerConstr, [Var (rInt)]))
                                         ]
