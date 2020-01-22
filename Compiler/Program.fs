@@ -6,6 +6,14 @@ open StgGen
 open Ast
 
 let program = """
+data Cons(head, tail)
+data Empty
+map(list, f(x)) = {
+    return switch(list){
+        Cons(head, tail) => Cons(f(head), tail)
+        Empty => Empty
+    }
+}
 export fibonacci(x) = {
     return switch(x){
         | 0 => 1
@@ -13,6 +21,7 @@ export fibonacci(x) = {
         | _ => fibonacci(x-1) + fibonacci(x-2)
     }
 }
+
 """
 
 [<EntryPoint>] 
@@ -24,9 +33,9 @@ let main argv =
         astModule 
          |> Renamer.renameProgram
          |> CoreGen.genProgram
-    let optimized = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
+    let coreModule = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
     let stgModule = 
-        optimized
+        coreModule
          |> StgGen.genProgram   
     let wasmModule =
         stgModule          
