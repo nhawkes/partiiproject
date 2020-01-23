@@ -101,7 +101,8 @@ let rec genExpr tenv (env:Map<Var, Placement>) depth =
     | Let(binds, e) -> genLet tenv env depth binds e
     | Case(e, v, alts) -> genCase tenv env depth v e alts
     | App(v, atoms) -> genApp tenv env depth v atoms
-    | Call(constr, atoms) -> genPrim tenv env depth (AVar constr :: (atoms |> List.rev))
+    | Call(f, atoms) -> genPrim tenv env depth (AVar f :: (atoms |> List.rev))
+    | Constr(constr, atoms) -> genPrim tenv env depth (AVar constr :: (atoms |> List.rev))
     | Jump(j, atoms) -> genJump tenv env depth j atoms
     | Prim(atoms) -> genPrim tenv env depth atoms
 
