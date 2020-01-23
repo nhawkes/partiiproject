@@ -8,7 +8,8 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Benchmark Program",
-            "program": "${workspaceFolder}/Compiler.Benchmark/benchmark.js",
+            "runtimeArgs": ["--experimental-modules", "--experimental-wasm-modules"],
+            "program": "${workspaceFolder}/Compiler.Benchmark/benchmark.mjs",
             "skipFiles": [
                 "<node_internals>/**"
             ],

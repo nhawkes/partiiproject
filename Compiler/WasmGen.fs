@@ -385,7 +385,11 @@ let rec genLetCode tenv env depth = function
 
 and genLetsCode tenv env depth = List.collect (genLetCode tenv env depth)
 
-let genTopBindCode tenv env depth (lf: LambdaForm<_>) =
+let genTopBindCode tenv env depth b (lf: LambdaForm<_>) =
+    let resetHeap =
+        match b with
+        |{Vars.Var.unique=Vars.Export _} -> [Wasm.I32Const 0; Wasm.GlobalSet heapTop]
+        |_ -> []
     if not (List.isEmpty lf.frees) then
         failwithf "Top level bindings cannot have free variables: %A" lf.frees
     else
@@ -398,7 +402,8 @@ let genTopBindCode tenv env depth (lf: LambdaForm<_>) =
             |> Map.ofSeq
 
         let wasmLocalTypes = Wasm.I32 |> List.replicate ((lf.locals |> List.length) + (lf.lets |> List.length))
-        [ [wasmLocalTypes, genExpr tenv newEnv depth lf.expr ]
+        let expr = genExpr tenv newEnv depth lf.expr
+        [ [wasmLocalTypes, List.concat [resetHeap; expr] ]
           genLetsCode tenv env depth lf.lets ]
         |> List.concat
 
@@ -454,8 +459,8 @@ let genTopConstrCode tenv env depth b vs =
 
 let genTopLevelCode tenv env depth =
     function
-    | _, TopLam lam -> genTopBindCode tenv env depth lam
-    | _, TopCaf lam -> genTopBindCode tenv env depth lam
+    | b, TopLam lam -> genTopBindCode tenv env depth b lam
+    | b, TopCaf lam -> genTopBindCode tenv env depth b lam
     | b, TopConstr(vs) -> [ genTopConstrCode tenv env depth b vs ]
 
 
