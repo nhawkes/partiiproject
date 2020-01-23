@@ -37,481 +37,115 @@
   TopExpr
     (Lam
        (x ,
-        Case
-          (Var x ,anon_0 ,
-           ([((DataAlt IntegerConstr , [gen_15 ]),
-              Case
-                (Var gen_15 ,gen_16 ,
-                 ([((LitAlt (I32 0), []), App (Var IntegerConstr ,Lit (I32 1)));
-                   ((LitAlt (I32 1), []), App (Var IntegerConstr ,Lit (I32 1)))],
+        Let
+          (Rec
+             [(list ,
+               App
+                 (App (Var Cons ,App (Var IntegerConstr ,Lit (I32 1))),
+                  App
+                    (App (Var Cons ,App (Var IntegerConstr ,Lit (I32 5))),
+                     App
+                       (App (Var Cons ,App (Var IntegerConstr ,Lit (I32 9))),
+                        Var Empty ))));
+              (addTwo ,
+               Lam
+                 (x ,
                   Case
-                    (Var x ,gen_7 ,
+                    (Var x ,gen_0 ,
                      ([((DataAlt IntegerConstr , [intern_xInt ]),
                         Case
-                          (Prim (I32Sub,[Lit (I32 1); Var intern_xInt ]),
+                          (Prim (I32Add,[Lit (I32 2); Var intern_xInt ]),
                            intern_rInt ,
-                           ([],
-                            Case
-                              (App
-                                 (Var fibonacci ,
-                                  App (Var IntegerConstr ,Var intern_rInt )),
-                               gen_0 ,
-                               ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                  Case
-                                    (Var x ,gen_7 ,
-                                     ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                        Case
-                                          (Prim
-                                             (I32Sub,
-                                              [Lit (I32 2); Var intern_xInt ]),
-                                           intern_rInt ,
-                                           ([],
-                                            Case
-                                              (App
-                                                 (Var fibonacci ,
-                                                  App
-                                                    (Var IntegerConstr ,
-                                                     Var intern_rInt )),gen_3 ,
-                                               ([((DataAlt IntegerConstr ,
-                                                   [intern_yInt ]),
-                                                  Case
-                                                    (Prim
-                                                       (I32Add,
-                                                        [Var intern_yInt ;
-                                                         Var intern_xInt ]),
-                                                     intern_rInt ,
-                                                     ([],
-                                                      App
-                                                        (Var IntegerConstr ,
-                                                         Var intern_rInt ))))],
-                                                App
-                                                  (Var fibonacci ,
-                                                   App
-                                                     (Var IntegerConstr ,
-                                                      Var intern_rInt )))))))],
-                                      Case
-                                        (Unreachable,gen_3 ,
-                                         ([((DataAlt IntegerConstr ,
-                                             [intern_yInt ]),
-                                            Case
-                                              (Prim
-                                                 (I32Add,
-                                                  [Var intern_yInt ;
-                                                   Var intern_xInt ]),
-                                               intern_rInt ,
-                                               ([],
-                                                App
-                                                  (Var IntegerConstr ,
-                                                   Var intern_rInt ))))],
-                                          Unreachable)))))],
-                                App
-                                  (Var fibonacci ,
-                                   App (Var IntegerConstr ,Var intern_rInt )))))))],
-                      Case
-                        (Unreachable,gen_0 ,
-                         ([((DataAlt IntegerConstr , [intern_xInt ]),
-                            Case
-                              (Var x ,gen_7 ,
-                               ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                  Case
-                                    (Prim
-                                       (I32Sub,[Lit (I32 2); Var intern_xInt ]),
-                                     intern_rInt ,
-                                     ([],
-                                      Case
-                                        (App
-                                           (Var fibonacci ,
-                                            App
-                                              (Var IntegerConstr ,
-                                               Var intern_rInt )),gen_3 ,
-                                         ([((DataAlt IntegerConstr ,
-                                             [intern_yInt ]),
-                                            Case
-                                              (Prim
-                                                 (I32Add,
-                                                  [Var intern_yInt ;
-                                                   Var intern_xInt ]),
-                                               intern_rInt ,
-                                               ([],
-                                                App
-                                                  (Var IntegerConstr ,
-                                                   Var intern_rInt ))))],
-                                          App
-                                            (Var fibonacci ,
-                                             App
-                                               (Var IntegerConstr ,
-                                                Var intern_rInt )))))))],
-                                Case
-                                  (Unreachable,gen_3 ,
-                                   ([((DataAlt IntegerConstr , [intern_yInt ]),
-                                      Case
-                                        (Prim
-                                           (I32Add,
-                                            [Var intern_yInt ; Var intern_xInt ]),
-                                         intern_rInt ,
-                                         ([],
-                                          App
-                                            (Var IntegerConstr ,Var intern_rInt ))))],
-                                    Unreachable)))))], Unreachable)))))))],
-            Case
-              (Var x ,gen_7 ,
-               ([((DataAlt IntegerConstr , [intern_xInt ]),
-                  Case
-                    (Prim (I32Sub,[Lit (I32 1); Var intern_xInt ]),intern_rInt ,
-                     ([],
-                      Case
-                        (App
-                           (Var fibonacci ,
-                            App (Var IntegerConstr ,Var intern_rInt )),gen_0 ,
-                         ([((DataAlt IntegerConstr , [intern_xInt ]),
-                            Case
-                              (Var x ,gen_7 ,
-                               ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                  Case
-                                    (Prim
-                                       (I32Sub,[Lit (I32 2); Var intern_xInt ]),
-                                     intern_rInt ,
-                                     ([],
-                                      Case
-                                        (App
-                                           (Var fibonacci ,
-                                            App
-                                              (Var IntegerConstr ,
-                                               Var intern_rInt )),gen_3 ,
-                                         ([((DataAlt IntegerConstr ,
-                                             [intern_yInt ]),
-                                            Case
-                                              (Prim
-                                                 (I32Add,
-                                                  [Var intern_yInt ;
-                                                   Var intern_xInt ]),
-                                               intern_rInt ,
-                                               ([],
-                                                App
-                                                  (Var IntegerConstr ,
-                                                   Var intern_rInt ))))],
-                                          App
-                                            (Var fibonacci ,
-                                             App
-                                               (Var IntegerConstr ,
-                                                Var intern_rInt )))))))],
-                                Case
-                                  (Unreachable,gen_3 ,
-                                   ([((DataAlt IntegerConstr , [intern_yInt ]),
-                                      Case
-                                        (Prim
-                                           (I32Add,
-                                            [Var intern_yInt ; Var intern_xInt ]),
-                                         intern_rInt ,
-                                         ([],
-                                          App
-                                            (Var IntegerConstr ,Var intern_rInt ))))],
-                                    Unreachable)))))],
-                          App
-                            (Var fibonacci ,
-                             App (Var IntegerConstr ,Var intern_rInt )))))))],
-                Case
-                  (Unreachable,gen_0 ,
-                   ([((DataAlt IntegerConstr , [intern_xInt ]),
-                      Case
-                        (Var x ,gen_7 ,
-                         ([((DataAlt IntegerConstr , [intern_xInt ]),
-                            Case
-                              (Prim (I32Sub,[Lit (I32 2); Var intern_xInt ]),
-                               intern_rInt ,
-                               ([],
-                                Case
-                                  (App
-                                     (Var fibonacci ,
-                                      App (Var IntegerConstr ,Var intern_rInt )),
-                                   gen_3 ,
-                                   ([((DataAlt IntegerConstr , [intern_yInt ]),
-                                      Case
-                                        (Prim
-                                           (I32Add,
-                                            [Var intern_yInt ; Var intern_xInt ]),
-                                         intern_rInt ,
-                                         ([],
-                                          App
-                                            (Var IntegerConstr ,Var intern_rInt ))))],
-                                    App
-                                      (Var fibonacci ,
-                                       App (Var IntegerConstr ,Var intern_rInt )))))))],
-                          Case
-                            (Unreachable,gen_3 ,
-                             ([((DataAlt IntegerConstr , [intern_yInt ]),
-                                Case
-                                  (Prim
-                                     (I32Add,
-                                      [Var intern_yInt ; Var intern_xInt ]),
-                                   intern_rInt ,
-                                   ([],
-                                    App (Var IntegerConstr ,Var intern_rInt ))))],
-                              Unreachable)))))], Unreachable)))))))));
- (fibonacci ,
-  TopExpr
-    (Lam
-       (x ,
-        Case
-          (Var x ,gen_23 ,
-           ([((DataAlt IntegerConstr , [spec_gen_15 ]),
-              Case
-                (App (Var spec_work_fibonacci ,Var spec_gen_15 ),spec_gen_15 ,
-                 ([], App (Var IntegerConstr ,Var spec_gen_15 ))))],
-            App (Var work_fibonacci ,Var gen_23 ))))));
- (spec_work_fibonacci ,
-  TopExpr
-    (Lam
-       (gen_20 ,
-        Case
-          (App (Var IntegerConstr ,Var gen_20 ),x ,
-           ([],
-            Case
-              (Case
-                 (Var x ,anon_0 ,
-                  ([((DataAlt IntegerConstr , [gen_15 ]),
-                     Case
-                       (Var gen_15 ,gen_16 ,
-                        ([((LitAlt (I32 0), []),
-                           App (Var IntegerConstr ,Lit (I32 1)));
-                          ((LitAlt (I32 1), []),
-                           App (Var IntegerConstr ,Lit (I32 1)))],
-                         Case
-                           (Var x ,gen_7 ,
-                            ([((DataAlt IntegerConstr , [intern_xInt ]),
-                               Case
-                                 (Prim (I32Sub,[Lit (I32 1); Var intern_xInt ]),
-                                  intern_rInt ,
-                                  ([],
-                                   Case
-                                     (App
-                                        (Var fibonacci ,
-                                         App
-                                           (Var IntegerConstr ,Var intern_rInt )),
-                                      gen_0 ,
-                                      ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                         Case
-                                           (Var x ,gen_7 ,
-                                            ([((DataAlt IntegerConstr ,
-                                                [intern_xInt ]),
-                                               Case
-                                                 (Prim
-                                                    (I32Sub,
-                                                     [Lit (I32 2);
-                                                      Var intern_xInt ]),
-                                                  intern_rInt ,
-                                                  ([],
-                                                   Case
-                                                     (App
-                                                        (Var fibonacci ,
-                                                         App
-                                                           (Var IntegerConstr ,
-                                                            Var intern_rInt )),
-                                                      gen_3 ,
-                                                      ([((DataAlt IntegerConstr ,
-                                                          [intern_yInt ]),
-                                                         Case
-                                                           (Prim
-                                                              (I32Add,
-                                                               [Var intern_yInt ;
-                                                                Var intern_xInt ]),
-                                                            intern_rInt ,
-                                                            ([],
-                                                             App
-                                                               (Var
-                                                                  IntegerConstr ,
-                                                                Var intern_rInt ))))],
-                                                       App
-                                                         (Var fibonacci ,
-                                                          App
-                                                            (Var IntegerConstr ,
-                                                             Var intern_rInt )))))))],
-                                             Case
-                                               (Unreachable,gen_3 ,
-                                                ([((DataAlt IntegerConstr ,
-                                                    [intern_yInt ]),
-                                                   Case
-                                                     (Prim
-                                                        (I32Add,
-                                                         [Var intern_yInt ;
-                                                          Var intern_xInt ]),
-                                                      intern_rInt ,
-                                                      ([],
-                                                       App
-                                                         (Var IntegerConstr ,
-                                                          Var intern_rInt ))))],
-                                                 Unreachable)))))],
-                                       App
-                                         (Var fibonacci ,
-                                          App
-                                            (Var IntegerConstr ,Var intern_rInt )))))))],
-                             Case
-                               (Unreachable,gen_0 ,
-                                ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                   Case
-                                     (Var x ,gen_7 ,
-                                      ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                         Case
-                                           (Prim
-                                              (I32Sub,
-                                               [Lit (I32 2); Var intern_xInt ]),
-                                            intern_rInt ,
-                                            ([],
-                                             Case
-                                               (App
-                                                  (Var fibonacci ,
-                                                   App
-                                                     (Var IntegerConstr ,
-                                                      Var intern_rInt )),gen_3 ,
-                                                ([((DataAlt IntegerConstr ,
-                                                    [intern_yInt ]),
-                                                   Case
-                                                     (Prim
-                                                        (I32Add,
-                                                         [Var intern_yInt ;
-                                                          Var intern_xInt ]),
-                                                      intern_rInt ,
-                                                      ([],
-                                                       App
-                                                         (Var IntegerConstr ,
-                                                          Var intern_rInt ))))],
-                                                 App
-                                                   (Var fibonacci ,
-                                                    App
-                                                      (Var IntegerConstr ,
-                                                       Var intern_rInt )))))))],
-                                       Case
-                                         (Unreachable,gen_3 ,
-                                          ([((DataAlt IntegerConstr ,
-                                              [intern_yInt ]),
-                                             Case
-                                               (Prim
-                                                  (I32Add,
-                                                   [Var intern_yInt ;
-                                                    Var intern_xInt ]),
-                                                intern_rInt ,
-                                                ([],
-                                                 App
-                                                   (Var IntegerConstr ,
-                                                    Var intern_rInt ))))],
-                                           Unreachable)))))], Unreachable)))))))],
-                   Case
-                     (Var x ,gen_7 ,
-                      ([((DataAlt IntegerConstr , [intern_xInt ]),
-                         Case
-                           (Prim (I32Sub,[Lit (I32 1); Var intern_xInt ]),
-                            intern_rInt ,
-                            ([],
-                             Case
-                               (App
-                                  (Var fibonacci ,
-                                   App (Var IntegerConstr ,Var intern_rInt )),
-                                gen_0 ,
-                                ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                   Case
-                                     (Var x ,gen_7 ,
-                                      ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                         Case
-                                           (Prim
-                                              (I32Sub,
-                                               [Lit (I32 2); Var intern_xInt ]),
-                                            intern_rInt ,
-                                            ([],
-                                             Case
-                                               (App
-                                                  (Var fibonacci ,
-                                                   App
-                                                     (Var IntegerConstr ,
-                                                      Var intern_rInt )),gen_3 ,
-                                                ([((DataAlt IntegerConstr ,
-                                                    [intern_yInt ]),
-                                                   Case
-                                                     (Prim
-                                                        (I32Add,
-                                                         [Var intern_yInt ;
-                                                          Var intern_xInt ]),
-                                                      intern_rInt ,
-                                                      ([],
-                                                       App
-                                                         (Var IntegerConstr ,
-                                                          Var intern_rInt ))))],
-                                                 App
-                                                   (Var fibonacci ,
-                                                    App
-                                                      (Var IntegerConstr ,
-                                                       Var intern_rInt )))))))],
-                                       Case
-                                         (Unreachable,gen_3 ,
-                                          ([((DataAlt IntegerConstr ,
-                                              [intern_yInt ]),
-                                             Case
-                                               (Prim
-                                                  (I32Add,
-                                                   [Var intern_yInt ;
-                                                    Var intern_xInt ]),
-                                                intern_rInt ,
-                                                ([],
-                                                 App
-                                                   (Var IntegerConstr ,
-                                                    Var intern_rInt ))))],
-                                           Unreachable)))))],
-                                 App
-                                   (Var fibonacci ,
-                                    App (Var IntegerConstr ,Var intern_rInt )))))))],
-                       Case
-                         (Unreachable,gen_0 ,
-                          ([((DataAlt IntegerConstr , [intern_xInt ]),
-                             Case
-                               (Var x ,gen_7 ,
-                                ([((DataAlt IntegerConstr , [intern_xInt ]),
-                                   Case
-                                     (Prim
-                                        (I32Sub,[Lit (I32 2); Var intern_xInt ]),
-                                      intern_rInt ,
-                                      ([],
-                                       Case
-                                         (App
-                                            (Var fibonacci ,
-                                             App
-                                               (Var IntegerConstr ,
-                                                Var intern_rInt )),gen_3 ,
-                                          ([((DataAlt IntegerConstr ,
-                                              [intern_yInt ]),
-                                             Case
-                                               (Prim
-                                                  (I32Add,
-                                                   [Var intern_yInt ;
-                                                    Var intern_xInt ]),
-                                                intern_rInt ,
-                                                ([],
-                                                 App
-                                                   (Var IntegerConstr ,
-                                                    Var intern_rInt ))))],
-                                           App
-                                             (Var fibonacci ,
-                                              App
-                                                (Var IntegerConstr ,
-                                                 Var intern_rInt )))))))],
-                                 Case
-                                   (Unreachable,gen_3 ,
-                                    ([((DataAlt IntegerConstr , [intern_yInt ]),
-                                       Case
-                                         (Prim
-                                            (I32Add,
-                                             [Var intern_yInt ; Var intern_xInt ]),
-                                          intern_rInt ,
-                                          ([],
-                                           App
-                                             (Var IntegerConstr ,
-                                              Var intern_rInt ))))], Unreachable)))))],
-                           Unreachable)))))),gen_21 ,
-               ([((DataAlt IntegerConstr , [gen_22 ]), Var gen_22 )],
-                Unreachable)))))));
+                           ([], App (Var IntegerConstr ,Var intern_rInt ))))],
+                      Unreachable))));
+              (mapped , App (App (Var map ,Var addTwo ),Var list ));
+              (mapped2 , App (App (Var map ,Var addTwo ),Var list ));
+              (mapped3 , App (App (Var map ,Var addTwo ),Var list ));
+              (mapped4 , App (App (Var map ,Var addTwo ),Var list ));
+              (mapped5 , App (App (Var map ,Var addTwo ),Var list ))],
+           App
+             (App (Var take ,App (Var IntegerConstr ,Lit (I32 0))),Var mapped )))));
+ (fibonacci , TopExpr (Lam (x ,App (Var work_fibonacci ,Var x ))));
  (work_E_fibonacci ,
   TopExpr
     (Lam
        (x ,
         Case
-          (App (Var fibonacci ,App (Var IntegerConstr ,Var x )),gen_18 ,
-           ([((DataAlt IntegerConstr , [gen_19 ]), Var gen_19 )], Unreachable)))));
- (E_fibonacci , TopExpr (Lam (x ,App (Var work_E_fibonacci ,Var x ))))]
+          (App (Var fibonacci ,App (Var IntegerConstr ,Var x )),gen_14 ,
+           ([((DataAlt IntegerConstr , [gen_15 ]), Var gen_15 )], Unreachable)))));
+ (E_fibonacci , TopExpr (Lam (x ,App (Var work_E_fibonacci ,Var x ))));
+ (work_take ,
+  TopExpr
+    (Lam
+       (i ,
+        Lam
+          (list ,
+           Case
+             (Var list ,gen_16 ,
+              ([((DataAlt Cons , [head ; tail ]),
+                 Case
+                   (Var i ,anon_0 ,
+                    ([((DataAlt IntegerConstr , [gen_21 ]),
+                       Case
+                         (Var gen_21 ,gen_22 ,
+                          ([((LitAlt (I32 0), []), Var head )],
+                           App
+                             (Case
+                                (Var i ,gen_7 ,
+                                 ([((DataAlt IntegerConstr , [intern_xInt ]),
+                                    Case
+                                      (Prim
+                                         (I32Sub,[Lit (I32 1); Var intern_xInt ]),
+                                       intern_rInt ,
+                                       ([],
+                                        App
+                                          (Var take ,
+                                           App
+                                             (Var IntegerConstr ,
+                                              Var intern_rInt )))))],
+                                  Unreachable)),Var tail ))))],
+                     App
+                       (Case
+                          (Var i ,gen_7 ,
+                           ([((DataAlt IntegerConstr , [intern_xInt ]),
+                              Case
+                                (Prim (I32Sub,[Lit (I32 1); Var intern_xInt ]),
+                                 intern_rInt ,
+                                 ([],
+                                  App
+                                    (Var take ,
+                                     App (Var IntegerConstr ,Var intern_rInt )))))],
+                            Unreachable)),Var tail ))))], Unreachable))))));
+ (take ,
+  TopExpr
+    (Lam
+       (i ,
+        Lam
+          (list ,
+           Case
+             (Var i ,gen_28 ,
+              ([],
+               Case
+                 (Var list ,gen_29 ,
+                  ([], App (App (Var work_take ,Var gen_28 ),Var gen_29 )))))))));
+ (work_map ,
+  TopExpr
+    (Lam
+       (f ,
+        Lam
+          (list ,
+           Case
+             (Var list ,gen_24 ,
+              ([((DataAlt Cons , [head ; tail ]),
+                 App (App (Var Cons ,App (Var f ,Var head )),Var tail ));
+                ((DataAlt Empty , []), Var Empty )], Unreachable))))));
+ (map ,
+  TopExpr
+    (Lam
+       (f ,
+        Lam
+          (list ,
+           Case
+             (Var list ,gen_30 ,
+              ([], App (App (Var work_map ,Var f ),Var gen_30 )))))));
+ (Empty , TopConstr []); (Cons , TopConstr [head ; tail ])]

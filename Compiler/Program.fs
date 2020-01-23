@@ -7,22 +7,9 @@ open Ast
 
 let program = """
 data Cons(head, tail)
-data Empty
-map(list, f(x)) = {
-    return switch(list){
-        Cons(head, tail) => Cons(f(head), tail)
-        Empty => Empty
-    }
-}
-export fibonacci(x) = {
-    return switch(x){
-        | 0 => 1
-        | 1 => 1
-        | _ => fibonacci(x-1) + fibonacci(x-2)
-    }
-}
+data Empty()
+map(f(x), list) = {     return switch(list){         | Cons(head, tail) => Cons(f(head), tail)         | Empty() => Empty     } } take(i, list) = {     return switch(list){         | Cons(head, tail) =>              switch(i){                 | 0 => head                 | _ => take(i-1, tail)             }     } } export fibonacci(x) = {     list = Cons(1, Cons(5, Cons(9, Empty)))     addTwo(x) = x + 2     mapped = map(addTwo, list)     mapped2 = map(addTwo, list)     mapped3 = map(addTwo, list)     mapped4 = map(addTwo, list)     mapped5 = map(addTwo, list)     return take(0, mapped) }  """  
 
-"""
 
 [<EntryPoint>] 
 let main argv =
@@ -33,7 +20,7 @@ let main argv =
         astModule 
          |> Renamer.renameProgram
          |> CoreGen.genProgram
-    let coreModule = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
+    //let coreModule = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
     let stgModule = 
         coreModule
          |> StgGen.genProgram   

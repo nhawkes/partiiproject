@@ -71,7 +71,7 @@ let rec makeWrapper call vs = function
                     let specCall = {var=specializeVar() call.var; analysis=call.analysis} 
                     let specResult = getResultSpecialization call e
                     Map.ofList [v, [c, value, specCall.var, specResult]], [(specCall, Core.TopExpr (makeSpecialization specResult e [v,c, value]))]
-                |None -> Map.empty, []
+                |_ -> Map.empty, []
         makeWrapperLambda call specializations [] (vs |> List.rev), extraProgram
 
 and makeSpecialization specResult e = function
@@ -349,13 +349,14 @@ and simplifyCase inlineMap (e, b, (alts, def)) =
 and caseOfCase = function
     |(Core.Case(e2, b2, (alts2, def2)), b, (alts, def)) ->
         let newAlts2 = alts2 |> List.map (fun (p, e) -> (p, Core.Case(e, b, (alts, def))))
-        let newDef = def2 |> fun def -> (Core.Case(def, b, (alts, def)))
-        (e2, b2, (newAlts2, newDef)) |> caseOfCase
+        let newDef2 = (Core.Case(def2, b, (alts, def)))
+        (e2, b2, (newAlts2, newDef2)) |> caseOfCase
     |x -> x
 
 and isConstr = function
     |Core.Var{callType=Some ConstrCall} -> true
     |_ -> false
+    
     
 
 let rec simplify inlineMap = function

@@ -55,8 +55,7 @@ let ppatbind = pidentifier |>> PatBind
 ppatImpl := choice [ppatconstr; ppatlit; ppatbind]
 
 let pcaseexpr = choice [
-    skipNewline >>. pblock <??> "Switch block"
-    pexpr <??> "Switch expression"
+    spaces >>. pexpr <??> "Switch expression"
 ]
 let pcase = 
     ps "|" >>. ppat .>> ps "=>" .>>. pcaseexpr
@@ -80,11 +79,17 @@ operatorPrecedenceParser.TermParser <- pterm
 pexprImpl := operatorPrecedenceParser.ExpressionParser
 
 
-let passignArgs = between (ps "(") (ps ")") (sepBy pidentifier (ps ","))
-let passign = pidentifier .>>. (opt passignArgs .>> ws) .>>. ((ps "=") >>. pexpr)
+let passignVarArgs = between (ps "(") (ps ")") (sepBy pidentifier (ps ","))
+let passignLHSVars = pidentifier .>>. (opt passignVarArgs .>> ws)
+let passignLHS, passignLHSImpl = createParserForwardedToRef()
+let passignArgs = between (ps "(") (ps ")") (sepBy passignLHS (ps ","))
+passignLHSImpl := pidentifier .>>. (opt passignArgs .>> ws) |>> function
+    |v, None -> AssignVar v
+    |f, Some xs -> AssignFunc(f, xs)
+
+let passign = passignLHS .>>. ((ps "=") >>. pexpr)
 let passignStatement = passign <??> "Assignment" |>> function
-    |((v, None), e) -> Assign(v, [], e)
-    |((f, Some args), e) -> Assign(f, args, e)
+    |(lhs, e) -> Assign(lhs, e)
 
 let preturn = 
     ps "return" >>. pexpr
@@ -95,19 +100,17 @@ pblockImpl :=
     many (pstatement .>> spaces) |>> Block
 
 let pexportDecl = 
-    ps "export" >>. passign  |>> function
+    ps "export" >>. passignLHSVars .>>. ((ps "=") >>. pexpr) |>> function
     |((v, None), e) -> ExportDecl((v, []), (v, []), e)
     |((f, Some args), e) -> ExportDecl((f, args), (f, args), e)
 
 let pglobalDecl = 
-    pidentifier .>>. (opt passignArgs .>> ws) .>>. ((ps "=") >>. pexpr) |>> function
-    |((v, None), e) -> GlobalDecl(v, [], e)
-    |((f, Some args), e) -> GlobalDecl(f, args, e)
+    passignLHS .>>. ((ps "=") >>. pexpr) |>> function
+    |(lhs, e) -> GlobalDecl(lhs, e)
 
 
 let pdata =
-    ps "data" >>.  pidentifier .>>. passignArgs .>> ws |>> function    
-    |(f, args) -> TypeDecl(f, args)
+    ps "data" >>.  passignLHS .>> ws |>> TypeDecl 
 
 let pdecl = choice [pdata; pexportDecl; pglobalDecl]
 

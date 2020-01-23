@@ -19,6 +19,17 @@ let newVar typ = function
     |"_" -> anonymousVar typ
     |b -> userVar b typ    
 
+let rec typeFromLHS funcKind = function
+    |AssignVar v -> ValueT
+    |AssignFunc (v, vs) -> createFuncT funcKind (vs |> List.map (typeFromLHS Types.UnSatFunc)) ValueT
+
+let newVarFromLHS funcKind lhs =
+    let v = 
+        match lhs with
+        |AssignVar v -> v
+        |AssignFunc (v, vs) -> v
+    newVar (typeFromLHS funcKind lhs) v
+
 let put env (var:Var) =
     env |> Map.add (var.name) var
 
@@ -72,10 +83,10 @@ and renameCase env (pattern, e) =
 and renameCases env = List.map (renameCase env)
 
 and renameBlock env assigns ret = function
-    |Assign(b, bs, e)::xs -> 
-        let typ =  createFuncT Types.UnSatFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
-        let v = newVar typ b
-        let vs = bs |> List.map (newVar ValueT)
+    |Assign(lhs, e)::xs -> 
+        let v = newVarFromLHS UnSatFunc lhs
+        let bs = match lhs with |AssignFunc (_, bs) -> bs| _ -> [] 
+        let vs = bs |> List.map (newVarFromLHS UnSatFunc)
         let newEnv = put env v
         renameBlock newEnv ((v, vs, e)::assigns) ret xs
     |Return(e)::xs ->
@@ -85,9 +96,12 @@ and renameBlock env assigns ret = function
         let retRenamed = ret |> Option.toList |> List.map(renameReturn env)
         Block(List.concat [assignsRenamed; retRenamed])
 
-and renameAssign env (v, vs, e) =
-    let newEnv = putAll env vs
-    Assign(v, vs, renameExpr newEnv e)
+and renameAssign env = function
+    |v, [], e -> 
+        Assign(AssignVar v, renameExpr env e)
+    |v, vs, e ->
+        let newEnv = putAll env vs
+        Assign(AssignFunc (v, vs |> List.map AssignVar), renameExpr newEnv e)
 
 and renameReturn env e = Return(renameExpr env e)
 
@@ -100,16 +114,16 @@ let rec renameDecls env exportDecls globalDecls typeDecls = function
         let vs = bs |> List.map (newVar ValueT)
         let newEnv = put env v
         renameDecls newEnv ((n, (v,vs), e)::exportDecls) globalDecls typeDecls xs
-    | GlobalDecl(b, bs, e)::xs ->
-        let typ =  createFuncT SatFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
-        let v = { newVar typ b with callType=Some DirectCall }
-        let vs = bs |> List.map (newVar ValueT)
+    | GlobalDecl(lhs, e)::xs -> 
+        let v = {newVarFromLHS SatFunc lhs with callType=Some DirectCall }
+        let bs = match lhs with |AssignFunc (_, bs) -> bs| _ -> [] 
+        let vs = bs |> List.map (newVarFromLHS UnSatFunc)
         let newEnv = put env v
         renameDecls newEnv exportDecls ((v, vs, e)::globalDecls) typeDecls xs
-    | TypeDecl(b, bs)::xs -> 
-        let typ =  createFuncT SatFunc (ValueT |> List.replicate (bs |> List.length)) (ValueT)
-        let v = { newVar typ b with callType=Some ConstrCall }
-        let vs = bs |> List.map (newVar ValueT)
+    | TypeDecl(lhs)::xs -> 
+        let v = {newVarFromLHS SatFunc lhs with callType=Some ConstrCall }
+        let bs = match lhs with |AssignFunc (_, bs) -> bs| _ -> [] 
+        let vs = bs |> List.map (newVarFromLHS UnSatFunc)
         let newEnv = put env v
         renameDecls newEnv exportDecls globalDecls ((v,vs)::typeDecls) xs
 
@@ -127,12 +141,16 @@ and renameExportDecl env (n, (v,vs), e) =
     let newEnv = putAll env vs
     ExportDecl(n, (v, vs), renameExpr newEnv e)
 
-and renameGlobalDecl env (v, vs, e) =
-    let newEnv = putAll env vs
-    GlobalDecl(v, vs, renameExpr newEnv e)
+and renameGlobalDecl env = function
+    |v, [], e -> 
+        GlobalDecl(AssignVar v, renameExpr env e)
+    |v, vs, e ->
+        let newEnv = putAll env vs
+        GlobalDecl(AssignFunc (v, vs |> List.map AssignVar), renameExpr newEnv e)
+    
 
 and renameTypeDecl env (v, vs) = 
-    TypeDecl(v, vs)
+    TypeDecl(AssignFunc(v, vs |> List.map AssignVar))
 
 
 let renameProgram program =

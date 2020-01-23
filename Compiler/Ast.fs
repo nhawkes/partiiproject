@@ -35,12 +35,16 @@ and Case<'b> = Pattern<'b> * Expr<'b>
 and Block<'b> = Statement<'b> list
 
 and Statement<'b> =
-    | Assign of 'b * 'b list * Expr<'b>
+    | Assign of AssignLHS<'b> * Expr<'b>
     | Return of Expr<'b>
+
+and AssignLHS<'b> =
+    |AssignVar of 'b
+    |AssignFunc of 'b * AssignLHS<'b> list
 
 type Declaration<'b> =
     | ExportDecl of (string * string list) * ('b * 'b list) * Expr<'b>
-    | GlobalDecl of 'b * 'b list * Expr<'b>
-    | TypeDecl of 'b * 'b list
+    | GlobalDecl of AssignLHS<'b> * Expr<'b>
+    | TypeDecl of AssignLHS<'b>
 
 type Program<'b> = Declaration<'b> list

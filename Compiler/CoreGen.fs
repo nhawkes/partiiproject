@@ -107,7 +107,8 @@ and genPatLit state (l: Core.Lit) (subCases: (Ast.Pattern<Vars.Var> list * Ast.E
 
 and genBlock returnValue lets =
     function
-    | Ast.Assign(lhs, args, rhs) :: xs -> genBlock returnValue ((lhs, genRhs (genExpr rhs) args) :: lets) xs
+    | Ast.Assign(Ast.AssignVar(lhs), rhs) :: xs -> genBlock returnValue ((lhs, genRhs (genExpr rhs) []) :: lets) xs
+    | Ast.Assign(Ast.AssignFunc(lhs, args), rhs) :: xs -> genBlock returnValue ((lhs, genRhs (genExpr rhs) args) :: lets) xs    
     | Ast.Return(e) :: xs ->
         match returnValue with
         | None -> genBlock (Some(genExpr e)) lets xs
@@ -120,7 +121,7 @@ and genBlock returnValue lets =
 
 and genRhs (rhs: Core.Expr<_, _>) =
     function
-    | x :: xs -> Core.Lam(x, genRhs rhs xs)
+    | Ast.AssignVar x :: xs -> Core.Lam(x, genRhs rhs xs)
     | [] -> rhs
 
 
@@ -141,14 +142,15 @@ let rec genExport call args rhs =
 
 let genDeclaration =
     function
-    | Ast.GlobalDecl(lhs: Vars.Var, args, rhs) -> [ lhs, Core.TopExpr(genRhs (genExpr rhs) args) ]
+    | Ast.GlobalDecl(Ast.AssignVar(lhs: Vars.Var), rhs) -> [ lhs, Core.TopExpr(genRhs (genExpr rhs) []) ]
+    | Ast.GlobalDecl(Ast.AssignFunc(lhs, args), rhs) -> [ lhs, Core.TopExpr(genRhs (genExpr rhs) args) ]
     | Ast.ExportDecl((exportName, exportArgs), (lhs, args), rhs) ->
         let exportTyp =
             Types.createFuncT Types.SatFunc (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
         let exportVar = Vars.exportVar exportName exportTyp
-        let exportArgs = exportArgs |> List.map (fun arg -> Vars.userVar arg Types.IntT)
-        [ lhs, Core.TopExpr(genRhs (genExpr rhs) args)
-          exportVar, Core.TopExpr(genRhs (genExport (Core.Var lhs) exportArgs rhs) exportArgs) ]
-    | Ast.TypeDecl(v, vs) -> [ v, Core.TopConstr(vs) ]
+        let exportArgs = exportArgs |> List.map (fun arg -> Vars.userVar arg Types.IntT) 
+        [ lhs, Core.TopExpr(genRhs (genExpr rhs) (args |> List.map Ast.AssignVar))
+          exportVar, Core.TopExpr(genRhs (genExport (Core.Var lhs) exportArgs rhs) (exportArgs |> List.map Ast.AssignVar)) ]
+    | Ast.TypeDecl(Ast.AssignFunc(v, vs)) -> [ v, Core.TopConstr(vs |> List.map(function Ast.AssignVar v -> v)) ]
 
 let genProgram (ast: Ast.Program<_>): Core.Program<_, _> = ast |> List.collect genDeclaration
