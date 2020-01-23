@@ -101,7 +101,8 @@ let rec genExpr tenv (env:Map<Var, Placement>) depth =
     | Let(binds, e) -> genLet tenv env depth binds e
     | Case(e, v, alts) -> genCase tenv env depth v e alts
     | App(v, atoms) -> genApp tenv env depth v atoms
-    | Call(constr, atoms) -> genPrim tenv env depth (AVar constr :: (atoms |> List.rev))
+    | Call(f, atoms) -> genPrim tenv env depth (AVar f :: (atoms |> List.rev))
+    | Constr(constr, atoms) -> genPrim tenv env depth (AVar constr :: (atoms |> List.rev))
     | Jump(j, atoms) -> genJump tenv env depth j atoms
     | Prim(atoms) -> genPrim tenv env depth atoms
 
@@ -210,38 +211,8 @@ and genLetJoin tenv env depth j arg je e =
 and genApp tenv env depth v args =
     let whnf =
         [            
-            // Check if thunk and call if so
-
             genAtom tenv env depth (AVar (StgVar v))
-            [Wasm.I32Load
-              { align = 0u
-                offset = 0u }]
-            [Wasm.I32Eqz]
-            // Args Remaining = 0
-
-            genAtom tenv env depth (AVar (StgVar v))
-            [Wasm.I32Load
-              { align = 0u
-                offset = 4u }]
-            [Wasm.I32Eqz; Wasm.I32Const -1; Wasm.I32Xor]
-            // Function != 0
-
-            [Wasm.I32And]
-            // Args Remaining = 0 and Function != 0 ie. is a thunk
-
-            [
-                Wasm.IfElse([Wasm.I32],
-                    [ genAtom tenv env ( depth + 1u) (AVar (StgVar v))
-                      genAtom tenv env ( depth + 1u ) (AVar (StgVar v))
-                      [ Wasm.I32Load
-                          { align = 0u
-                            offset = 4u } ]
-                      [ Wasm.CallIndirect(tenv |> Map.find stdFuncType) ] ]
-                    |> List.concat, [
-                        genAtom tenv env ( depth + 1u ) (AVar (StgVar v))
-                    ] |> List.concat
-                )
-            ]
+            [Wasm.Call (getFunc env WhnfEval)]
         ] |> List.concat
 
     let clone = 
@@ -500,7 +471,7 @@ let genCafData env (caf:Func) =
 
 
 let genProgram (program: Program<Vars.Var>) =
-    let runtimeFuncs = [ identity; malloc; clone 1u; apply 0u ]
+    let runtimeFuncs = [ identity; indirection; malloc; clone 2u; apply 0u; whnfEval 0u 1u ]
 
     let topLevelFuncs =
         List.concat
@@ -515,7 +486,7 @@ let genProgram (program: Program<Vars.Var>) =
 
 
     let typeSec =
-        topLevelFuncs
+        topLevelFuncs 
         |> List.map (fun x -> x.functype)
         |> List.distinct
 

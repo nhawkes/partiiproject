@@ -15,6 +15,7 @@ type Expr<'b> =
     | Case of Expr<'b> * 'b * Alts<'b>
     | App of 'b * Atom<'b> list
     | Call of 'b * Atom<'b> list
+    | Constr of 'b * Atom<'b> list
     | Jump of 'b * Atom<'b> list
     | Prim of Atom<'b> list
 
@@ -40,6 +41,7 @@ and LambdaForm<'b> =
       frees: 'b list
       locals: 'b list
       lets: ('b * LambdaForm<'b>) list
+      stdConstrs: ('b * 'b) list
       expr: Expr<'b> }
 
 type TopLevel<'b> =
@@ -56,6 +58,7 @@ let lambdaForm e =
       frees = []
       locals = []
       lets = []
+      stdConstrs = []
       expr = e }
 
 let combineLf lf1 lf2 = 
@@ -63,6 +66,7 @@ let combineLf lf1 lf2 =
       frees = [ lf1.frees; lf2.frees ] |> List.concat
       locals = [ lf1.locals; lf2.locals ] |> List.concat
       lets = [ lf1.lets; lf2.lets ] |> List.concat
+      stdConstrs = [ lf1.stdConstrs; lf2.stdConstrs ] |> List.concat
       expr = lf1.expr }     
 
 let normLf lf =
@@ -70,5 +74,6 @@ let normLf lf =
       frees = lf.frees |> List.distinct
       locals = lf.locals |> List.distinct
       lets = lf.lets |> List.distinct
+      stdConstrs = lf.stdConstrs |> List.distinct
       expr = lf.expr
     }

@@ -3,6 +3,7 @@ module RuntimeFunctions
 type Var =
     | StgVar of Vars.Var
     | Identity
+    | Indirection
     | WhnfEval
     | Malloc
     | Clone
@@ -26,6 +27,17 @@ let identity =
       functype = stdFuncType
       indirect = true
       func = [], [ Wasm.LocalGet 0u ] }
+
+let indirection = 
+    { name = Indirection
+      functype = stdFuncType
+      indirect = true
+      func = [], [ 
+        Wasm.LocalGet 0u 
+        Wasm.I32Load
+          { align = 0u
+            offset = 8u }
+      ] }
 
 let malloc =
     { name = Malloc
@@ -213,3 +225,60 @@ let apply stdFuncTypeIdx =
                 ]              
               )
           ] }
+
+let whnfEval stdFuncTypeIdx (indirectionIdx:uint32) = 
+    let evaluated = 1u
+    { name = WhnfEval
+      functype = stdFuncType
+      indirect = false
+      func = [ Wasm.I32 ], [ 
+            // Check if thunk and call if so
+
+            [Wasm.LocalGet 0u]
+            [Wasm.I32Load
+              { align = 0u
+                offset = 0u }]
+            [Wasm.I32Eqz]
+            // Args Remaining = 0
+
+            [Wasm.LocalGet 0u]
+            [Wasm.I32Load
+              { align = 0u
+                offset = 4u }]
+            [Wasm.I32Eqz; Wasm.I32Const -1; Wasm.I32Xor]
+            // Function != 0
+
+            [Wasm.I32And]
+            // Args Remaining = 0 and Function != 0 ie. is a thunk
+
+            [
+                Wasm.IfElse([Wasm.I32],
+                    [ [Wasm.LocalGet 0u]
+                      [Wasm.LocalGet 0u]
+                      [ Wasm.I32Load
+                          { align = 0u
+                            offset = 4u } ]
+                      [ Wasm.CallIndirect(stdFuncTypeIdx) ] 
+                      [ Wasm.LocalSet evaluated]
+
+                      [ Wasm.LocalGet 0u ]
+                      [ Wasm.LocalGet evaluated ]
+                      [ Wasm.I32Store
+                          { align = 0u
+                            offset = 8u } ]
+
+                      [ Wasm.LocalGet 0u ]
+                      [ Wasm.I32Const ((indirectionIdx:uint32) |> int32) ]
+                      [ Wasm.I32Store
+                          { align = 0u
+                            offset = 4u } ]
+
+                      [ Wasm.LocalGet evaluated]    
+                    ]
+                    |> List.concat, [
+                        [Wasm.LocalGet 0u]
+                    ] |> List.concat
+                )
+            ]
+      ] |> List.concat 
+      }

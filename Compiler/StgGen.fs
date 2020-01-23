@@ -51,9 +51,9 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
     and genLet e =
         function
-        | Core.NonRec x -> genBindings genNonRec [x] e
+        | Core.NonRec (v, e) -> genBindings genNonRec [ v, genExpr e ] (genExpr e)
         | Core.Join j -> genLetJoin j e
-        | Core.Rec ls -> genBindings genRec ls e
+        | Core.Rec ls -> genBindings genRec (ls |> List.map(fun (v,e) -> v, genExpr e)) (genExpr e)
             
     and genNonRec (vs, expr) =
         match vs with
@@ -66,9 +66,8 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
         |vs -> Stg.Let(Stg.Rec vs, expr)
 
             
-    and genBindings mapExpr ls e =
-        let lf = genExpr e
-        let newLets = ls |> List.map(fun (v,e) -> v, genExpr e)
+    and genBindings mapExpr lfEs lf =
+        let newLets = lfEs// |> List.partition(fun (_, lfE) -> match lfE.expr with Stg.Constr(_)->true|_ -> false )
         let vs = newLets |> List.map fst
         let lfs = newLets |> List.map snd
 
@@ -130,6 +129,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
                 lets = List.concat [lf.lets; lfJ.lets]
                 locals = List.concat [args; lf.locals; lfJ.locals]
                 args = []
+                stdConstrs = []
                 frees = frees
                 expr = expr
         }
@@ -233,7 +233,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
         match f.callType with
         |Some Vars.JoinCall -> Stg.Jump(f, atoms)
         |Some Vars.DirectCall -> Stg.Call(f, atoms)
-        |Some Vars.ConstrCall -> Stg.Call(f, atoms)
+        |Some Vars.ConstrCall -> Stg.Constr(f, atoms)
         |_ ->
         match f.typ with
         | Types.ValueT -> Stg.App(f, atoms)
@@ -259,12 +259,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
         let var = Vars.generateVar Types.ValueT
         let lfInner = f var
         let lfE = arg
-        let lets = (var, lfE) :: lfInner.lets
-        let frees = List.concat [ lfInner.frees; lfE.frees ]
-        { lfInner with
-              lets = lets
-              frees = frees
-              expr = Stg.Let(Stg.NonRec var, lfInner.expr) }
+        genBindings genNonRec [var, lfE] lfInner
 
     and genPrim w ps =
         genAtoms (fun atoms -> Stg.lambdaForm (Stg.Prim(Stg.ALit w::atoms))) [] ps
