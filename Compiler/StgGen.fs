@@ -67,13 +67,14 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
             
     and genBindings mapExpr lfEs lf =
-        let newLets = lfEs// |> List.partition(fun (_, lfE) -> match lfE.expr with Stg.Constr(_)->true|_ -> false )
+        let newStdConstrs, newLets = lfEs |> List.partition(fun (_, lfE) -> match lfE.expr with Stg.Constr(_)->true|_ -> false )
         let vs = newLets |> List.map fst
-        let lfs = newLets |> List.map snd
 
         let innerFrees =
-            lfs 
-            |> List.collect(fun lf -> lf.frees) 
+            List.concat [
+                newLets |> List.map snd |> List.collect(fun lf -> lf.frees) 
+                newStdConstrs |> List.map snd |> List.collect(fun lf -> lf.frees) 
+            ]            
             |> List.distinct
             |> List.filter (fun free -> not (lf.locals |> List.contains free))
             |> List.filter (fun free -> not (lf.args |> List.contains free))
@@ -82,6 +83,12 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
                     (lf.lets
                      |> List.map fst
                      |> List.contains free))
+
+        let stdConstrs = 
+            List.concat [
+                newStdConstrs |> List.map(function (v, {expr=Stg.Constr(f, vs)}) -> (v, f, vs))
+                lf.stdConstrs
+            ]
 
         let lets =
             List.concat
@@ -94,6 +101,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
             |> List.filter (fun v -> not(vs |> List.contains v))
 
         { lf with
+              stdConstrs = stdConstrs
               frees = frees
               lets = lets
               expr = mapExpr(vs, lf.expr) }

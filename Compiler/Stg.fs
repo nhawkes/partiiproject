@@ -41,7 +41,7 @@ and LambdaForm<'b> =
       frees: 'b list
       locals: 'b list
       lets: ('b * LambdaForm<'b>) list
-      stdConstrs: ('b * 'b) list
+      stdConstrs: ('b * 'b * Atom<'b> list) list
       expr: Expr<'b> }
 
 type TopLevel<'b> =

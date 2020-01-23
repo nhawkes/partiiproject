@@ -35,6 +35,7 @@ type Placement =
     | Func of Wasm.FuncIdx
     | IndirectFunc of Wasm.TableIdx
     | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args<Var> * Free<Var>
+    | StdConstr of Wasm.LocalIdx * Atom<Vars.Var> list
     | Data of uint32
     | Block of uint32
     | Unreachable
@@ -73,7 +74,7 @@ let getBlock env depth v =
     | Block(i) -> [Wasm.Br (depth - i)]
     | _ -> failwith "Error"    
 
-let genAtom tenv env depth =
+let rec genAtom tenv env depth =
     function
     | AVar v ->
         match env |> Map.tryFind (v) with
@@ -86,12 +87,16 @@ let genAtom tenv env depth =
         | Some(Func i) -> [ Wasm.Call i ]
         | Some(Lambda(i, _, _, _)) -> [ Wasm.LocalGet i ]
         | Some(Data(i)) -> [ Wasm.I32Const (int i) ]
+        | Some(StdConstr(i, atoms)) -> 
+            [ 
+                atoms |> List.collect (genStgVarAtom tenv env depth)  
+                [Wasm.Call i] ]  |> List.concat
         | Some(Unreachable) -> failwith "Error"
         | None -> failwithf "Variable %A not in environment" v
     | ALit w -> [ w ]
 
 
-let genStgVarAtom tenv env depth = function
+and genStgVarAtom tenv env depth = function
     |AVar v -> genAtom tenv env depth (AVar (StgVar v))
     |ALit w -> genAtom tenv env depth (ALit w)
 
@@ -349,6 +354,8 @@ let genTopLevelFuncs =
 let placeLocal local i = (local, Local i)
 let placeLet (env:Map<Var, Placement>) ((b, lf: LambdaForm<Vars.Var>)) i =
     (StgVar b, Lambda(i, getIndirectFunc env (StgVar b), lf.args |> List.map StgVar, lf.frees |> List.map StgVar))
+let stdConstrEnv env (b, f, vs) =
+    (StgVar b), StdConstr(getFunc env (StgVar f), vs)
 
 let localsEnv env args locals (lets:(Vars.Var*LambdaForm<Vars.Var>) list) =
     let wasmLocals =
@@ -367,6 +374,7 @@ let rec genLetCode tenv env depth = function
             Seq.concat
                 [ Map.toSeq env
                   localsEnv env [This] lf.locals lf.lets
+                  lf.stdConstrs |> Seq.map (stdConstrEnv env )
                   Seq.initInfinite (uint32 >> Heap)
                   |> Seq.zip (ArgsRemaining :: ThisFunction :: List.concat [ lf.args |> List.rev |> List.map StgVar; lf.frees |> List.map StgVar]) ]
             |> Map.ofSeq
@@ -384,6 +392,7 @@ let genTopBindCode tenv env depth (lf: LambdaForm<_>) =
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
+                  lf.stdConstrs |> Seq.map (stdConstrEnv env )
                   localsEnv env (lf.args |> List.map StgVar) lf.locals lf.lets 
                 ]
             |> Map.ofSeq
