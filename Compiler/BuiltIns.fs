@@ -1,52 +1,42 @@
 module BuiltIns
-open Ast
 open Vars
 open Types
+open Core
 
-let rec fieldsForType i = function
-    |FuncT(_, t, b) -> 
-        AssignVar ({unique=InternalField i;  name=""; typ=t; callType=None})::fieldsForType (i+1) b
-    |ValueT -> []
+let v s = Internal s, 0
 
 
-let builtInConstr builtInVar =
-    TypeDecl(AssignFunc(builtInVar, fieldsForType 0 builtInVar.typ))
-
-let builtInOp builtInVar w : Declaration<Var> = 
-    GlobalDecl(AssignFunc(builtInVar, [AssignVar xValue; AssignVar yValue]),
-            Block [
-                Return(
-                    Match(
-                        (Var((xValue)), ValueT),
-                        [
-                            PatConstr(integerConstr, [PatBind xInt]),
-                            Match(
-                                (Var((yValue)), ValueT),
-                                [
-                                    PatConstr(integerConstr, [PatBind yInt]),
-                                    Match(
-                                        (Prim (w, [yInt; xInt]), IntT),
-                                        [
-                                            PatBind(rInt), (Call (integerConstr, [Var (rInt)]))
-                                        ]
-                                    )
-                                ]
-                            )
-                        ]
-                    )
+let builtInOp builtInVar w = 
+    builtInVar, (NoExport,
+        lam([v "x_boxed"],
+            lam([v "y_boxed"],
+                case(Var <| F (v "x_boxed"), v "x_boxed", 
+                    [
+                        DataAlt IntDestr, [v "x"],
+                        case(Var <| F (v "y_boxed"), v "y_boxed", 
+                            [
+                                DataAlt IntDestr, [v "y"],
+                                case(Prim(w, [Var(F <| v "x"); Var(F <| v "y")]), v "r", 
+                                    [
+                                        DefAlt, [], App(Var <| F (IntConstr, 0), [Var <| F (v "r")])
+                                    ]
+                                
+                                )
+                            ]
+                        )
+                    ]
                 )
-            ]
-        )  
+            )    
+        )
+    )
 
-let builtIns =
+let builtInsConstrs =
     [
-        builtInConstr integerConstr
-        builtInOp addOp Wasm.I32Add
-        builtInOp subOp Wasm.I32Sub
+        (IntConstr, 0), (IntDestr, [v"x"])
     ]
 
-let builtInsEnv =
-    [
-        "Int", integerConstr
-    ] |> Map.ofList
-
+let builtInExprs =
+    [    
+        builtInOp (AddOp, 0) Wasm.I32Add
+        builtInOp (SubOp, 0) Wasm.I32Sub
+    ]

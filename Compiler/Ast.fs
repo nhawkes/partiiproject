@@ -1,6 +1,10 @@
 module Ast
 
-
+[<StructuredFormatDisplay("{AsString}")>]
+type Var = 
+    {text:string; startPos: FParsec.Position; endPos: FParsec.Position}
+    member x.AsString = x.text 
+        
 
 type Boxed = Integer of int32
 
@@ -8,43 +12,44 @@ type Lit =
     | Raw of Core.Lit
     | Box of Boxed
 
-type Pattern<'b> =
+type Pattern =
     | PatLit of Lit
-    | PatBind of 'b
-    | PatConstr of 'b * Pattern<'b> list
+    | PatBind of Var
+    | PatConstr of Var * Pattern list
 
 type Op =
     | Add
     | Sub
-
-type Expr<'b> =
+type Expr =
     | Lit of Lit
-    | Var of 'b
-    | BinOp of Expr<'b> * Op * Expr<'b>
-    | Call of 'b * Expr<'b> list
-    | Match of (Expr<'b> * Types.Typ) * Case<'b> list
-    | Block of Block<'b>
-    | Prim of Wasm.Instr * 'b list
+    | Var of Var
+    | BinOp of Expr * Op * Expr
+    | Call of Var * Expr list
+    | Match of (Expr * Types.Typ) * Case list
+    | Block of Block
+    | Prim of Wasm.Instr * Var list
 
-and Prim<'b> =
-    | PrimVar of 'b
+
+and Prim =
+    | PrimVar of Var
     | PrimWasm of Wasm.Instr
 
-and Case<'b> = Pattern<'b> * Expr<'b>
+and Case = Pattern * Expr
 
-and Block<'b> = Statement<'b> list
+and Block = Statement list
 
-and Statement<'b> =
-    | Assign of AssignLHS<'b> * Expr<'b>
-    | Return of Expr<'b>
+and Statement =
+    | Assign of AssignLHS * Expr
+    | Return of Expr
 
-and AssignLHS<'b> =
-    |AssignVar of 'b
-    |AssignFunc of 'b * AssignLHS<'b> list
+and AssignLHS =
+    |AssignVar of Var
+    |AssignFunc of Var * AssignLHS list
 
-type Declaration<'b> =
-    | ExportDecl of (string * string list) * ('b * 'b list) * Expr<'b>
-    | GlobalDecl of AssignLHS<'b> * Expr<'b>
-    | TypeDecl of AssignLHS<'b>
+type Declaration =
+    | ExportDecl of (string * string list) * (Var * Var list) * Expr
+    | GlobalDecl of AssignLHS * Expr
+    | TypeDecl of AssignLHS
 
-type Program<'b> = Declaration<'b> list
+type Program = Declaration list
+

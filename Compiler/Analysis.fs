@@ -1,6 +1,6 @@
 module Analysis
 
-
+(*
 
 type Args = int
 
@@ -24,9 +24,13 @@ type StrictnessValue<'v when 'v: comparison> =
     { arity: int
       strictness: StrictnessResult<'v> }
 
+type Analysis = {
+    strictness: Strictness
+}
+
 [<StructuredFormatDisplay("{AsString}")>]
 type AnalysedVar<'v when 'v: comparison> = 
-    {var:'v; analysis:Strictness} 
+    {var:'v; analysis:Analysis} 
     member m.AsString = sprintf "%A" m.var 
     
 
@@ -318,3 +322,6 @@ let rec analyseProgram binds constrs = function
 let analyse e = 
     let _env, program = analyseProgram [] [] e
     program
+
+
+*)

@@ -22,9 +22,19 @@ let main argv =
     |Ok astModule ->
     let coreModule =
         astModule 
-         |> Renamer.renameProgram
          |> CoreGen.genProgram
+
+    let fv = coreModule |> Core.fvProgram
+    printfn "%A" coreModule
+    match fv |> Set.toList with
+    |(Vars.V x,_)::_ ->failwithf "Not defined %s" x.text
+    |x::_ -> failwithf "Internal error - not defined: %A" x
+    |_ ->
+
+    printfn "%s" (printProgram coreModule)         
     // let coreModule = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
+
+    (*
     let stgModule = 
         coreModule
          |> StgGen.genProgram   
@@ -33,5 +43,6 @@ let main argv =
          |> WasmGen.genProgram
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
+    *)
     
     0

@@ -1,5 +1,6 @@
 module Transform
 
+(*
 open Analysis
 open Vars
 let isBuiltIn b =
@@ -399,3 +400,5 @@ let transform program =
     System.IO.File.WriteAllText("./Compiler/input.core", sprintf "%A" ww)
     System.IO.File.WriteAllText("./Compiler/output.core", sprintf "%A" result)
     result
+
+*)

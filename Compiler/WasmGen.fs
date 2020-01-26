@@ -27,7 +27,7 @@ Thunk - ArgsRemaining=0 Function!=0
 8..: frees
 *)
 
-
+(*
 
 type Placement =
     | Heap of uint32
@@ -583,3 +583,5 @@ let genProgram (program: Program<Vars.Var>) =
       Wasm.CodeSec(codeSec)
       if dataInit.Length>0 then Wasm.DataSec [{data=0u; offset=[Wasm.I32Const 0]; init=dataInit}]
     ]
+
+*)

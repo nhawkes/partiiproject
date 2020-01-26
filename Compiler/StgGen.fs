@@ -1,5 +1,7 @@
 module StgGen
 
+
+(*
 let rec forcedCallArityWithKind k = function 
     |Types.FuncT(k2, a, b) when k = k2 ->
         1 + forcedCallArityWithKind k b    
@@ -13,7 +15,7 @@ let forcedCallArity = function
     |_ -> 0 |> Some
 
 
-let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
+let genProgram (core: Core.Program<_>): Stg.Program<Vars.Var> =
 
     let globals = core |> List.map fst
 
@@ -31,7 +33,7 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
             | Core.Var v -> genAppWithAtoms v []
             | Core.Lit lit -> Stg.lambdaForm (Stg.Prim [ Stg.ALit(genLit lit) ])
             | Core.Lam(v, e) -> genLam [ v ] e
-            | Core.Let(bs, e) -> genLet e bs
+            | Core.Let(l, bs, e) -> genLet e (l, bs)
             | Core.Case(e, v, alts) -> genCase e v alts
             | Core.App(a, b) -> genApp [ b ] a
             | Core.Prim (w, es) -> genPrim w es
@@ -51,9 +53,9 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
     and genLet e =
         function
-        | Core.NonRec (v, e) -> genBindings genNonRec [ v, genExpr e ] (genExpr e)
-        | Core.Join j -> genLetJoin j e
-        | Core.Rec ls -> genBindings genRec (ls |> List.map(fun (v,e) -> v, genExpr e)) (genExpr e)
+        | Core.NonRec, vs -> genBindings genNonRec [ v, genExpr e ] (genExpr e)
+        | Core.Join, js -> genLetJoin j e
+        | Core.Rec, vs -> genBindings genRec (vs |> List.map(fun (v,e) -> v, genExpr e)) (genExpr e)
             
     and genNonRec (vs, expr) =
         match vs with
@@ -281,3 +283,5 @@ let genProgram (core: Core.Program<Vars.Var, _>): Stg.Program<Vars.Var> =
 
     let program = core |> List.map genTopLevel
     program
+
+*)

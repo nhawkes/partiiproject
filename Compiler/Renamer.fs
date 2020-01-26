@@ -5,6 +5,8 @@ open BuiltIns
 open Vars
 open Types
 
+(*
+type TVar = string * Typ
 
 let lookup env b =
     match b with
@@ -160,3 +162,5 @@ let renameProgram program =
         renameDecls env [] [] [] program
     ]
     
+
+*)
