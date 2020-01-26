@@ -1,7 +1,13 @@
 module StgGen
+open Vars
 
+let genVar =
+    let i = ref (-1)
+    fun typ ->
+        let next = !i
+        i := !i - 1
+        Gen typ, next
 
-(*
 let rec forcedCallArityWithKind k = function 
     |Types.FuncT(k2, a, b) when k = k2 ->
         1 + forcedCallArityWithKind k b    
@@ -14,274 +20,297 @@ let forcedCallArity = function
         |Types.UnSatFunc -> None
     |_ -> 0 |> Some
 
+type Env =
+    |IsLam of int
+    |IsCaf
+    |IsJoinPoint of int
+    |IsConstr of int
+    |IsExport of string
+    |IsPrim
 
-let genProgram (core: Core.Program<_>): Stg.Program<Vars.Var> =
-
-    let globals = core |> List.map fst
-
-    let addFree v frees =
-        match globals |> List.contains v with
-        | true -> frees
-        | false -> v :: frees
-
-    let genLit = function
-        | Core.I32 i -> Wasm.I32Const i
-
-    let rec genExpr e =
-        let lf =
-            match e with
-            | Core.Var v -> genAppWithAtoms v []
-            | Core.Lit lit -> Stg.lambdaForm (Stg.Prim [ Stg.ALit(genLit lit) ])
-            | Core.Lam(v, e) -> genLam [ v ] e
-            | Core.Let(l, bs, e) -> genLet e (l, bs)
-            | Core.Case(e, v, alts) -> genCase e v alts
-            | Core.App(a, b) -> genApp [ b ] a
-            | Core.Prim (w, es) -> genPrim w es
-            | Core.Unreachable -> genPrim Wasm.Unreachable [ Core.Lit(Core.I32 -1) ]
-        Stg.normLf lf
+let addFree env v frees =
+        match env |> Map.tryFind v with
+        | Some (IsLam _) -> frees
+        | Some (IsConstr _) -> frees
+        | Some (IsCaf) -> frees
+        | _ -> v :: frees
 
 
-    and genLam vs =
-        function
-        | Core.Lam(v, e) -> genLam (v :: vs) e
-        | e ->
-            let lf = genExpr e
-            let frees = lf.frees |> List.filter (fun free -> not (vs |> List.contains free))
-            { lf with
-                  args = vs |> List.rev
-                  frees = frees }
 
-    and genLet e =
-        function
-        | Core.NonRec, vs -> genBindings genNonRec [ v, genExpr e ] (genExpr e)
-        | Core.Join, js -> genLetJoin j e
-        | Core.Rec, vs -> genBindings genRec (vs |> List.map(fun (v,e) -> v, genExpr e)) (genExpr e)
-            
-    and genNonRec (vs, expr) =
-        match vs with
-        |[] -> expr
-        |v::vs -> Stg.Let(Stg.NonRec v, genNonRec (vs, expr))
-     
-    and genRec (vs, expr) = 
-        match vs with
-        |[] -> expr
-        |vs -> Stg.Let(Stg.Rec vs, expr)
 
-            
-    and genBindings mapExpr lfEs lf =
-        let newStdConstrs, newLets = lfEs |> List.partition(fun (_, lfE) -> match lfE.expr with Stg.Constr(_)->true|_ -> false )
-        let vs = newLets |> List.map fst
+let genLit env = function
+    | Core.I32 i -> Wasm.I32Const i
 
-        let innerFrees =
-            List.concat [
-                newLets |> List.map snd |> List.collect(fun lf -> lf.frees) 
-                newStdConstrs |> List.map snd |> List.collect(fun lf -> lf.frees) 
-            ]            
-            |> List.distinct
-            |> List.filter (fun free -> not (lf.locals |> List.contains free))
-            |> List.filter (fun free -> not (lf.args |> List.contains free))
-            |> List.filter (fun free ->
-                not
-                    (lf.lets
-                     |> List.map fst
-                     |> List.contains free))
+let rec genExpr (env:Map<Var, Env>) e =
+    let lf =
+        match e with
+        | Core.VarE (v:Vars.Var) -> genApp env [] (Core.varE v)
+        | Core.Lit lit -> Stg.lambdaForm (Stg.Prim [ Stg.ALit(genLit env lit) ])
+        | Core.LamE([v], e) -> genLam env [ v ] e
+        | Core.LetE(l, bs, e) -> genLet env e (l, bs)
+        | Core.CaseE(e, v, alts) -> genCase env e v alts
+        | Core.App(a, b) -> genApp env b a
+        | Core.Prim (w, es) -> genPrim env w es
+        | Core.Unreachable -> genPrim env Wasm.Unreachable [ Core.Lit(Core.I32 -1) ]
+    Stg.normLf lf
 
-        let stdConstrs = 
-            List.concat [
-                newStdConstrs |> List.map(function (v, {expr=Stg.Constr(f, vs)}) -> (v, f, vs))
-                lf.stdConstrs
-            ]
 
-        let lets =
-            List.concat
-                [ newLets
-                  lf.lets ]
-
-        let frees =
-            lf.frees
-            |> List.append innerFrees
-            |> List.filter (fun v -> not(vs |> List.contains v))
-
+and genLam env vs =
+    function
+    | Core.LamE([v], e) -> genLam env (v :: vs) e
+    | e ->
+        let lf = genExpr env e
+        let frees = lf.frees |> List.filter (fun free -> not (vs |> List.contains free))
         { lf with
-              stdConstrs = stdConstrs
-              frees = frees
-              lets = lets
-              expr = mapExpr(vs, lf.expr) }
+              args = vs |> List.rev
+              frees = frees }
 
-    and genLetJoin (j, eJ) e =
-        let lf = genExpr e
-        let lfJ = genExpr eJ
-        let args = lfJ.args
-
-        let innerFrees =
-            lfJ.frees
-            |> List.distinct
-            |> List.filter (fun free -> not (lf.locals |> List.contains free))
-            |> List.filter (fun free -> not (lf.args |> List.contains free))
-            |> List.filter (fun free ->
-                not
-                    (lf.lets
-                     |> List.map fst
-                     |> List.contains free))
-
-        let frees =
-            lf.frees
-            |> List.append innerFrees
-            |> List.filter ((<>)j)
-
-        let expr =
-            Stg.Let(
-                Stg.Join(j, args, lfJ.expr),
-                lf.expr
-            )
+and genLet env e =
+    function
+    | Core.NonRec, [v1, e1] -> genBindings env genNonRec [ v1, genExpr env e1 ] (genExpr env e)
+    | Core.Join, [j] -> genLetJoin env j e
+    | Core.Rec, vs -> genBindings env genRec (vs |> List.map(fun (v,e) -> v, genExpr env e)) (genExpr env e)
         
-        {
-                lets = List.concat [lf.lets; lfJ.lets]
-                locals = List.concat [args; lf.locals; lfJ.locals]
-                args = []
-                stdConstrs = []
-                frees = frees
-                expr = expr
-        }
+and genNonRec env (vs, expr) =
+    match vs with
+    |[] -> expr
+    |v::vs -> Stg.Let(Stg.NonRec v, genNonRec env (vs, expr))
+ 
+and genRec env (vs, expr) = 
+    match vs with
+    |[] -> expr
+    |vs -> Stg.Let(Stg.Rec vs, expr)
 
         
+and genBindings env mapExpr (lfEs:(Vars.Var*Stg.LambdaForm<_>) list) lf =
+    let newStdConstrs, newLets = lfEs |> List.partition(fun (_, lfE) -> match lfE.expr with Stg.Constr(_)->true|_ -> false )
+    let vs = newLets |> List.map fst
+
+    let innerFrees =
+        List.concat [
+            newLets |> List.map snd |> List.collect(fun lf -> lf.frees) 
+            newStdConstrs |> List.map snd |> List.collect(fun lf -> lf.frees) 
+        ]            
+        |> List.distinct
+        |> List.filter (fun free -> not (lf.locals |> List.contains free))
+        |> List.filter (fun free -> not (lf.args |> List.contains free))
+        |> List.filter (fun free ->
+            not
+                (lf.lets
+                 |> List.map fst
+                 |> List.contains free))
+
+    let stdConstrs = 
+        List.concat [
+            newStdConstrs |> List.map(function (v, {expr=Stg.Constr(f, vs)}) -> (v, f, vs))
+            lf.stdConstrs
+        ]
+
+    let lets =
+        List.concat
+            [ newLets
+              lf.lets ]
+
+    let frees =
+        lf.frees
+        |> List.append innerFrees
+        |> List.filter (fun v -> not(vs |> List.contains v))
+
+    { lf with
+          stdConstrs = stdConstrs
+          frees = frees
+          lets = lets
+          expr = mapExpr env (vs, lf.expr) }
+
+and genLetJoin env (j, eJ) e =
+    let lf = genExpr (env |> Map.add j (IsJoinPoint 1) ) e
+    let lfJ = genExpr env eJ
+    let args = lfJ.args
+
+    let innerFrees =
+        lfJ.frees
+        |> List.distinct
+        |> List.filter (fun free -> not (lf.locals |> List.contains free))
+        |> List.filter (fun free -> not (lf.args |> List.contains free))
+        |> List.filter (fun free ->
+            not
+                (lf.lets
+                 |> List.map fst
+                 |> List.contains free))
+
+    let frees =
+        lf.frees
+        |> List.append innerFrees
+        |> List.filter ((<>)j)
+
+    let expr =
+        Stg.Let(
+            Stg.Join(j, args, lfJ.expr),
+            lf.expr
+        )
+    
+    {
+            lets = List.concat [lf.lets; lfJ.lets]
+            locals = List.concat [args; lf.locals; lfJ.locals]
+            args = []
+            stdConstrs = []
+            frees = frees
+            expr = expr
+    }
+
+    
 
 
 
 
 
-    and genCase e v alts =
-        let lf = genExpr e
-        let stgAlts, lfAlts = genAlts alts
-        let lfCombined = Stg.combineLf lf lfAlts
+and genCase env e v alts =
+    let lf = genExpr env e
+    let def, otherAlts =
+        match alts with
+        |(Core.DefAlt, [], e)::otherAlts -> e, otherAlts
+        |otherAlts -> Core.Unreachable, otherAlts
+    let stgAlts, lfAlts = genAlts env def otherAlts
+    let lfCombined = Stg.combineLf lf lfAlts
 
-        let expr = Stg.Case(lf.expr, v, stgAlts)
-        let locals = v :: lfCombined.locals
-        let frees = lfCombined.frees |> List.filter ((<>) v)
+    let expr = Stg.Case(lf.expr, v, stgAlts)
+    let locals = v :: lfCombined.locals
+    let frees = lfCombined.frees |> List.filter ((<>) v)
+    { lfCombined with
+          locals = locals
+          frees = frees
+          expr = expr }
+
+and genAlts env def =
+    function
+    | (Core.DataAlt v, vs, e) :: xs -> 
+        let lfDef = genExpr env def
+        genAAlt env lfDef lfDef.expr [] v vs e xs
+    | (Core.LitAlt l, [], e) :: xs ->
+        let lfDef = genExpr env def
+        genPAlt env lfDef lfDef.expr [] l e xs
+    | [] ->
+        let lfDef = genExpr env def
+        genPAlts env lfDef lfDef.expr [] []
+
+and genAAlt env lfAcc def aalts v vs e xs =
+    let lfE = genExpr env e
+    let lfCombined = Stg.combineLf lfE lfAcc
+    let frees = lfCombined.frees |> List.filter (fun free -> not (vs |> List.contains free))
+    let locals = lfCombined.locals |> List.append vs
+
+    let lf =
         { lfCombined with
-              locals = locals
               frees = frees
-              expr = expr }
+              locals = locals }
+    genAAlts env lf def
+        (List.concat
+            [ [ (genConstr env v, vs), lf.expr ]
+              aalts ]) xs
 
-    and genAlts =
-        function
-        | ((Core.DataAlt v, vs), e) :: xs, def -> 
-            let lfDef = genExpr def
-            genAAlt lfDef lfDef.expr [] v vs e xs
-        | ((Core.LitAlt l, []), e) :: xs, def ->
-            let lfDef = genExpr def
-            genPAlt lfDef lfDef.expr [] l e xs
-        | [], def ->
-            let lfDef = genExpr def
-            genPAlts lfDef lfDef.expr [] []
+and genAAlts env lfAcc def aalts =
+    function
+    | (Core.DataAlt v, vs, e) :: xs -> genAAlt env lfAcc def aalts v vs e xs
+    | [] -> Stg.AAlts(aalts, def), lfAcc
 
-    and genAAlt lfAcc def aalts v vs e xs =
-        let lfE = genExpr e
-        let lfCombined = Stg.combineLf lfE lfAcc
-        let frees = lfCombined.frees |> List.filter (fun free -> not (vs |> List.contains free))
-        let locals = lfCombined.locals |> List.append vs
+and genConstr env = function
+| Core.IntDestr -> 1
+| Core.Constr i -> 2 + i
 
-        let lf =
-            { lfCombined with
-                  frees = frees
-                  locals = locals }
-        genAAlts lf def
-            (List.concat
-                [ [ (v, vs), lf.expr ]
-                  aalts ]) xs
+and genPAlt env lfAcc def palts l e xs =
+    let lfE = genExpr env e
+    let lfCombined = Stg.combineLf lfE lfAcc
+    genPAlts env lfCombined def
+        (List.concat
+            [ [ genLit env l, lfCombined.expr ]
+              palts ]) xs
 
-    and genAAlts lfAcc def aalts =
-        function
-        | ((Core.DataAlt v, vs), e) :: xs -> genAAlt lfAcc def aalts v vs e xs
-        | [] -> Stg.AAlts(aalts, def), lfAcc
+and genPAlts env lfAcc def (palts: Stg.PAlts<_>) =
+    function
+    | (Core.LitAlt l, [], e) :: xs -> genPAlt env lfAcc def palts l e xs
+    | [] -> Stg.PAlts(palts, def), lfAcc
 
-    and genPAlt lfAcc def palts l e xs =
-        let lfE = genExpr e
-        let lfCombined = Stg.combineLf lfE lfAcc
-        genPAlts lfCombined def
-            (List.concat
-                [ [ genLit l, lfCombined.expr ]
-                  palts ]) xs
-
-    and genPAlts lfAcc def (palts: Stg.PAlts<_>) =
-        function
-        | ((Core.LitAlt l, []), e) :: xs -> genPAlt lfAcc def palts l e xs
-        | [] -> Stg.PAlts(palts, def), lfAcc
-
-    and genApp args =
-        function
-        | Core.App(f, a) -> genApp (a :: args) f
-        | Core.Var v -> genAppWithArgs v args
-
-    and genAppWithArgs f args =
-        let arity = forcedCallArity f.typ
-        match arity with 
-        |None -> 
-            genAtoms (genAppWithAtoms f) [] args
-        |Some i when i = (args |> List.length) -> 
-            // Saturated
-            genAtoms (fun xs -> Stg.lambdaForm (genCallWithAtoms f xs)) [] args
-        |Some i when i < (args |> List.length) -> 
-            // Oversaturated
-            let firstArgs = args |> List.take i
-            let secondArgs = args |> List.skip i
-            let firstResult = genAppWithArgs f firstArgs
-            genAtom (fun f -> genAppWithArgs f secondArgs) firstResult
-        |Some i when i > (args |> List.length) -> 
-            // Undersaturated
-            let extraArgs = [(args |> List.length)..i] |> List.map (fun _ -> Vars.generateVar Types.ValueT)
-            let lf = genAppWithArgs f (List.concat [args; extraArgs |> List.map Core.Var])
-            let frees = lf.frees |> List.filter(fun v -> not(extraArgs |> List.contains(v)))
-            {lf with args=List.concat[extraArgs; lf.args]; frees=frees}
-        
-    and genAppWithAtoms (f:Vars.Var) atoms =
-        let e = genCallWithAtoms f atoms
-        let lf = Stg.lambdaForm e
-        { lf with frees = lf.frees |> addFree f }
-
-    and genCallWithAtoms (f:Vars.Var) atoms =   
-        match f.callType with
-        |Some Vars.JoinCall -> Stg.Jump(f, atoms)
-        |Some Vars.DirectCall -> Stg.Call(f, atoms)
-        |Some Vars.ConstrCall -> Stg.Constr(f, atoms)
+and genApp env (arg:Core.Expr<Var> list) =
+    function
+    | Core.VarE v as x ->
+        match env |> Map.tryFind v with
+        |Some(IsLam x) ->
+            // Direct Call 
+            if (arg|>List.length) <> x then failwith "Length must match"
+            genAtoms env (fun xs -> Stg.Call(v, xs) |> Stg.lambdaForm) [] arg
+        |Some (IsCaf) ->
+            if not(arg |> List.isEmpty) then failwith "Length must be 0"
+            Stg.App(v, []) |> Stg.lambdaForm   
+        |Some (IsJoinPoint x) ->
+            genAtoms env (fun xs -> Stg.Jump(v, xs) |> Stg.lambdaForm) [] arg
+        |Some(IsPrim) ->
+            if not(arg |> List.isEmpty) then failwith "Length must be 0"
+            Stg.Prim [ Stg.AVar v ] |> Stg.lambdaForm
         |_ ->
-        match f.typ with
-        | Types.ValueT -> Stg.App(f, atoms)
-        | Types.FuncT _ -> Stg.App(f, atoms)
-        | Types.IntT -> 
-            if atoms |> List.isEmpty then
-                Stg.Prim [ Stg.AVar f ]
-            else failwith "Literal cannot take arguments"
+        match arg with
+            |[] -> Stg.App(v, []) |> Stg.lambdaForm 
+            |[a] -> genDynamicApp env [a] x
+            |_ -> failwithf "Cannot multiple app this"
+
+    | x ->
+        match arg with
+            |[a] -> genDynamicApp env [a] x
+            |_ -> failwithf "Cannot multiple app this"
+        
 
 
-    and genAtoms mapAtoms xs =
-        function
-        | (Core.Var arg) :: args ->
-            let (lf:Stg.LambdaForm<_>) = genAtoms mapAtoms (Stg.AVar arg :: xs) args
-            let frees = lf.frees |> addFree arg
-            { lf with frees = frees }
-        | (Core.Lit arg) :: args -> genAtoms mapAtoms (Stg.ALit(genLit arg) :: xs) args
-        | arg :: args ->
-            genAtom (fun var -> genAtoms mapAtoms (Stg.AVar var :: xs) args) (genExpr arg)
-        | [] -> mapAtoms (xs |> List.rev)
-
-    and genAtom f (arg) =    
-        let var = Vars.generateVar Types.ValueT
-        let lfInner = f var
-        let lfE = arg
-        genBindings genNonRec [var, lfE] lfInner
-
-    and genPrim w ps =
-        genAtoms (fun atoms -> Stg.lambdaForm (Stg.Prim(Stg.ALit w::atoms))) [] ps
 
 
-    let genTopLevel =
-        function
-        | b, Core.TopExpr e when (b:Vars.Var).typ = Types.ValueT -> b, Stg.TopCaf(genExpr e)
-        | b, Core.TopExpr e -> b, Stg.TopLam(genExpr e)
-        | b, Core.TopConstr vs -> b, Stg.TopConstr vs
+and genDynamicApp env args = function
+    | Core.App(f, [a]) -> genDynamicApp env (a :: args) f
+    | Core.VarE v -> genAppWithArgs env v args
 
-    let program = core |> List.map genTopLevel
+and genAppWithArgs env f args =
+    genAtoms env (genAppWithAtoms env f) [] args
+    
+and genAppWithAtoms env (f:Vars.Var) atoms =
+    let e = Stg.App(f, atoms)
+    let lf = Stg.lambdaForm e
+    { lf with frees = lf.frees |> addFree env f }
+
+
+
+and genAtoms env mapAtoms xs =
+    function
+    | (Core.VarE arg) :: args ->
+        let (lf:Stg.LambdaForm<_>) = genAtoms env mapAtoms (Stg.AVar arg :: xs) args
+        let frees = lf.frees |> addFree env arg
+        { lf with frees = frees }
+    | (Core.Lit arg) :: args -> genAtoms env mapAtoms (Stg.ALit(genLit env arg) :: xs) args
+    | arg :: args ->
+        genAtom env (fun var -> genAtoms env mapAtoms (Stg.AVar var :: xs) args) (genExpr env arg)
+    | [] -> mapAtoms (xs |> List.rev)
+
+and genAtom env f (arg : Stg.LambdaForm<_>) =    
+    let var = genVar Types.ValueT
+    let lfInner = f var
+    let lfE = arg
+    genBindings env (genNonRec) [var, lfE] lfInner
+
+and genPrim env w ps =
+    genAtoms env (fun atoms -> Stg.lambdaForm (Stg.Prim(Stg.ALit w::atoms))) [] ps
+
+
+let genTopLevel env =
+    function
+    | b, Core.TopExpr (_, e) -> 
+        match env |> Map.tryFind b with
+        |Some IsCaf -> b, Stg.TopCaf(genExpr env e)
+        |Some (IsExport name) -> b, Stg.TopExport(name, genExpr env e)
+        |_ -> b, Stg.TopLam(genExpr env e)
+    | b, Core.TopConstr(_, vs) -> b, Stg.TopConstr vs
+
+let genProgram (Core.Program core): Stg.Program<Vars.Var> =
+    let env = core |> List.map(function
+        | b, Core.TopConstr (c, vs) -> b, IsConstr (vs.Length)
+        | b, Core.TopExpr (Core.NoExport, Core.LamE(bs, e)) -> b, IsLam (bs.Length)
+        | b, Core.TopExpr (Core.NoExport, e) -> b, IsCaf
+        | b, Core.TopExpr (Core.Export s, e) -> b, IsExport s
+    ) 
+    let program = core |> List.map (genTopLevel (env |> Map.ofList))
     program
-
-*)

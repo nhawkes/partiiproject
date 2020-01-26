@@ -1,6 +1,6 @@
 module Stg
 
-type Constr<'b> = 'b
+type Constr = int
 
 type Args<'b> = 'b list
 type Free<'b> = 'b list
@@ -31,7 +31,7 @@ and Default<'b> = Expr<'b>
 and Alts<'b> =
     | AAlts of AAlts<'b> * Default<'b>
     | PAlts of PAlts<'b> * Default<'b>
-and AAlts<'b> = ((Constr<'b> * 'b list) * Expr<'b>) list
+and AAlts<'b> = ((Constr * 'b list) * Expr<'b>) list
 and PAlts<'b> = (Wasm.Instr * Expr<'b>) list
 and Lifted<'b> = Lifted of Bind<'b>
 and Lets<'b> = Lifted<'b> list
@@ -47,6 +47,7 @@ and LambdaForm<'b> =
 type TopLevel<'b> =
     |TopCaf of LambdaForm<'b>
     |TopLam of LambdaForm<'b>
+    |TopExport of string * LambdaForm<'b>
     |TopConstr of 'b list      
 
 type TopBind<'b> = 'b * TopLevel<'b>

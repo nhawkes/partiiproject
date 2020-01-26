@@ -24,7 +24,7 @@ let main argv =
         astModule 
          |> CoreGen.genProgram
 
-    let fv = coreModule |> Core.fvProgram
+    let fv = coreModule |> fvProgram
     printfn "%A" coreModule
     match fv |> Set.toList with
     |(Vars.V x,_)::_ ->failwithf "Not defined %s" x.text
@@ -34,7 +34,7 @@ let main argv =
     printfn "%s" (printProgram coreModule)         
     // let coreModule = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
 
-    (*
+    
     let stgModule = 
         coreModule
          |> StgGen.genProgram   
@@ -43,6 +43,6 @@ let main argv =
          |> WasmGen.genProgram
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
-    *)
+    
     
     0

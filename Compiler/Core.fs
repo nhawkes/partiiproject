@@ -3,7 +3,6 @@ module Core
 type Lit = I32 of int32
 
 type Constr =
-    | FreeConstr of string
     | IntDestr
     | Constr of int
 
@@ -36,10 +35,10 @@ and Pat =
     | DefAlt
 
 
-and Alts<'b when 'b: comparison> = ClosedAlts of (Pat * 'b list * Closed<'b>) list
+and Alts<'b when 'b: comparison> = (Pat * 'b list * Closed<'b>) list
 
 type Export =
-    |Export
+    |Export of string
     |NoExport
 
 type TopLevel<'b when 'b: comparison> =
@@ -71,7 +70,7 @@ let rec fvExpr = function
     | Unreachable -> Set.empty
 
 and fvClosed (Closed e) = fvExpr e
-and fvClosedAlts (ClosedAlts alts) =
+and fvClosedAlts (alts) =
     fvAlts alts
 and fvAlts alts =
     alts |> List.map(fun (_,_,e)->fvClosed e) |> Set.unionMany
@@ -89,24 +88,21 @@ let rec bindClosed i bs (Closed(e)) =
 
 and bindExpr i bs =
     function
-    | Var (B (i,j)) -> Var(B (i,j))
-    | Var(F v) ->
+    | Var (B (i,j)) -> Var(B (i,j)) : Expr<'a>
+    | Var(F (v:'b*int)) ->
         match bs |> List.tryFindIndex ((=)(name v)) with
         | Some j -> Var(B(i, j))
         | _ -> Var(F v)
     | Lit l -> Lit l
     | Lam(xs, e) -> Lam(xs, bindClosed i bs e)
     | Let(l, binds, e) -> Let(l, binds |> List.map(fun (b,e) -> (b, bindClosed i bs e)), bindClosed i bs e)
-    | Case(e, b, alts) -> Case(bindExpr i bs e, b, bindClosedAlts i bs alts)
+    | Case(e, b, alts) -> Case(bindExpr i bs e, b, bindAlts i b bs alts)
     | App(f, xs) -> App(bindExpr i bs f, xs |> List.map (bindExpr i bs))
     | Prim(p, es) -> Prim(p, es |> List.map (bindExpr i bs))
     | Unreachable -> Unreachable
 
-and bindAlts i bs alts =
-    alts |> List.map(fun (alt, binds, e) -> (alt, binds, bindClosed i bs e))
-
-and bindClosedAlts i bs (ClosedAlts alts) =    
-    ClosedAlts(bindAlts (i+1) bs alts)
+and bindAlts i b bs alts =
+    alts |> List.map(fun (alt, binds, e) -> (alt, binds, bindClosed i (bs) e))
 
 let rec unbindClosed i bs (Closed(e)) =
     Closed(unbindExpr (i+1) bs e)
@@ -122,84 +118,87 @@ and unbindExpr i bs =
     | Lit l -> Lit l
     | Lam(xs, e) -> Lam(xs, unbindClosed i bs e)
     | Let(l, binds, e) -> Let(l, binds |> List.map(fun (b,e) -> (b, unbindClosed i bs e)), unbindClosed i bs e)
-    | Case(e, b, alts) -> Case(unbindExpr i bs e, b, unbindClosedAlts i bs alts)
+    | Case(e, b, alts) -> Case(unbindExpr i bs e, b, unbindAlts i b bs alts)
     | App(f, xs) -> App(unbindExpr i bs f, xs |> List.map (unbindExpr i bs))
     | Prim(p, es) -> Prim(p, es |> List.map (unbindExpr i bs))
     | Unreachable -> Unreachable
 
-and unbindClosedAlts i bs (ClosedAlts alts) =
-    ClosedAlts(unbindAlts (i+1) bs alts)
+and unbindAlts i b bs alts =
+    alts |> List.map(fun (alt, binds, e) -> (alt, binds, unbindClosed i (bs) e))
 
-and unbindAlts i bs alts =
-    alts |> List.map(fun (alt, binds, e) -> (alt, binds, unbindClosed i bs e))
 
 
 let openE (bs) (Closed e) =
-    let fs = bs |> List.map fst
-    let frees = fvExpr e
-    let maxi = Seq.append [0] (frees |> Set.toSeq |> Seq.filter(fun (x,_) -> fs |> List.contains x) |> Seq.map snd) |> Seq.max
-    let bsFresh = bs |> List.map(fun (x, _) -> x, maxi+1)
-    bsFresh, unbindExpr 0 bsFresh e
-
-let openAlts bs (ClosedAlts alts) =
-    let fs = bs |> List.map fst
-    let frees = fvAlts alts
-    let maxi = Seq.append [0] (frees |> Set.toSeq |> Seq.filter(fun (x,_) -> fs |> List.contains x) |> Seq.map snd) |> Seq.max
-    let bsFresh = bs |> List.map(fun (x, _) -> x, maxi+1)
-    bsFresh, unbindAlts 0 bsFresh alts
+    unbindExpr 0 bs e
 
 let closeE bs e =
     let closed = Closed(bindExpr 0 (bs |> List.map name) e)
     closed
-
-let closeAlts bs alts =
-    let closedAlts = ClosedAlts(bindAlts 0 (bs |> List.map name) alts)
-    closedAlts
-
-
+let freshen fv bs es =    
+    let fs = bs |> List.map fst
+    let frees = es |> List.map fv |> Set.unionMany
+    let maxi = Seq.append [-1] (frees |> Set.toSeq |> Seq.filter(fun (x,_) -> fs |> List.contains x) |> Seq.map snd) |> Seq.max
+    let bsFresh = bs |> List.map(fun (x, _) -> x, maxi+1)
+    bsFresh
     
 let lamE (xs, e) =
     let closed = closeE xs e
     Lam(xs, closed) 
 
 let caseE (e, b, alts) =
-    let closed = alts |> List.map (fun (alt, bs, e) -> (alt, bs, closeE (bs) e))   
-    Case(e, b, closeAlts [b] closed)
+    let closed = alts |> List.map (fun (alt, bs, e) -> (alt, bs, closeE (b::bs) e))   
+    Case(e, b, closed)
     
 let letE (l, binds, e) =
     let bs = binds |> List.map fst
     Let(l, binds |> List.map(fun (b,e) -> (b, closeE bs e)), closeE bs e)
 
+let varE v = Var(F v)
+
+let (|VarE|_|) = function
+    |Var(F v) -> Some v
+    |_ -> None
+
 let (|LamE|_|) = function
     |Lam(bs, closed) -> 
-        let newBs, e = openE bs closed
+        let newBs = freshen fvClosed bs [closed]
+        let e = openE newBs closed
         Some(newBs, e)
     |_ -> None
 let (|LetE|_|) = function
-    |Let(l, bs, closed) -> 
-        let newBs, e = openE (bs|>List.map fst) closed
-        Some(l, newBs, e)
+    |Let(l, xs, closed) -> 
+        let bs = xs |> List.map fst
+        let es = xs |> List.map snd
+        let newBs = freshen fvClosed bs (closed::es)
+        let e = openE newBs closed
+        let ys = es |> List.map (openE newBs) |> List.zip newBs
+        Some(l, ys, e)
     |_ -> None
 let (|CaseE|_|) = function
     |Case(e, b, alts) -> 
-        let [newB], closedAlts = openAlts [b] alts
-        let newAlts = closedAlts |> List.map(fun (alt, bs, closed) -> 
-            let newBs, e = openE bs closed
-            (alt, newBs, e)        
+        let bs = b::(alts|>List.collect(fun (_, bs, _) -> bs))
+        let es = alts |> List.map(fun (_,_,e) -> e)
+        let newBs = freshen fvClosed bs es
+        let freshMap = List.zip bs newBs |> Map.ofList
+        let newAlts = alts |> List.map(fun (alt, bs, closed) -> 
+            let e = openE ((b::bs)|>List.map(fun k -> Map.find k freshMap)) closed
+            (alt, bs|>List.map(fun k -> Map.find k freshMap), e)        
         )
-        Some(e, newB, newAlts)
+        Some(e, freshMap |> Map.find b, newAlts)
     |_ -> None
 let closeProgram program = 
     let bs = program |> List.map fst
     program |> List.map (function
         |b, TopExpr(export, e) -> b, ClosedTopExpr(export, closeE bs e)
-        |b, TopConstr(c, bs) -> b, ClosedTopConstr(c, bs)
+        |b, TopConstr(c, x) -> b, ClosedTopConstr(c, x)
     ) 
 
 let (|Program|) program =
     let bs = program |> List.map fst
-    program |> List.map (function
-        |b, ClosedTopExpr(export, e) -> b, TopExpr(export, openE bs e)
+    let es = program |> List.map snd
+    let newBs = freshen fvProgram bs [program]
+    es |> List.zip newBs |> List.map (function
+        |b, ClosedTopExpr(export, e) -> b, TopExpr(export, openE newBs e)
         |b, ClosedTopConstr(c, bs) -> b, TopConstr(c, bs)
     )    
 
@@ -213,8 +212,8 @@ let newline indent = "\n" + String.replicate (indent*4) " "
 let rec printExpr indent = function
     | Var(v) -> printVar v
     | Lit(I32 i) -> sprintf "%i" i
-    | LamE(xs, e) -> sprintf "<%s> -> %s" (xs |> List.map printBinder |> String.concat ", ") (printExpr indent e)
-    | LetE(l, bs, e) -> sprintf "%s %s%s in %s%s" (printLet l) (newline indent)  (printBinds indent bs) (newline indent)  (printExpr indent e)
+    | LamE(xs, e) -> sprintf "\<%s> -> %s" (xs |> List.map printBinder |> String.concat ", ") (printExpr indent e)
+    | LetE(l, bs, e) -> sprintf "%s %s in %s%s" (printLet l)  (printBinds (indent+1) bs) (newline (indent+1))  (printExpr (indent+1) e)
     | CaseE(e, b, alts) -> sprintf "case %s as %s of {%s%s}" (printExpr indent e) (printBinder b) (printAlts (indent+1) alts) (newline indent)
     | App(f, xs) -> sprintf "%s (%s)" (printExpr indent f) (printExprs indent xs)
     | Prim(p, es) -> sprintf "{%% %A %s %%}" p (printExprs indent es)
@@ -236,9 +235,10 @@ and printLet = function
     |Join -> "let join"
 
 and printBinds indent bs =
-    bs |> 
+    (newline (indent)) +
+    (bs |> 
         List.map(fun (b, e) -> printBind indent (b, e)) |>
-        String.concat "and"
+        String.concat "and")
 
 and printBind indent (b, e:Expr<_>) =
     sprintf "%s = %s" (b |> printBinder) (printExpr indent e)
@@ -255,7 +255,6 @@ and printAlt indent = function
         sprintf "_ -> %s" (printExpr indent e)
 
 and printConstr = function
-    |FreeConstr s -> s
     |Constr i -> string(i)
     |IntDestr -> "Int"
 
@@ -266,12 +265,12 @@ and printLit = function
 and printBinder (s, i) = sprintf "%A_%i" s i 
 and printBinders bs = bs |> List.map printBinder |> String.concat ", " 
 
-and printProgram program = 
+and printProgram (Program program) = 
     let bs = program |> List.map fst
     program |> List.map (printTopLevel bs) |> String.concat "\n" 
 
 and printTopLevel bs = function
-    |b, TopExpr(export, closed) -> sprintf "%s = %s%s\n" (printBinder b) (newline 1) (printClosed 1 bs closed)
+    |b, TopExpr(export, e) -> sprintf "%s = %s%s\n" (printBinder b) (newline 1) (printExpr 1 e)
     |b, TopConstr(c, bs) -> sprintf "Data %s = %s(%s)" (printBinder b) (printConstr c) (printBinders bs)
 
 

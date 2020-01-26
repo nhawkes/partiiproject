@@ -8,15 +8,15 @@ let v s = Internal s, 0
 
 let builtInOp builtInVar w = 
     builtInVar, (NoExport,
-        lam([v "x_boxed"],
-            lam([v "y_boxed"],
-                case(Var <| F (v "x_boxed"), v "x_boxed", 
+        lamE([v "x_boxed"],
+            lamE([v "y_boxed"],
+                caseE(Var <| F (v "x_boxed"), v "x_boxed", 
                     [
                         DataAlt IntDestr, [v "x"],
-                        case(Var <| F (v "y_boxed"), v "y_boxed", 
+                        caseE(Var <| F (v "y_boxed"), v "y_boxed", 
                             [
                                 DataAlt IntDestr, [v "y"],
-                                case(Prim(w, [Var(F <| v "x"); Var(F <| v "y")]), v "r", 
+                                caseE(Prim(w, [Var(F <| v "x"); Var(F <| v "y")]), v "r", 
                                     [
                                         DefAlt, [], App(Var <| F (IntConstr, 0), [Var <| F (v "r")])
                                     ]
@@ -30,7 +30,7 @@ let builtInOp builtInVar w =
         )
     )
 
-let builtInsConstrs =
+let builtInConstrs =
     [
         (IntConstr, 0), (IntDestr, [v"x"])
     ]

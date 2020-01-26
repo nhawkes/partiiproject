@@ -27,7 +27,6 @@ Thunk - ArgsRemaining=0 Function!=0
 8..: frees
 *)
 
-(*
 
 type Placement =
     | Heap of uint32
@@ -44,7 +43,9 @@ type Func =
     { name: Var
       functype: Wasm.FuncType
       indirect: bool
-      caf: bool }
+      caf: bool 
+      export: string option      
+    }
 
 
 
@@ -275,7 +276,7 @@ and genPAlts tenv env depth atom def =
 and genAAlts tenv env depth atom def =
     function
     | ((c, vs), e) :: xs ->
-        let funcIndex = getFunc env (StgVar c)
+        let constrIndex = c
 
         let assignLocals =
             vs
@@ -293,7 +294,7 @@ and genAAlts tenv env depth atom def =
           [ Wasm.I32Load
               { align = 0u
                 offset = 8u }
-            Wasm.I32Const(int funcIndex)
+            Wasm.I32Const(int c)
             Wasm.I32Eq
             Wasm.IfElse
                 ([ Wasm.I32 ],
@@ -314,17 +315,20 @@ let rec genLetFuncs = function
         [ [ { name = StgVar b
               functype = stdFuncType
               indirect = true
-              caf = false } ]
+              caf = false
+              export = None
+          } ]
           genLetsFuncs lf.lets ]
         |> List.concat
 
 and genLetsFuncs = List.collect genLetFuncs
 
-let genTopLamFuncs b (lf: LambdaForm<Vars.Var>) =
+let genTopLamFuncs export b (lf: LambdaForm<Vars.Var>) =
     [ [ { name = StgVar b
           functype = (Wasm.I32 |> List.replicate (lf.args |> List.length), [ Wasm.I32 ])
           indirect = false
-          caf = false } ]
+          caf = false
+          export=export } ]
       genLetsFuncs lf.lets ]
     |> List.concat
 
@@ -335,6 +339,7 @@ let genTopCafFunc b lf =
         functype = stdFuncType
         indirect = true
         caf = true
+        export = None
         }]
         genLetsFuncs lf.lets
     ] |> List.concat 
@@ -343,11 +348,13 @@ let genTopConstrFunc b vs =
     { name = StgVar b
       functype = (Wasm.I32 |> List.replicate (vs |> List.length), [ Wasm.I32 ])
       indirect = false
-      caf = false }
+      caf = false
+      export= None }
 
 let genTopLevelFuncs =
     function
-    | b:Vars.Var, TopLam lam -> genTopLamFuncs b lam
+    | b:Vars.Var, TopLam lam -> genTopLamFuncs None b lam
+    | b:Vars.Var, TopExport (name, lam) -> genTopLamFuncs (Some name) b lam
     | b, TopCaf lam -> genTopCafFunc b lam
     | b, TopConstr vs -> [ genTopConstrFunc b vs ]
 
@@ -385,10 +392,10 @@ let rec genLetCode tenv env depth = function
 
 and genLetsCode tenv env depth = List.collect (genLetCode tenv env depth)
 
-let genTopBindCode tenv env depth b (lf: LambdaForm<_>) =
+let genTopBindCode export tenv env depth b (lf: LambdaForm<_>) =
     let resetHeap =
-        match b with
-        |{Vars.Var.unique=Vars.Export _} -> [Wasm.I32Const 0; Wasm.GlobalSet heapTop]
+        match export with
+        |true -> [Wasm.I32Const 0; Wasm.GlobalSet heapTop]
         |_ -> []
     if not (List.isEmpty lf.frees) then
         failwithf "Top level bindings cannot have free variables: %A" lf.frees
@@ -459,8 +466,9 @@ let genTopConstrCode tenv env depth b vs =
 
 let genTopLevelCode tenv env depth =
     function
-    | b, TopLam lam -> genTopBindCode tenv env depth b lam
-    | b, TopCaf lam -> genTopBindCode tenv env depth b lam
+    | b, TopLam lam -> genTopBindCode false tenv env depth b lam
+    | b, TopExport (_, lam) -> genTopBindCode true tenv env depth b lam
+    | b, TopCaf lam -> genTopBindCode false tenv env depth b lam
     | b, TopConstr(vs) -> [ genTopConstrCode tenv env depth b vs ]
 
 
@@ -494,7 +502,9 @@ let genProgram (program: Program<Vars.Var>) =
                   { name = x.name
                     functype = x.functype
                     indirect = x.indirect
-                    caf = false })
+                    caf = false 
+                    export = None
+                    })
               program |> List.collect (genTopLevelFuncs) ]
 
 
@@ -515,12 +525,12 @@ let genProgram (program: Program<Vars.Var>) =
     let topLevelFuncVars = topLevelFuncs |> List.map (fun x -> x.name)
 
     let exportSec =
-        topLevelFuncVars
+        topLevelFuncs
         |> List.indexed
         |> List.choose (function
-            | (i, StgVar {unique=Vars.Export nm}) ->
+            | (i, {export=Some name}) ->
                 Some
-                    { Wasm.Export.nm = nm
+                    { Wasm.Export.nm = name
                       Wasm.Export.exportdesc = Wasm.ExportFunc(uint32 i) }
             | _ -> None)
 
@@ -583,5 +593,3 @@ let genProgram (program: Program<Vars.Var>) =
       Wasm.CodeSec(codeSec)
       if dataInit.Length>0 then Wasm.DataSec [{data=0u; offset=[Wasm.I32Const 0]; init=dataInit}]
     ]
-
-*)
