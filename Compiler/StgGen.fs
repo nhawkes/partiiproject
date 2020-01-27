@@ -25,7 +25,7 @@ type Env =
     |IsCaf
     |IsJoinPoint of int
     |IsConstr of int
-    |IsExport of string
+    |IsExport of string * int
     |IsPrim
 
 let addFree env v frees =
@@ -46,10 +46,10 @@ let rec genExpr (env:Map<Var, Env>) e =
         match e with
         | Core.VarE (v:Vars.Var) -> genApp env [] (Core.varE v)
         | Core.Lit lit -> Stg.lambdaForm (Stg.Prim [ Stg.ALit(genLit env lit) ])
-        | Core.LamE([v], e) -> genLam env [ v ] e
+        | Core.LamE(v, e) -> genLam env [v] e
         | Core.LetE(l, bs, e) -> genLet env e (l, bs)
         | Core.CaseE(e, v, alts) -> genCase env e v alts
-        | Core.App(a, b) -> genApp env b a
+        | Core.App(a, b) -> genApp env [b] a
         | Core.Prim (w, es) -> genPrim env w es
         | Core.Unreachable -> genPrim env Wasm.Unreachable [ Core.Lit(Core.I32 -1) ]
     Stg.normLf lf
@@ -57,7 +57,7 @@ let rec genExpr (env:Map<Var, Env>) e =
 
 and genLam env vs =
     function
-    | Core.LamE([v], e) -> genLam env (v :: vs) e
+    | Core.LamE(v, e) -> genLam env (v :: vs) e
     | e ->
         let lf = genExpr env e
         let frees = lf.frees |> List.filter (fun free -> not (vs |> List.contains free))
@@ -262,7 +262,7 @@ and genApp env (arg:Core.Expr<Var> list) =
 
 
 and genDynamicApp env args = function
-    | Core.App(f, [a]) -> genDynamicApp env (a :: args) f
+    | Core.App(f, a) -> genDynamicApp env (a :: args) f
     | Core.VarE v -> genAppWithArgs env v args
 
 and genAppWithArgs env f args =
@@ -295,22 +295,33 @@ and genAtom env f (arg : Stg.LambdaForm<_>) =
 and genPrim env w ps =
     genAtoms env (fun atoms -> Stg.lambdaForm (Stg.Prim(Stg.ALit w::atoms))) [] ps
 
+let rec genTopLam env x args = function
+    |Core.LamE(a, b) -> genTopLam env (x-1) (a::args) b
+    |e when x = 0 -> 
+        let lf = genExpr env e
+        let frees = lf.frees |> List.filter(fun x -> not(args |> List.contains x))
+        args|>List.rev, {lf with frees=frees} 
 
 let genTopLevel env =
     function
     | b, Core.TopExpr (_, e) -> 
         match env |> Map.tryFind b with
         |Some IsCaf -> b, Stg.TopCaf(genExpr env e)
-        |Some (IsExport name) -> b, Stg.TopExport(name, genExpr env e)
-        |_ -> b, Stg.TopLam(genExpr env e)
+        |Some (IsExport (name, arity)) -> 
+            let args, e = genTopLam env arity [] e
+            b, Stg.TopExport(name, args, e)
+        |Some (IsLam arity) -> b, Stg.TopLam(genTopLam env arity [] e)
     | b, Core.TopConstr(_, vs) -> b, Stg.TopConstr vs
 
+let rec getManifestArity = function
+    |Core.LamE(a, b) -> 1 + getManifestArity b
+    |_ -> 0
 let genProgram (Core.Program core): Stg.Program<Vars.Var> =
     let env = core |> List.map(function
         | b, Core.TopConstr (c, vs) -> b, IsConstr (vs.Length)
-        | b, Core.TopExpr (Core.NoExport, Core.LamE(bs, e)) -> b, IsLam (bs.Length)
+        | b, Core.TopExpr (Core.NoExport, e) when getManifestArity e > 0 -> b, IsLam (getManifestArity e)
         | b, Core.TopExpr (Core.NoExport, e) -> b, IsCaf
-        | b, Core.TopExpr (Core.Export s, e) -> b, IsExport s
+        | b, Core.TopExpr (Core.Export s, e) -> b, IsExport (s, getManifestArity e)
     ) 
     let program = core |> List.map (genTopLevel (env |> Map.ofList))
     program

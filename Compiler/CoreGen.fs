@@ -41,12 +41,12 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
 
     and genLit =
         function
-        | Ast.Box(Ast.Integer i) -> Core.App(Core.Var(Core.F (IntConstr, 0)), [Core.Lit(Core.I32 i)])
+        | Ast.Box(Ast.Integer i) -> Core.App(Core.Var(Core.F (IntConstr, 0)), Core.Lit(Core.I32 i))
         | Ast.Raw(l) -> Core.Lit(l)
 
     and genCall f =
         function
-        | arg :: args -> genCall (Core.App(f, [genExpr arg])) args
+        | arg :: args -> genCall (Core.App(f, genExpr arg)) args
         | [] -> f
 
     and genBinOp x y =
@@ -81,9 +81,9 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
             let bindV = bind |> Option.defaultWith (fun () -> genVar Types.ValueT)
             let defVar = genVar Types.ValueT
             let defaultExpr = Core.closeE [bindV] (genManyMatch def es subCases)
-            let d = Core.App(Core.Var (Core.F defVar), [Core.Var (Core.F bindV)])
+            let d = Core.App(Core.Var (Core.F defVar), Core.Var (Core.F bindV))
             Core.letE
-                (Core.Join, [defVar, Core.Lam([bindV], defaultExpr)],
+                (Core.Join, [defVar, Core.Lam(bindV, defaultExpr)],
                  genCasesWithDefault
                      (d, [], (matchexpr, typ), es, bindV)
                      otherCases)
@@ -152,7 +152,7 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
 
     and genRhs (rhs: Core.Expr<Var>) =
         function
-        | x :: xs -> Core.lamE([x], genRhs rhs xs)
+        | x :: xs -> Core.lamE(x, genRhs rhs xs)
         | [] -> rhs
         
 
@@ -162,7 +162,7 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
 
     let rec genExport call args rhs =
         match args with
-        | x :: xs -> genExport (Core.App(call, [Core.App(Core.Var(Core.F (IntConstr, 0)), [Core.Var (Core.F x)])])) xs rhs
+        | x :: xs -> genExport (Core.App(call, Core.App(Core.Var(Core.F (IntConstr, 0)), Core.Var (Core.F x)))) xs rhs
         | [] ->
             let resultVar = genVar Types.ValueT
             let returnVar = genVar Types.IntT
