@@ -230,42 +230,49 @@ and genPAlts env lfAcc def (palts: Stg.PAlts<_>) =
     | (Core.LitAlt l, [], e) :: xs -> genPAlt env lfAcc def palts l e xs
     | [] -> Stg.PAlts(palts, def), lfAcc
 
-and genApp env (arg:Core.Expr<Var> list) =
-    function
-    | Core.VarE v as x ->
-        match env |> Map.tryFind v with
-        |Some(IsLam x) ->
-            // Direct Call 
-            if (arg|>List.length) <> x then failwith "Length must match"
-            genAtoms env (fun xs -> Stg.Call(v, xs) |> Stg.lambdaForm) [] arg
-        |Some (IsCaf) ->
-            if not(arg |> List.isEmpty) then failwith "Length must be 0"
-            Stg.App(v, []) |> Stg.lambdaForm   
-        |Some (IsJoinPoint x) ->
-            genAtoms env (fun xs -> Stg.Jump(v, xs) |> Stg.lambdaForm) [] arg
-        |Some(IsPrim) ->
-            if not(arg |> List.isEmpty) then failwith "Length must be 0"
-            Stg.Prim [ Stg.AVar v ] |> Stg.lambdaForm
-        |_ ->
-        match arg with
-            |[] -> Stg.App(v, []) |> Stg.lambdaForm 
-            |[a] -> genDynamicApp env [a] x
-            |_ -> failwithf "Cannot multiple app this"
 
-    | x ->
-        match arg with
-            |[a] -> genDynamicApp env [a] x
-            |_ -> failwithf "Cannot multiple app this"
+
+and genApp env args = function
+    | Core.App(f, a) -> genDynamicApp env (a :: args) f
+    | Core.VarE v -> genAppWithArgs env v args
+
+and genAppWithArgs env v args =
+    match args with
+    |[] ->
+        match v with
+        |Some(IsLam x) ->
+            let newVar = genVar Types.ValueT
+            let lf = genFastApp env v 
+
+
+and genFastApp env v (arg:Core.Expr<Var> list) =
+    match env |> Map.tryFind v with
+    |Some(IsLam x) ->
+        // Direct Call 
+        if (arg|>List.length) <> x then failwith "Length must match"
+        genAtoms env (fun xs -> Stg.Call(v, xs) |> Stg.lambdaForm) [] arg
+    |Some (IsCaf) ->
+        if not(arg |> List.isEmpty) then failwith "Length must be 0"
+        Stg.App(v, []) |> Stg.lambdaForm   
+    |Some (IsJoinPoint x) ->
+        genAtoms env (fun xs -> Stg.Jump(v, xs) |> Stg.lambdaForm) [] arg
+    |Some(IsPrim) ->
+        if not(arg |> List.isEmpty) then failwith "Length must be 0"
+        Stg.Prim [ Stg.AVar v ] |> Stg.lambdaForm
+    |Some(IsConstr i) ->
+        if (arg|>List.length) <> i then failwith "Length must match"
+        genAtoms env (fun xs -> Stg.Constr(v, xs) |> Stg.lambdaForm) [] arg
+    |_ ->
+    match arg with
+        |[] -> Stg.App(v, []) |> Stg.lambdaForm 
+        |[a] -> genDynamicApp env [a] x
+        |_ -> failwithf "Cannot multiple app this"
+
         
 
 
 
-
-and genDynamicApp env args = function
-    | Core.App(f, [a]) -> genDynamicApp env (a :: args) f
-    | Core.VarE v -> genAppWithArgs env v args
-
-and genAppWithArgs env f args =
+and genDynamicApp env f args =
     genAtoms env (genAppWithAtoms env f) [] args
     
 and genAppWithAtoms env (f:Vars.Var) atoms =

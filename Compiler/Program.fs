@@ -41,6 +41,7 @@ let main argv =
     let wasmModule =
         stgModule          
          |> WasmGen.genProgram
+    printfn "%A" stgModule
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
     
