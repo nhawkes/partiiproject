@@ -323,9 +323,10 @@ let rec genLetFuncs = function
 
 and genLetsFuncs = List.collect genLetFuncs
 
-let genTopLamFuncs export b (lf: LambdaForm<Vars.Var>) =
+
+let genTopLamFuncs export b args (lf: LambdaForm<Vars.Var>) =
     [ [ { name = StgVar b
-          functype = (Wasm.I32 |> List.replicate (lf.args |> List.length), [ Wasm.I32 ])
+          functype = (Wasm.I32 |> List.replicate (args |> List.length), [ Wasm.I32 ])
           indirect = false
           caf = false
           export=export } ]
@@ -353,8 +354,8 @@ let genTopConstrFunc b vs =
 
 let genTopLevelFuncs =
     function
-    | b:Vars.Var, TopLam lam -> genTopLamFuncs None b lam
-    | b:Vars.Var, TopExport (name, lam) -> genTopLamFuncs (Some name) b lam
+    | b:Vars.Var, TopLam (args, lam) -> genTopLamFuncs None b args lam
+    | b:Vars.Var, TopExport (name, args, lam) -> genTopLamFuncs (Some name) b args lam
     | b, TopCaf lam -> genTopCafFunc b lam
     | b, TopConstr vs -> [ genTopConstrFunc b vs ]
 
@@ -392,7 +393,7 @@ let rec genLetCode tenv env depth = function
 
 and genLetsCode tenv env depth = List.collect (genLetCode tenv env depth)
 
-let genTopBindCode export tenv env depth b (lf: LambdaForm<_>) =
+let genTopBindCode export tenv env depth b args (lf: LambdaForm<_>) =
     let resetHeap =
         match export with
         |true -> [Wasm.I32Const 0; Wasm.GlobalSet heapTop]
@@ -400,11 +401,14 @@ let genTopBindCode export tenv env depth b (lf: LambdaForm<_>) =
     if not (List.isEmpty lf.frees) then
         failwithf "Top level bindings cannot have free variables: %A" lf.frees
     else
+    if not (List.isEmpty lf.args) then
+        failwithf "Top level bindings cannot have args: %A" lf.frees
+    else
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
                   lf.stdConstrs |> Seq.map (stdConstrEnv env )
-                  localsEnv env (lf.args |> List.map StgVar) lf.locals lf.lets 
+                  localsEnv env (args |> List.map StgVar) lf.locals lf.lets 
                 ]
             |> Map.ofSeq
 
@@ -466,9 +470,9 @@ let genTopConstrCode tenv env depth b vs =
 
 let genTopLevelCode tenv env depth =
     function
-    | b, TopLam lam -> genTopBindCode false tenv env depth b lam
-    | b, TopExport (_, lam) -> genTopBindCode true tenv env depth b lam
-    | b, TopCaf lam -> genTopBindCode false tenv env depth b lam
+    | b, TopLam (args, lam) -> genTopBindCode false tenv env depth b args lam
+    | b, TopExport (_, args, lam) -> genTopBindCode true tenv env depth b args lam
+    | b, TopCaf lam -> genTopBindCode false tenv env depth b [] lam
     | b, TopConstr(vs) -> [ genTopConstrCode tenv env depth b vs ]
 
 

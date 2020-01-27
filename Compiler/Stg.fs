@@ -46,8 +46,8 @@ and LambdaForm<'b> =
 
 type TopLevel<'b> =
     |TopCaf of LambdaForm<'b>
-    |TopLam of LambdaForm<'b>
-    |TopExport of string * LambdaForm<'b>
+    |TopLam of Args<'b> * LambdaForm<'b>
+    |TopExport of string * Args<'b> * LambdaForm<'b>
     |TopConstr of 'b list      
 
 type TopBind<'b> = 'b * TopLevel<'b>

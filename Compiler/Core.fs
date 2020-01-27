@@ -18,10 +18,10 @@ type Let =
 type Expr<'b when 'b: comparison> =
     | Var of Var<'b>
     | Lit of Lit
-    | Lam of 'b list * Closed<'b>
+    | Lam of 'b * Closed<'b>
     | Let of Let * Binds<'b> * Closed<'b>
     | Case of Expr<'b> * 'b * Alts<'b>
-    | App of Expr<'b> * Expr<'b> list
+    | App of Expr<'b> * Expr<'b>
     | Prim of Wasm.Instr * Expr<'b> list
     | Unreachable
 
@@ -65,7 +65,7 @@ let rec fvExpr = function
     | Lam(xs, e) -> fvClosed e
     | Let(l, bs, e) -> Set.union (fvClosed e) (bs |> List.map (snd >> fvClosed) |> Set.unionMany)
     | Case(e, b, alts) -> Set.union (fvExpr e) (fvClosedAlts alts)
-    | App(f, xs) -> Set.union (fvExpr f) (xs |> List.map (fvExpr) |> Set.unionMany)
+    | App(a, b) -> Set.union (fvExpr a) (fvExpr b)
     | Prim(p, es) -> es |> List.map (fvExpr) |> Set.unionMany
     | Unreachable -> Set.empty
 
@@ -97,7 +97,7 @@ and bindExpr i bs =
     | Lam(xs, e) -> Lam(xs, bindClosed i bs e)
     | Let(l, binds, e) -> Let(l, binds |> List.map(fun (b,e) -> (b, bindClosed i bs e)), bindClosed i bs e)
     | Case(e, b, alts) -> Case(bindExpr i bs e, b, bindAlts i b bs alts)
-    | App(f, xs) -> App(bindExpr i bs f, xs |> List.map (bindExpr i bs))
+    | App(a, b) -> App(bindExpr i bs a, bindExpr i bs b)
     | Prim(p, es) -> Prim(p, es |> List.map (bindExpr i bs))
     | Unreachable -> Unreachable
 
@@ -119,7 +119,7 @@ and unbindExpr i bs =
     | Lam(xs, e) -> Lam(xs, unbindClosed i bs e)
     | Let(l, binds, e) -> Let(l, binds |> List.map(fun (b,e) -> (b, unbindClosed i bs e)), unbindClosed i bs e)
     | Case(e, b, alts) -> Case(unbindExpr i bs e, b, unbindAlts i b bs alts)
-    | App(f, xs) -> App(unbindExpr i bs f, xs |> List.map (unbindExpr i bs))
+    | App(a, b) -> App(unbindExpr i bs a, unbindExpr i bs b)
     | Prim(p, es) -> Prim(p, es |> List.map (unbindExpr i bs))
     | Unreachable -> Unreachable
 
@@ -141,9 +141,9 @@ let freshen fv bs es =
     let bsFresh = bs |> List.map(fun (x, _) -> x, maxi+1)
     bsFresh
     
-let lamE (xs, e) =
-    let closed = closeE xs e
-    Lam(xs, closed) 
+let lamE (x, e) =
+    let closed = closeE [x] e
+    Lam(x, closed) 
 
 let caseE (e, b, alts) =
     let closed = alts |> List.map (fun (alt, bs, e) -> (alt, bs, closeE (b::bs) e))   
@@ -161,8 +161,8 @@ let (|VarE|_|) = function
 
 let (|LamE|_|) = function
     |Lam(bs, closed) -> 
-        let newBs = freshen fvClosed bs [closed]
-        let e = openE newBs closed
+        let [newBs] = freshen fvClosed [bs] [closed]
+        let e = openE [newBs] closed
         Some(newBs, e)
     |_ -> None
 let (|LetE|_|) = function
@@ -212,10 +212,10 @@ let newline indent = "\n" + String.replicate (indent*4) " "
 let rec printExpr indent = function
     | Var(v) -> printVar v
     | Lit(I32 i) -> sprintf "%i" i
-    | LamE(xs, e) -> sprintf "\<%s> -> %s" (xs |> List.map printBinder |> String.concat ", ") (printExpr indent e)
+    | LamE(xs, e) -> sprintf "\<%s> -> %s" (xs |> printBinder) (printExpr indent e)
     | LetE(l, bs, e) -> sprintf "%s %s in %s%s" (printLet l)  (printBinds (indent+1) bs) (newline (indent+1))  (printExpr (indent+1) e)
     | CaseE(e, b, alts) -> sprintf "case %s as %s of {%s%s}" (printExpr indent e) (printBinder b) (printAlts (indent+1) alts) (newline indent)
-    | App(f, xs) -> sprintf "%s (%s)" (printExpr indent f) (printExprs indent xs)
+    | App(a, b) -> sprintf "%s (%s)" (printExpr indent a) (printExpr indent b)
     | Prim(p, es) -> sprintf "{%% %A %s %%}" p (printExprs indent es)
     | Unreachable -> "_|_"
 
