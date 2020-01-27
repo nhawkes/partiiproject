@@ -357,7 +357,7 @@ let genTopLevelFuncs =
     | b:Vars.Var, TopLam (args, lam) -> genTopLamFuncs None b args lam
     | b:Vars.Var, TopExport (name, args, lam) -> genTopLamFuncs (Some name) b args lam
     | b, TopCaf lam -> genTopCafFunc b lam
-    | b, TopConstr vs -> [ genTopConstrFunc b vs ]
+    | b, TopConstr (_, vs) -> [ genTopConstrFunc b vs ]
 
 let placeLocal local i = (local, Local i)
 let placeLet (env:Map<Var, Placement>) ((b, lf: LambdaForm<Vars.Var>)) i =
@@ -418,7 +418,7 @@ let genTopBindCode export tenv env depth b args (lf: LambdaForm<_>) =
           genLetsCode tenv env depth lf.lets ]
         |> List.concat
 
-let genTopConstrCode tenv env depth b vs =
+let genTopConstrCode tenv env depth b c vs =
     let localidx =
         vs
         |> List.length
@@ -460,7 +460,7 @@ let genTopConstrCode tenv env depth b vs =
 
       [ 
         Wasm.LocalGet localidx
-        Wasm.I32Const(getFunc env (StgVar b) |> int)
+        Wasm.I32Const(c)
         Wasm.I32Store
             { align = 0u
               offset = 8u } ]
@@ -473,7 +473,7 @@ let genTopLevelCode tenv env depth =
     | b, TopLam (args, lam) -> genTopBindCode false tenv env depth b args lam
     | b, TopExport (_, args, lam) -> genTopBindCode true tenv env depth b args lam
     | b, TopCaf lam -> genTopBindCode false tenv env depth b [] lam
-    | b, TopConstr(vs) -> [ genTopConstrCode tenv env depth b vs ]
+    | b, TopConstr(c, vs) -> [ genTopConstrCode tenv env depth b c vs ]
 
 
 let genCafData env (caf:Func) =

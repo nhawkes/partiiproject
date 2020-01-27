@@ -7,11 +7,7 @@ open Ast
 
 let program = """
 export fibonacci(x) = {
-    return switch(x){
-        | 0 => 1
-        | 1 => 1
-        | _ => fibonacci(x-1) + fibonacci(x-2)
-    }
+    return 0
 }
 """
 

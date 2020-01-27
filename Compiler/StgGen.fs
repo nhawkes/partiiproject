@@ -13,12 +13,6 @@ let rec forcedCallArityWithKind k = function
         1 + forcedCallArityWithKind k b    
     |_ -> 0
 
-let forcedCallArity = function
-    |Types.FuncT(k, a, b) ->
-        match k with
-        |Types.SatFunc -> forcedCallArityWithKind k b + 1 |> Some
-        |Types.UnSatFunc -> None
-    |_ -> 0 |> Some
 
 type Env =
     |IsLam of int
@@ -27,6 +21,13 @@ type Env =
     |IsConstr of int
     |IsExport of string * int
     |IsPrim
+
+let forcedCallArity env f =
+    match env |> Map.tryFind f with
+    |Some(IsLam x) -> Some x
+    |Some(IsConstr x) -> Some x
+    |_ -> None
+
 
 let addFree env v frees =
         match env |> Map.tryFind v with
@@ -231,58 +232,43 @@ and genPAlts env lfAcc def (palts: Stg.PAlts<_>) =
     | [] -> Stg.PAlts(palts, def), lfAcc
 
 
-
-and genApp env args = function
-    | Core.App(f, a) -> genDynamicApp env (a :: args) f
+and genApp env args =
+    function
+    | Core.App(f, a) -> genApp env (a :: args) f
     | Core.VarE v -> genAppWithArgs env v args
 
-and genAppWithArgs env v args =
-    match args with
-    |[] ->
-        match v with
-        |Some(IsLam x) ->
-            let newVar = genVar Types.ValueT
-            let lf = genFastApp env v 
-
-
-and genFastApp env v (arg:Core.Expr<Var> list) =
-    match env |> Map.tryFind v with
-    |Some(IsLam x) ->
-        // Direct Call 
-        if (arg|>List.length) <> x then failwith "Length must match"
-        genAtoms env (fun xs -> Stg.Call(v, xs) |> Stg.lambdaForm) [] arg
-    |Some (IsCaf) ->
-        if not(arg |> List.isEmpty) then failwith "Length must be 0"
-        Stg.App(v, []) |> Stg.lambdaForm   
-    |Some (IsJoinPoint x) ->
-        genAtoms env (fun xs -> Stg.Jump(v, xs) |> Stg.lambdaForm) [] arg
-    |Some(IsPrim) ->
-        if not(arg |> List.isEmpty) then failwith "Length must be 0"
-        Stg.Prim [ Stg.AVar v ] |> Stg.lambdaForm
-    |Some(IsConstr i) ->
-        if (arg|>List.length) <> i then failwith "Length must match"
-        genAtoms env (fun xs -> Stg.Constr(v, xs) |> Stg.lambdaForm) [] arg
-    |_ ->
-    match arg with
-        |[] -> Stg.App(v, []) |> Stg.lambdaForm 
-        |[a] -> genDynamicApp env [a] x
-        |_ -> failwithf "Cannot multiple app this"
-
-        
-
-
-and genDynamicApp env args = function
-    | Core.App(f, a) -> genDynamicApp env (a :: args) f
-    | Core.VarE v -> genAppWithArgs env v args
-
-and genDynamicApp env f args =
-    genAtoms env (genAppWithAtoms env f) [] args
+and genAppWithArgs env f args =
+    let arity = forcedCallArity env f
+    match arity with 
+    |None -> 
+        genAtoms env (genAppWithAtoms env f) [] args
+    |Some i when i = (args |> List.length) -> 
+        // Saturated
+        genAtoms env (fun xs -> Stg.lambdaForm (genCallWithAtoms env f xs)) [] args
+    |Some i when i < (args |> List.length) -> 
+        // Oversaturated
+        let firstArgs = args |> List.take i
+        let secondArgs = args |> List.skip i
+        let firstResult = genAppWithArgs env f firstArgs
+        genAtom env (fun f -> genAppWithArgs env f secondArgs) firstResult
+    |Some i when i > (args |> List.length) -> 
+        // Undersaturated
+        let extraArgs = [(args |> List.length)..i] |> List.map (fun _ -> genVar Types.ValueT)
+        let lf = genAppWithArgs env f (List.concat [args; extraArgs |> List.map Core.varE])
+        let frees = lf.frees |> List.filter(fun v -> not(extraArgs |> List.contains(v)))
+        {lf with args=List.concat[extraArgs; lf.args]; frees=frees}
     
 and genAppWithAtoms env (f:Vars.Var) atoms =
-    let e = Stg.App(f, atoms)
+    let e = genCallWithAtoms env f atoms
     let lf = Stg.lambdaForm e
     { lf with frees = lf.frees |> addFree env f }
 
+and genCallWithAtoms env (f:Vars.Var) atoms =   
+    match env |> Map.tryFind f with
+    |Some (IsJoinPoint _) -> Stg.Jump(f, atoms)
+    |Some (IsLam _) -> Stg.Call(f, atoms)
+    |Some (IsConstr _) -> Stg.Constr(f, atoms)
+    |_ -> Stg.App(f, atoms)
 
 
 and genAtoms env mapAtoms xs =
@@ -321,11 +307,12 @@ let genTopLevel env =
             let args, e = genTopLam env arity [] e
             b, Stg.TopExport(name, args, e)
         |Some (IsLam arity) -> b, Stg.TopLam(genTopLam env arity [] e)
-    | b, Core.TopConstr(_, vs) -> b, Stg.TopConstr vs
+    | b, Core.TopConstr(c, vs) -> b, Stg.TopConstr (genConstr c, vs)
 
 let rec getManifestArity = function
     |Core.LamE(a, b) -> 1 + getManifestArity b
     |_ -> 0
+
 let genProgram (Core.Program core): Stg.Program<Vars.Var> =
     let env = core |> List.map(function
         | b, Core.TopConstr (c, vs) -> b, IsConstr (vs.Length)
