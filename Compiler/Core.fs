@@ -1,14 +1,23 @@
 module Core
 
+type LocalVarId = int
+type GlobalVarId = int
+type Name = string * int
+let stringToName s = (s, 0)
+let s2n s = stringToName s
+let integer2Name i = ("", i)
+type Bound = int * int
+type Binder<'b> = 'b * Name
+
 type Lit = I32 of int32
 
 type Constr =
     | IntDestr
     | Constr of int
 
-type Var<'b> =
-    | B of int * int
-    | F of 'b
+type Var =
+    | B of Bound
+    | F of Name
 
 type Let =
     | Rec
@@ -16,18 +25,18 @@ type Let =
     | Join
 
 type Expr<'b when 'b: comparison> =
-    | Var of Var<'b>
+    | Var of Var
     | Lit of Lit
-    | Lam of 'b * Closed<'b>
+    | Lam of ('b * string) * Closed<'b>
     | Let of Let * Binds<'b> * Closed<'b>
-    | Case of Expr<'b> * 'b * Alts<'b>
+    | Case of Expr<'b> * ('b * string) * Alts<'b>
     | App of Expr<'b> * Expr<'b>
     | Prim of Wasm.Instr * Expr<'b> list
     | Unreachable
 
 and Closed<'b when 'b: comparison> = Closed of Expr<'b>
 
-and Binds<'b when 'b: comparison> = ('b * Closed<'b>) list
+and Binds<'b when 'b: comparison> = (('b * string)* Closed<'b>) list
 
 and Pat =
     | DataAlt of Constr
@@ -35,7 +44,7 @@ and Pat =
     | DefAlt
 
 
-and Alts<'b when 'b: comparison> = (Pat * 'b list * Closed<'b>) list
+and Alts<'b when 'b: comparison> = (Pat * ('b * string )list * Closed<'b>) list
 
 type Export =
     |Export of string
@@ -43,20 +52,18 @@ type Export =
 
 type TopLevel<'b when 'b: comparison> =
     | TopExpr of Export * Expr<'b>
-    | TopConstr of Constr * 'b list
+    | TopConstr of Constr * (string*'b) list
 
 type TopLevelClosed<'b when 'b: comparison> =
     | ClosedTopExpr of Export * Closed<'b>
-    | ClosedTopConstr of Constr * 'b list
+    | ClosedTopConstr of Constr * (string*'b) list
 
-type TopBind<'b when 'b: comparison> = 'b * TopLevel<'b>
-type TopBindClosed<'b when 'b: comparison> = 'b * TopLevelClosed<'b>
+type TopBind<'b when 'b: comparison> = Binder<'b> * TopLevel<'b>
+type TopBindClosed<'b when 'b: comparison> = ('b * string) * TopLevelClosed<'b>
 
 type Program<'b when 'b: comparison> = TopBind<'b> list
 type ClosedProgram<'b when 'b: comparison> = TopBindClosed<'b> list
 
-type Name<'a> = 'a * int
-let name<'a> (s:'a, i:int) = sprintf "%A" s, i
 
 let rec fvExpr = function
     | Var(F v) -> Set.singleton v
@@ -89,8 +96,8 @@ let rec bindClosed i bs (Closed(e)) =
 and bindExpr i bs =
     function
     | Var (B (i,j)) -> Var(B (i,j)) : Expr<'a>
-    | Var(F (v:'b*int)) ->
-        match bs |> List.tryFindIndex ((=)(name v)) with
+    | Var(F v) ->
+        match bs |> List.tryFindIndex ((=)(v)) with
         | Some j -> Var(B(i, j))
         | _ -> Var(F v)
     | Lit l -> Lit l
@@ -109,7 +116,7 @@ let rec unbindClosed i bs (Closed(e)) =
     
 and unbindExpr i bs =
     function
-    | Var (B (i2,j)) when i = i2 ->
+    |(Var (B (i2,j)):Expr<'a>) when i = i2 ->
         Var (F (bs |> List.item j))  
     | Var (B (i2,j)) -> Var (B (i2,j))       
     | Var(F v) ->
@@ -121,7 +128,7 @@ and unbindExpr i bs =
     | Case(e, b, alts) -> Case(unbindExpr i bs e, b, unbindAlts i b bs alts)
     | App(a, b) -> App(unbindExpr i bs a, unbindExpr i bs b)
     | Prim(p, es) -> Prim(p, es |> List.map (unbindExpr i bs))
-    | Unreachable -> Unreachable
+    | Unreachable -> Unreachable:Expr<'a>
 
 and unbindAlts i b bs alts =
     alts |> List.map(fun (alt, binds, e) -> (alt, binds, unbindClosed i (bs) e))
@@ -132,26 +139,26 @@ let openE (bs) (Closed e) =
     unbindExpr 0 bs e
 
 let closeE bs e =
-    let closed = Closed(bindExpr 0 (bs |> List.map name) e)
+    let closed = Closed(bindExpr 0 (bs) e)
     closed
-let freshen fv bs es =    
-    let fs = bs |> List.map fst
+let freshen fv (bs:('a*string) list) es =    
+    let s = bs |> List.map (snd)
     let frees = es |> List.map fv |> Set.unionMany
-    let maxi = Seq.append [-1] (frees |> Set.toSeq |> Seq.filter(fun (x,_) -> fs |> List.contains x) |> Seq.map snd) |> Seq.max
-    let bsFresh = bs |> List.map(fun (x, _) -> x, maxi+1)
-    bsFresh
+    let maxi = Seq.append [-1] (frees |> Set.toSeq |> Seq.filter(fun (x, _) -> s |> List.contains x) |> Seq.map snd) |> Seq.max
+    let bsFresh:Name list = s |> List.mapi(fun i x -> (x, maxi+i+1))
+    List.zip (bs|>List.map fst) bsFresh:Binder<_> list
     
-let lamE (x, e) =
-    let closed = closeE [x] e
-    Lam(x, closed) 
+let lamE ((b,(s, i)):Binder<_>, e) =
+    let closed = closeE [(s, i)] e
+    Lam((b, s), closed) 
 
-let caseE (e, b, alts) =
-    let closed = alts |> List.map (fun (alt, bs, e) -> (alt, bs, closeE (b::bs) e))   
-    Case(e, b, closed)
+let caseE (e, (b,(s, i)):Binder<_>, alts) =   
+    let closed = alts |> List.map (fun (alt, bs, e) -> (alt, bs|>List.map (fun (b,(s, i)) -> (b,s)), closeE ((s, i)::(bs|>List.map snd)) e))   
+    Case(e, (b, s), closed)
     
 let letE (l, binds, e) =
     let bs = binds |> List.map fst
-    Let(l, binds |> List.map(fun (b,e) -> (b, closeE bs e)), closeE bs e)
+    Let(l, binds |> List.map(fun ((b,(s, i)),e) -> ((b, s), closeE (bs|>List.map snd) e)), closeE (bs|>List.map snd) e)
 
 let varE v = Var(F v)
 
@@ -160,18 +167,18 @@ let (|VarE|_|) = function
     |_ -> None
 
 let (|LamE|_|) = function
-    |Lam(bs, closed) -> 
-        let [newBs] = freshen fvClosed [bs] [closed]
-        let e = openE [newBs] closed
+    |Lam((b:'a, s), closed) -> 
+        let [newBs] = freshen fvClosed [b, s] [closed]
+        let e = openE [newBs |> snd] closed
         Some(newBs, e)
     |_ -> None
 let (|LetE|_|) = function
-    |Let(l, xs, closed) -> 
+    |Let(l, xs:Binds<'a>, closed) -> 
         let bs = xs |> List.map fst
         let es = xs |> List.map snd
-        let newBs = freshen fvClosed bs (closed::es)
-        let e = openE newBs closed
-        let ys = es |> List.map (openE newBs) |> List.zip newBs
+        let newBs = freshen fvClosed (bs) (closed::es)
+        let e = openE (newBs |> List.map snd) closed
+        let ys = es |> List.map (openE (newBs |> List.map snd)) |> List.zip newBs
         Some(l, ys, e)
     |_ -> None
 let (|CaseE|_|) = function
@@ -179,28 +186,33 @@ let (|CaseE|_|) = function
         let bs = b::(alts|>List.collect(fun (_, bs, _) -> bs))
         let es = alts |> List.map(fun (_,_,e) -> e)
         let newBs = freshen fvClosed bs es
-        let freshMap = List.zip bs newBs |> Map.ofList
+        let freshMap = newBs |> Map.ofList
         let newAlts = alts |> List.map(fun (alt, bs, closed) -> 
-            let e = openE ((b::bs)|>List.map(fun k -> Map.find k freshMap)) closed
-            (alt, bs|>List.map(fun k -> Map.find k freshMap), e)        
+            let e = openE ((b::bs)|>List.map(fun k -> Map.find (fst k) freshMap)) closed
+            (alt, bs|>List.map(fun k -> fst k, Map.find (fst k) freshMap), e)        
         )
-        Some(e, freshMap |> Map.find b, newAlts)
+        Some(e, (fst b, freshMap |> Map.find (fst b)), newAlts)
+    |_ -> None
+
+let (|TopConstrE|_|) = function
+    |TopConstr(v, vs) -> 
+        Some(v, vs |> List.map snd)
     |_ -> None
 let closeProgram program = 
     let bs = program |> List.map fst
     program |> List.map (function
-        |b, TopExpr(export, e) -> b, ClosedTopExpr(export, closeE bs e)
-        |b, TopConstr(c, x) -> b, ClosedTopConstr(c, x)
+        |(b,(s, i)), TopExpr(export, e) -> (b, s), ClosedTopExpr(export, closeE (bs |> List.map snd) e)
+        |(b,(s, i)), TopConstr(c, x) -> (b, s), ClosedTopConstr(c, x)
     ) 
 
-let (|Program|) program =
+let (|Program|) (program:ClosedProgram<'a>) =
     let bs = program |> List.map fst
     let es = program |> List.map snd
     let newBs = freshen fvProgram bs [program]
     es |> List.zip newBs |> List.map (function
-        |b, ClosedTopExpr(export, e) -> b, TopExpr(export, openE newBs e)
-        |b, ClosedTopConstr(c, bs) -> b, TopConstr(c, bs)
-    )    
+        |b, ClosedTopExpr(export, e) -> b, TopExpr(export, openE (newBs |> List.map snd) e)
+        |b, ClosedTopConstr(c, xs) -> b, TopConstr(c, xs)
+    )    :Program<_>
 
     
 
@@ -224,7 +236,7 @@ and printExprs indent exprs =
 
 and printVar = function
     |B _ -> failwithf "Still bound"
-    |F s -> printBinder s        
+    |F s -> printFrees [s]        
 
 and printVars vs = 
     String.concat ", " (vs |> List.map printVar) 
@@ -262,16 +274,19 @@ and printLit = function
     |I32 i -> string(i)    
 
 
-and printBinder (s, i) = sprintf "%A_%i" s i 
-and printBinders bs = bs |> List.map printBinder |> String.concat ", " 
+and printFree ((s, i)) = 
+    sprintf "%s_%i" s i 
+and printBinder ((_, x):Binder<_>) = printFree x
+and printBinders bs = bs |> List.map snd |> printFrees
+and printFrees fs = fs |> List.map printFree |> String.concat ", " 
 
 and printProgram (Program program) = 
     let bs = program |> List.map fst
     program |> List.map (printTopLevel bs) |> String.concat "\n" 
 
 and printTopLevel bs = function
-    |b, TopExpr(export, e) -> sprintf "%s = %s%s\n" (printBinder b) (newline 1) (printExpr 1 e)
-    |b, TopConstr(c, bs) -> sprintf "Data %s = %s(%s)" (printBinder b) (printConstr c) (printBinders bs)
+    |b, TopExpr(export, (e:Expr<'a>)) -> sprintf "%s = %s%s\n" (printBinder b) (newline 1) (printExpr 1 e)
+    |b, TopConstr(c, bs) -> sprintf "Data %s = %s(%s)" (printBinder b) (printConstr c) (sprintf "%A" bs)
 
 
 (*

@@ -3,27 +3,11 @@ module Vars
 open Types
 
 
-[<StructuredFormatDisplay("{AsString}")>]
 
-type VarName =
-    |V of Ast.Var
-    |Internal of string
-    |Gen of Types.Typ
-    |IntConstr
-    |AddOp
-    |SubOp
-    member x.AsString = 
-      match x with
-      |V v -> v.text
-      |Internal i -> i
-      |Gen _ -> "gen"
-      |IntConstr -> "Int"
-      |AddOp -> "add"
-      |SubOp -> "sub"
-
-
-type VarId = int
-type Var = VarName * VarId
+type Var = {v:Ast.Var option; typ:Types.Typ}
+let intConstr = Core.s2n "Int"
+let addOp = Core.s2n "add"
+let subOp = Core.s2n "sub"
 
 (*
 type BuiltIn =

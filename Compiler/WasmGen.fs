@@ -33,8 +33,8 @@ type Placement =
     | Local of Wasm.LocalIdx
     | Func of Wasm.FuncIdx
     | IndirectFunc of Wasm.TableIdx
-    | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args<Var> * Free<Var>
-    | StdConstr of Wasm.LocalIdx * Atom<Vars.Var> list
+    | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args * Free
+    | StdConstr of Wasm.LocalIdx * Atom list
     | Data of uint32
     | Block of uint32
     | Unreachable
@@ -78,7 +78,7 @@ let getBlock env depth v =
 let rec genAtom tenv env depth =
     function
     | AVar v ->
-        match env |> Map.tryFind (v) with
+        match env |> Map.tryFind (StgVar v) with
         | Some(Heap i) ->
             [ Wasm.LocalGet 0u
               Wasm.I32Load
@@ -98,7 +98,7 @@ let rec genAtom tenv env depth =
 
 
 and genStgVarAtom tenv env depth = function
-    |AVar v -> genAtom tenv env depth (AVar (StgVar v))
+    |AVar v -> genAtom tenv env depth (AVar (v))
     |ALit w -> genAtom tenv env depth (ALit w)
 
 
@@ -217,7 +217,7 @@ and genLetJoin tenv env depth j arg je e =
 and genApp tenv env depth v args =
     let whnf =
         [            
-            genAtom tenv env depth (AVar (StgVar v))
+            genAtom tenv env depth (AVar (v))
             [Wasm.Call (getFunc env WhnfEval)]
         ] |> List.concat
 
@@ -241,7 +241,7 @@ and genApp tenv env depth v args =
         applyArgs
     ] |> List.concat
 
-and genJump tenv env depth (j: Vars.Var) vs =
+and genJump tenv env depth (j: Stg.Var) vs =
    match vs with
    | [arg] ->
        [
@@ -250,8 +250,8 @@ and genJump tenv env depth (j: Vars.Var) vs =
        ] |> List.concat
     |_ -> failwith "Jumps only support one variable"
 
-and genCase tenv env depth (v: Vars.Var) e alts =
-    let atom = AVar (StgVar v)
+and genCase tenv env depth (v: Stg.Var) e alts =
+    let atom = AVar (v)
     let local = getLocal env (StgVar v)
     [ e |> genExpr tenv env depth
       [ Wasm.LocalSet(local) ]
@@ -324,7 +324,7 @@ let rec genLetFuncs = function
 and genLetsFuncs = List.collect genLetFuncs
 
 
-let genTopLamFuncs export b args (lf: LambdaForm<Vars.Var>) =
+let genTopLamFuncs export b args (lf: LambdaForm) =
     [ [ { name = StgVar b
           functype = (Wasm.I32 |> List.replicate (args |> List.length), [ Wasm.I32 ])
           indirect = false
@@ -354,18 +354,18 @@ let genTopConstrFunc b vs =
 
 let genTopLevelFuncs =
     function
-    | b:Vars.Var, TopLam (args, lam) -> genTopLamFuncs None b args lam
-    | b:Vars.Var, TopExport (name, args, lam) -> genTopLamFuncs (Some name) b args lam
+    | b:Stg.Var, TopLam (args, lam) -> genTopLamFuncs None b args lam
+    | b:Stg.Var, TopExport (name, args, lam) -> genTopLamFuncs (Some name) b args lam
     | b, TopCaf lam -> genTopCafFunc b lam
     | b, TopConstr (_, vs) -> [ genTopConstrFunc b vs ]
 
 let placeLocal local i = (local, Local i)
-let placeLet (env:Map<Var, Placement>) ((b, lf: LambdaForm<Vars.Var>)) i =
-    (StgVar b, Lambda(i, getIndirectFunc env (StgVar b), lf.args |> List.map StgVar, lf.frees |> List.map StgVar))
+let placeLet (env:Map<Var, Placement>) ((b, lf: LambdaForm)) i =
+    (StgVar b, Lambda(i, getIndirectFunc env (StgVar b), lf.args, lf.frees))
 let stdConstrEnv env (b, f, vs) =
     (StgVar b), StdConstr(getFunc env (StgVar f), vs)
 
-let localsEnv env args locals (lets:(Vars.Var*LambdaForm<Vars.Var>) list) =
+let localsEnv env args locals (lets:(Stg.Var*LambdaForm) list) =
     let wasmLocals =
         List.concat 
             [ args |> List.map (placeLocal)
@@ -377,7 +377,7 @@ let localsEnv env args locals (lets:(Vars.Var*LambdaForm<Vars.Var>) list) =
     |> Seq.map (fun (f, i) -> f i)
 
 let rec genLetCode tenv env depth = function
-    | (_, lf: LambdaForm<Vars.Var>) ->
+    | (_, lf: LambdaForm) ->
         let newEnv =
             Seq.concat
                 [ Map.toSeq env
@@ -393,7 +393,7 @@ let rec genLetCode tenv env depth = function
 
 and genLetsCode tenv env depth = List.collect (genLetCode tenv env depth)
 
-let genTopBindCode export tenv env depth b args (lf: LambdaForm<_>) =
+let genTopBindCode export tenv env depth b args (lf: LambdaForm) =
     let resetHeap =
         match export with
         |true -> [Wasm.I32Const 0; Wasm.GlobalSet heapTop]
@@ -496,7 +496,7 @@ let genCafData env (caf:Func) =
 
 
 
-let genProgram (program: Program<Vars.Var>) =
+let genProgram (program: Program) =
     let runtimeFuncs = [ identity; indirection; malloc; clone 2u; apply 0u; whnfEval 0u 1u ]
 
     let topLevelFuncs =

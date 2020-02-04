@@ -3,22 +3,21 @@ open Vars
 open Types
 open Core
 
-let v s = Internal s, 0
-
-
-let builtInOp builtInVar w = 
-    builtInVar, (NoExport,
-        lamE(v "x_boxed",
-            lamE(v "y_boxed",
-                caseE(Var <| F (v "x_boxed"), v "x_boxed", 
+let v s = F (s2n s)
+let inline b<'a> s :Binder<Vars.Var> = {v=None; typ=ValueT}, s2n s
+let builtInOp<'a when 'a:comparison> (builtInVar) w = 
+    ({v=None; typ=FuncT(ValueT, FuncT(ValueT, ValueT))}, builtInVar), (NoExport,
+        (lamE(b "x_boxed",
+            lamE(b "y_boxed",
+                caseE(Var(v "x_boxed"), b "x_boxed", 
                     [
-                        DataAlt IntDestr, [v "x"],
-                        caseE(Var <| F (v "y_boxed"), v "y_boxed", 
+                        DataAlt IntDestr, [b "x"],
+                        caseE(Var(v "y_boxed"), b "y_boxed", 
                             [
-                                DataAlt IntDestr, [v "y"],
-                                caseE(Prim(w, [Var(F <| v "x"); Var(F <| v "y")]), v "r", 
+                                DataAlt IntDestr, [b "y"],
+                                caseE(Prim(w, [Var(v "x"); Var(v "y")]), b "r", 
                                     [
-                                        DefAlt, [], App(Var <| F (IntConstr, 0), Var <| F (v "r"))
+                                        DefAlt, [], App(Var(F intConstr), Var <| v "r")
                                     ]
                                 
                                 )
@@ -27,16 +26,16 @@ let builtInOp builtInVar w =
                     ]
                 )
             )    
-        )
+        ):Expr<_>)
     )
 
-let builtInConstrs =
+let builtInConstrs<'a> =
     [
-        (IntConstr, 0), (IntDestr, [v"x"])
+        ({v=None; typ=FuncT(IntT, ValueT)}, intConstr), ((IntDestr), ["x", {v=None; typ=IntT}])
     ]
 
-let builtInExprs =
+let builtInExprs<'a when 'a:comparison> =
     [    
-        builtInOp (AddOp, 0) Wasm.I32Add
-        builtInOp (SubOp, 0) Wasm.I32Sub
+        builtInOp<'a> (addOp) Wasm.I32Add
+        builtInOp (subOp) Wasm.I32Sub
     ]

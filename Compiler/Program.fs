@@ -7,7 +7,11 @@ open Ast
 
 let program = """
 export fibonacci(x) = {
-    return 0
+    return switch(x){
+        | 0 => 1
+        | 1 => 1
+        | x => 1
+    }
 }
 """
 
@@ -23,7 +27,7 @@ let main argv =
     let fv = coreModule |> fvProgram
     printfn "%A" coreModule
     match fv |> Set.toList with
-    |(Vars.V x,_)::_ ->failwithf "Not defined %s" x.text
+    |(x,_)::_ ->failwithf "Not defined %s" x
     |x::_ -> failwithf "Internal error - not defined: %A" x
     |_ ->
 
@@ -34,10 +38,10 @@ let main argv =
     let stgModule = 
         coreModule
          |> StgGen.genProgram   
+    printfn "%A" stgModule
     let wasmModule =
         stgModule          
          |> WasmGen.genProgram
-    printfn "%A" stgModule
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
     

@@ -1,20 +1,24 @@
 module StgGen
 open Vars
 
+
 let genVar =
     let i = ref (-1)
-    fun typ ->
+    fun () ->
         let next = !i
         i := !i - 1
-        Gen typ, next
+        {Stg.name="gen"; Stg.info=None; Stg.unique=next}
+let i = ref (1)
+let wrapVar<'a> : 'a -> Stg.Var =
+    fun (v) ->
+        let next = !i
+        i := !i + 1
+        {Stg.name="anon"; Stg.info=Some (v:>obj); Stg.unique=next}
 
-let rec forcedCallArityWithKind k = function 
-    |Types.FuncT(k2, a, b) when k = k2 ->
-        1 + forcedCallArityWithKind k b    
-    |_ -> 0
+let wrapBinder ((x, (s, i)):Core.Binder<_>) = {wrapVar x with name = sprintf "%s_%i" s i }, (s, i)
 
 
-type Env =
+type TopEnv =
     |IsLam of int
     |IsCaf
     |IsJoinPoint of int
@@ -22,68 +26,72 @@ type Env =
     |IsExport of string * int
     |IsPrim
 
-let forcedCallArity env f =
-    match env |> Map.tryFind f with
+let forcedCallArity topEnv env f =
+    match topEnv |> Map.tryFind f with
     |Some(IsLam x) -> Some x
     |Some(IsConstr x) -> Some x
     |_ -> None
 
 
-let addFree env v frees =
-        match env |> Map.tryFind v with
+let addFree topEnv  v frees =
+        match topEnv |> Map.tryFind v with
         | Some (IsLam _) -> frees
         | Some (IsConstr _) -> frees
         | Some (IsCaf) -> frees
         | _ -> v :: frees
 
 
+let rec withBinders env = function
+    |(v, k)::xs -> withBinders (env |> Map.add k v) xs
+    |[] -> env
 
-
-let genLit env = function
+let genLit topEnv env = function
     | Core.I32 i -> Wasm.I32Const i
 
-let rec genExpr (env:Map<Var, Env>) e =
+let rec genExpr (topEnv:Map<Stg.Var, TopEnv>) (env:Map<Core.Name, Stg.Var>) e =
     let lf =
         match e with
-        | Core.VarE (v:Vars.Var) -> genApp env [] (Core.varE v)
-        | Core.Lit lit -> Stg.lambdaForm (Stg.Prim [ Stg.ALit(genLit env lit) ])
-        | Core.LamE(v, e) -> genLam env [v] e
-        | Core.LetE(l, bs, e) -> genLet env e (l, bs)
-        | Core.CaseE(e, v, alts) -> genCase env e v alts
-        | Core.App(a, b) -> genApp env [b] a
-        | Core.Prim (w, es) -> genPrim env w es
-        | Core.Unreachable -> genPrim env Wasm.Unreachable [ Core.Lit(Core.I32 -1) ]
+        | Core.VarE (v) -> genApp topEnv env [] (Core.varE v)
+        | Core.Lit lit -> Stg.lambdaForm (Stg.Prim [ Stg.ALit(genLit topEnv env lit) ])
+        | Core.LamE(v:Core.Binder<Stg.Var>, e) -> genLam topEnv (withBinders env [v]) [fst v] e
+        | Core.LetE(l, bs, e) -> genLet topEnv env e (l, bs)
+        | Core.CaseE(e, v, alts) -> genCase topEnv (withBinders env [v]) e (fst v) alts
+        | Core.App(a, b) -> genApp topEnv env [b] a
+        | Core.Prim (w, es) -> genPrim topEnv env w es
+        | Core.Unreachable -> genPrim topEnv env Wasm.Unreachable [ Core.Lit(Core.I32 -1) ]
     Stg.normLf lf
 
 
-and genLam env vs =
+and genLam topEnv env vs =
     function
-    | Core.LamE(v, e) -> genLam env (v :: vs) e
+    | Core.LamE(v, e) -> genLam topEnv env (fst v :: vs) e
     | e ->
-        let lf = genExpr env e
+        let lf = genExpr topEnv env e
         let frees = lf.frees |> List.filter (fun free -> not (vs |> List.contains free))
         { lf with
               args = vs |> List.rev
               frees = frees }
 
-and genLet env e =
+and genLet topEnv env e =
     function
-    | Core.NonRec, [v1, e1] -> genBindings env genNonRec [ v1, genExpr env e1 ] (genExpr env e)
-    | Core.Join, [j] -> genLetJoin env j e
-    | Core.Rec, vs -> genBindings env genRec (vs |> List.map(fun (v,e) -> v, genExpr env e)) (genExpr env e)
+    | Core.NonRec, [v1, e1] -> genBindings topEnv env genNonRec [ v1 |>fst, genExpr topEnv (withBinders env [v1]) e1 ] (genExpr topEnv env e)
+    | Core.Join, [j] -> genLetJoin topEnv (withBinders env [fst j]) j e
+    | Core.Rec, vs -> 
+        let newEnv = (withBinders env (vs |> List.map fst))    
+        genBindings topEnv newEnv genRec (vs |> List.map(fun (v,e) -> fst v, genExpr topEnv newEnv e)) (genExpr topEnv newEnv e)
         
-and genNonRec env (vs, expr) =
+and genNonRec topEnv env (vs, expr) =
     match vs with
     |[] -> expr
-    |v::vs -> Stg.Let(Stg.NonRec v, genNonRec env (vs, expr))
+    |v::vs -> Stg.Let(Stg.NonRec v, genNonRec topEnv env (vs, expr))
  
-and genRec env (vs, expr) = 
+and genRec topEnv env (vs, expr) = 
     match vs with
     |[] -> expr
     |vs -> Stg.Let(Stg.Rec vs, expr)
 
         
-and genBindings env mapExpr (lfEs:(Vars.Var*Stg.LambdaForm<_>) list) lf =
+and genBindings topEnv env mapExpr (lfEs:(_*Stg.LambdaForm) list) lf =
     let newStdConstrs, newLets = lfEs |> List.partition(fun (_, lfE) -> match lfE.expr with Stg.Constr(_)->true|_ -> false )
     let vs = newLets |> List.map fst
 
@@ -109,7 +117,7 @@ and genBindings env mapExpr (lfEs:(Vars.Var*Stg.LambdaForm<_>) list) lf =
 
     let lets =
         List.concat
-            [ newLets
+            [ newLets |> List.map(fun (x,y) -> x, y)
               lf.lets ]
 
     let frees =
@@ -121,11 +129,11 @@ and genBindings env mapExpr (lfEs:(Vars.Var*Stg.LambdaForm<_>) list) lf =
           stdConstrs = stdConstrs
           frees = frees
           lets = lets
-          expr = mapExpr env (vs, lf.expr) }
+          expr = mapExpr topEnv env (vs, lf.expr) }
 
-and genLetJoin env (j, eJ) e =
-    let lf = genExpr (env |> Map.add j (IsJoinPoint 1) ) e
-    let lfJ = genExpr env eJ
+and genLetJoin topEnv env (j, eJ) e =
+    let lf = genExpr (topEnv |> Map.add (fst j) (IsJoinPoint 1)) (env ) e
+    let lfJ = genExpr topEnv env eJ
     let args = lfJ.args
 
     let innerFrees =
@@ -142,11 +150,11 @@ and genLetJoin env (j, eJ) e =
     let frees =
         lf.frees
         |> List.append innerFrees
-        |> List.filter ((<>)j)
+        |> List.filter ((<>)(fst j))
 
     let expr =
         Stg.Let(
-            Stg.Join(j, args, lfJ.expr),
+            Stg.Join(fst j, args, lfJ.expr),
             lf.expr
         )
     
@@ -165,13 +173,13 @@ and genLetJoin env (j, eJ) e =
 
 
 
-and genCase env e v alts =
-    let lf = genExpr env e
+and genCase topEnv env e v alts =
+    let lf = genExpr topEnv env e
     let def, otherAlts =
         match alts with
         |(Core.DefAlt, [], e)::otherAlts -> e, otherAlts
         |otherAlts -> Core.Unreachable, otherAlts
-    let stgAlts, lfAlts = genAlts env def otherAlts
+    let stgAlts, lfAlts = genAlts topEnv env def otherAlts
     let lfCombined = Stg.combineLf lf lfAlts
 
     let expr = Stg.Case(lf.expr, v, stgAlts)
@@ -182,20 +190,20 @@ and genCase env e v alts =
           frees = frees
           expr = expr }
 
-and genAlts env def =
+and genAlts topEnv env def =
     function
     | (Core.DataAlt v, vs, e) :: xs -> 
-        let lfDef = genExpr env def
-        genAAlt env lfDef lfDef.expr [] v vs e xs
+        let lfDef = genExpr topEnv env def
+        genAAlt topEnv (withBinders env vs) lfDef lfDef.expr [] v (vs |> List.map fst) e xs
     | (Core.LitAlt l, [], e) :: xs ->
-        let lfDef = genExpr env def
-        genPAlt env lfDef lfDef.expr [] l e xs
+        let lfDef = genExpr topEnv env def
+        genPAlt topEnv env lfDef lfDef.expr [] l e xs
     | [] ->
-        let lfDef = genExpr env def
-        genPAlts env lfDef lfDef.expr [] []
+        let lfDef = genExpr topEnv env def
+        genPAlts topEnv env lfDef lfDef.expr [] []
 
-and genAAlt env lfAcc def aalts v vs e xs =
-    let lfE = genExpr env e
+and genAAlt topEnv env lfAcc def aalts v vs e xs =
+    let lfE = genExpr topEnv env e
     let lfCombined = Stg.combineLf lfE lfAcc
     let frees = lfCombined.frees |> List.filter (fun free -> not (vs |> List.contains free))
     let locals = lfCombined.locals |> List.append vs
@@ -204,121 +212,146 @@ and genAAlt env lfAcc def aalts v vs e xs =
         { lfCombined with
               frees = frees
               locals = locals }
-    genAAlts env lf def
+    genAAlts topEnv env lf def
         (List.concat
-            [ [ (genConstr env v, vs), lf.expr ]
+            [ [ (genConstr topEnv env v, vs), lf.expr ]
               aalts ]) xs
 
-and genAAlts env lfAcc def aalts =
+and genAAlts topEnv env lfAcc def aalts =
     function
-    | (Core.DataAlt v, vs, e) :: xs -> genAAlt env lfAcc def aalts v vs e xs
+    | (Core.DataAlt v, vs, e) :: xs -> genAAlt topEnv env lfAcc def aalts v (vs |> List.map fst) e xs
     | [] -> Stg.AAlts(aalts, def), lfAcc
 
-and genConstr env = function
+and genConstr topEnv env = function
 | Core.IntDestr -> 1
 | Core.Constr i -> 2 + i
 
-and genPAlt env lfAcc def palts l e xs =
-    let lfE = genExpr env e
+and genPAlt topEnv env lfAcc def palts l e xs =
+    let lfE = genExpr topEnv env e
     let lfCombined = Stg.combineLf lfE lfAcc
-    genPAlts env lfCombined def
+    genPAlts topEnv env lfCombined def
         (List.concat
-            [ [ genLit env l, lfCombined.expr ]
+            [ [ genLit topEnv env l, lfCombined.expr ]
               palts ]) xs
 
-and genPAlts env lfAcc def (palts: Stg.PAlts<_>) =
+and genPAlts topEnv env lfAcc def (palts: Stg.PAlts) =
     function
-    | (Core.LitAlt l, [], e) :: xs -> genPAlt env lfAcc def palts l e xs
+    | (Core.LitAlt l, [], e) :: xs -> genPAlt topEnv env lfAcc def palts l e xs
     | [] -> Stg.PAlts(palts, def), lfAcc
 
 
-and genApp env args =
+and genApp topEnv env args =
     function
-    | Core.App(f, a) -> genApp env (a :: args) f
-    | Core.VarE v -> genAppWithArgs env v args
+    | Core.App(f, a) -> genApp topEnv env (a :: args) f
+    | Core.VarE v -> genAppWithArgs topEnv env (env |> Map.find v) args
 
-and genAppWithArgs env f args =
-    let arity = forcedCallArity env f
+and genAppWithArgs topEnv env f args =
+    let arity = forcedCallArity topEnv env (f)
     match arity with 
     |None -> 
-        genAtoms env (genAppWithAtoms env f) [] args
+        genAtoms topEnv env (genAppWithAtoms topEnv env f) [] args
     |Some i when i = (args |> List.length) -> 
         // Saturated
-        genAtoms env (fun xs -> Stg.lambdaForm (genCallWithAtoms env f xs)) [] args
+        genAtoms topEnv env (fun xs -> Stg.lambdaForm (genCallWithAtoms topEnv f xs)) [] args
     |Some i when i < (args |> List.length) -> 
         // Oversaturated
         let firstArgs = args |> List.take i
         let secondArgs = args |> List.skip i
-        let firstResult = genAppWithArgs env f firstArgs
-        genAtom env (fun f -> genAppWithArgs env f secondArgs) firstResult
+        let firstResult = genAppWithArgs topEnv env f firstArgs
+        genAtom topEnv env (fun f -> genAppWithArgs topEnv env f secondArgs) firstResult
     |Some i when i > (args |> List.length) -> 
         // Undersaturated
-        let extraArgs = [(args |> List.length)..i] |> List.map (fun _ -> genVar Types.ValueT)
-        let lf = genAppWithArgs env f (List.concat [args; extraArgs |> List.map Core.varE])
-        let frees = lf.frees |> List.filter(fun v -> not(extraArgs |> List.contains(v)))
-        {lf with args=List.concat[extraArgs; lf.args]; frees=frees}
+        failwith "Undersaturated"
     
-and genAppWithAtoms env (f:Vars.Var) atoms =
-    let e = genCallWithAtoms env f atoms
+and genAppWithAtoms topEnv env (f:Stg.Var) atoms =
+    let e = genCallWithAtoms topEnv f atoms
     let lf = Stg.lambdaForm e
-    { lf with frees = lf.frees |> addFree env f }
+    { lf with frees = lf.frees |> addFree topEnv f }
 
-and genCallWithAtoms env (f:Vars.Var) atoms =   
-    match env |> Map.tryFind f with
+and genCallWithAtoms topEnv (f:Stg.Var) atoms =   
+    match topEnv |> Map.tryFind f with
     |Some (IsJoinPoint _) -> Stg.Jump(f, atoms)
     |Some (IsLam _) -> Stg.Call(f, atoms)
     |Some (IsConstr _) -> Stg.Constr(f, atoms)
     |_ -> Stg.App(f, atoms)
 
 
-and genAtoms env mapAtoms xs =
+and genAtoms topEnv env mapAtoms xs =
     function
     | (Core.VarE arg) :: args ->
-        let (lf:Stg.LambdaForm<_>) = genAtoms env mapAtoms (Stg.AVar arg :: xs) args
-        let frees = lf.frees |> addFree env arg
+        let (lf:Stg.LambdaForm) = genAtoms topEnv env mapAtoms (Stg.AVar (env |> Map.find arg) :: xs) args
+        let frees = lf.frees |> addFree topEnv (env |> Map.find arg)
         { lf with frees = frees }
-    | (Core.Lit arg) :: args -> genAtoms env mapAtoms (Stg.ALit(genLit env arg) :: xs) args
+    | (Core.Lit arg) :: args -> genAtoms topEnv env mapAtoms (Stg.ALit(genLit topEnv env arg) :: xs) args
     | arg :: args ->
-        genAtom env (fun var -> genAtoms env mapAtoms (Stg.AVar var :: xs) args) (genExpr env arg)
+        genAtom topEnv env (fun var -> genAtoms topEnv env mapAtoms (Stg.AVar var :: xs) args) (genExpr topEnv env arg)
     | [] -> mapAtoms (xs |> List.rev)
 
-and genAtom env f (arg : Stg.LambdaForm<_>) =    
-    let var = genVar Types.ValueT
+and genAtom topEnv env f (arg : Stg.LambdaForm) =    
+    let var = genVar()
     let lfInner = f var
     let lfE = arg
-    genBindings env (genNonRec) [var, lfE] lfInner
+    genBindings topEnv env (genNonRec) [var, lfE] lfInner
 
-and genPrim env w ps =
-    genAtoms env (fun atoms -> Stg.lambdaForm (Stg.Prim(Stg.ALit w::atoms))) [] ps
+and genPrim topEnv env w ps =
+    genAtoms topEnv env (fun atoms -> Stg.lambdaForm (Stg.Prim(Stg.ALit w::atoms))) [] ps
 
-let rec genTopLam env x args = function
-    |Core.LamE(a, b) -> genTopLam env (x-1) (a::args) b
+let rec genTopLam topEnv env x args = function
+    |Core.LamE(a, b) -> genTopLam topEnv (withBinders env [a]) (x-1) (fst a::args) b
     |e when x = 0 -> 
-        let lf = genExpr env e
+        let lf = genExpr topEnv env e
         let frees = lf.frees |> List.filter(fun x -> not(args |> List.contains x))
+        if frees.Length <> 0 then failwith "Cannot have frees"
         args|>List.rev, {lf with frees=frees} 
 
-let genTopLevel env =
+let genTopLevel topEnv env =
     function
     | b, Core.TopExpr (_, e) -> 
-        match env |> Map.tryFind b with
-        |Some IsCaf -> b, Stg.TopCaf(genExpr env e)
+        match topEnv |> Map.tryFind (fst b) with
+        |Some IsCaf -> fst b, Stg.TopCaf(genExpr topEnv env e)
         |Some (IsExport (name, arity)) -> 
-            let args, e = genTopLam env arity [] e
-            b, Stg.TopExport(name, args, e)
-        |Some (IsLam arity) -> b, Stg.TopLam(genTopLam env arity [] e)
-    | b, Core.TopConstr(c, vs) -> b, Stg.TopConstr (genConstr c, vs)
+            let args, e = genTopLam topEnv env arity [] e
+            fst b, Stg.TopExport(name, args, e)
+        |Some (IsLam arity) -> fst b, Stg.TopLam(genTopLam topEnv env arity [] e)
+    | b, Core.TopConstr(c, vs) -> fst b, Stg.TopConstr (genConstr topEnv env c, vs |> List.map snd)
 
 let rec getManifestArity = function
     |Core.LamE(a, b) -> 1 + getManifestArity b
     |_ -> 0
 
-let genProgram (Core.Program core): Stg.Program<Vars.Var> =
-    let env = core |> List.map(function
-        | b, Core.TopConstr (c, vs) -> b, IsConstr (vs.Length)
-        | b, Core.TopExpr (Core.NoExport, e) when getManifestArity e > 0 -> b, IsLam (getManifestArity e)
-        | b, Core.TopExpr (Core.NoExport, e) -> b, IsCaf
-        | b, Core.TopExpr (Core.Export s, e) -> b, IsExport (s, getManifestArity e)
+
+
+
+let rec uniqueifyExpr = function
+    | Core.VarE(v) -> Core.varE (v)
+    | Core.Lit(l) -> Core.Lit(l)
+    | Core.LamE(x, e) -> Core.lamE(wrapBinder x, uniqueifyExpr e) 
+    | Core.LetE(l, bs, e) ->  Core.letE(l, uniqueifyBinds  bs, uniqueifyExpr e)
+    | Core.CaseE(e, b, alts) ->  Core.caseE(uniqueifyExpr e, wrapBinder b, uniqueifyAlts alts)
+    | Core.App(a, b) -> Core.App(uniqueifyExpr a, uniqueifyExpr b)
+    | Core.Prim(p, es) -> Core.Prim(p, es |> List.map (uniqueifyExpr))
+    | Core.Unreachable -> Core.Unreachable
+
+and uniqueifyAlts alts =
+    alts |> List.map(fun (a,bs,e)->a, bs |> List.map wrapBinder, uniqueifyExpr e)
+
+and uniqueifyBinds = function
+    |(b, e)::xs -> (wrapBinder b, uniqueifyExpr e)::uniqueifyBinds xs
+    |[] -> []
+    
+and uniquifyProgram program =
+     program |> List.map(function
+        | b, Core.TopConstr (c, vs) -> wrapBinder b, Core.TopConstr (c, vs |> List.map (fun (s, x) -> (s, wrapVar x)))
+        | b, Core.TopExpr (export, e) -> wrapBinder b, Core.TopExpr (export, uniqueifyExpr e)
     ) 
-    let program = core |> List.map (genTopLevel (env |> Map.ofList))
+
+let genProgram (Core.Program core): Stg.Program =
+    let unique = uniquifyProgram core
+    let topEnv = unique |> List.map(function
+        | b, Core.TopConstr (c, vs) -> fst b, IsConstr (vs.Length)
+        | b, Core.TopExpr (Core.NoExport, e) when getManifestArity e > 0 -> fst b, IsLam (getManifestArity e)
+        | b, Core.TopExpr (Core.NoExport, e) -> fst b, IsCaf
+        | b, Core.TopExpr (Core.Export s, e) -> fst b, IsExport (s, getManifestArity e)
+    ) 
+    let program = unique |> List.map (genTopLevel (topEnv |> Map.ofList) (withBinders  Map.empty (unique |> List.map fst)))
     program
