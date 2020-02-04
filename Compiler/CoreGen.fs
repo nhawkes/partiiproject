@@ -7,8 +7,8 @@ type MatchExpr =
     |MatchVar of Core.Binder<Var>
 
 
-let var : Ast.Var -> Core.Var = fun v -> Core.F(Core.s2n v.text)
-let b : Ast.Var -> Core.Binder<_> = fun v -> ({v=Some v; typ=Types.ValueT}, Core.s2n v.text)
+let var : Ast.Var -> Core.Var<_> = fun v -> Core.F(Core.s2n v.text, {v=Some v; typ=Types.ValueT})
+let b : Ast.Var -> Core.Binder<_> = fun v -> (Core.s2n v.text, {v=Some v; typ=Types.ValueT})
 let genName =
     let i = ref (1)
     fun () ->
@@ -57,7 +57,7 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
 
     and genMatchExpr = function
         |MatchExpr e -> genExpr e
-        |MatchVar v -> Core.Var(Core.F (snd v))
+        |MatchVar v -> Core.varE(v)
 
     and genMatch (e,t) cases =
         let manyCases = (cases |> List.map (fun (pat, expr) -> ([ pat ], expr)))
@@ -76,15 +76,15 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
     and genCases (def, (matchexpr, typ), es:(MatchExpr*Types.Typ) list, bind) subCases otherCases =
         function
         | (Ast.PatBind(bindV) :: xs, e) :: cases ->
-            genCases (def, (matchexpr, typ), es, Some ({v=Some bindV; typ=Types.ValueT}, Core.s2n bindV.text)) ((xs, e) :: subCases) otherCases cases
+            genCases (def, (matchexpr, typ), es, Some (Core.s2n bindV.text, {v=Some bindV; typ=Types.ValueT})) ((xs, e) :: subCases) otherCases cases
         | case :: cases -> genCases (def, (matchexpr, typ), es, bind) (subCases) (case :: otherCases) cases
         | [] ->
-            let bindV = bind |> Option.defaultWith (fun () -> {v=None;typ=Types.ValueT}, genName())
-            let defVar = genName()
-            let defaultExpr = Core.closeE [bindV |> snd] (genManyMatch def es subCases)
-            let d = Core.App(Core.Var (Core.F defVar), Core.Var (Core.F (snd bindV)))
+            let bindV = bind |> Option.defaultWith (fun () -> genName(), {v=None;typ=Types.ValueT})
+            let defVar = genName(), {v=None; typ=Types.ValueT}
+            let defaultExpr = Core.closeE [bindV |> fst] (genManyMatch def es subCases)
+            let d = Core.App(Core.varE (defVar), Core.varE bindV)
             Core.letE
-                (Core.Join, [({v=None; typ=Types.ValueT}, defVar), Core.Lam((fst bindV, ""), defaultExpr)],
+                (Core.Join, [(defVar), Core.Lam(("", snd bindV), defaultExpr)],
                  genCasesWithDefault
                      (d, [], (matchexpr, typ), es, bindV)
                      otherCases)
@@ -95,13 +95,13 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
         match cases with
         | ((Ast.PatLit(Ast.Raw l) :: _, _)) :: xs -> genPatLit state l [] [] cases
         | ((Ast.PatLit(Ast.Box(Ast.Integer _)) :: _, _)) :: xs ->
-            genPatConstr state Core.IntDestr [ ({v=None; typ=Types.IntT}, genName()), Types.IntT ] [] [] cases
+            genPatConstr state Core.IntDestr [ (genName(), {v=None; typ=Types.IntT}), Types.IntT ] [] [] cases
         | ([ Ast.PatConstr(v, ps) ], e) :: xs ->
             let vs =
                 ps
                 |> List.map (function
                     | Ast.PatBind(v) ->b v
-                    | _ ->  {v=None; typ=Types.ValueT}, genName())
+                    | _ -> genName(), {v=None; typ=Types.ValueT})
             genPatConstr state (getConstr v) (vs |> List.map(fun v -> v, Types.ValueT)) [] [] cases
         | (((Ast.PatBind(_) :: _), e)) :: xs -> genCasesWithDefault (def, alts, (matchexpr, typ), es, bind) xs
         | [] -> Core.caseE(genMatchExpr matchexpr, bind, ((Core.DefAlt, [], def)::alts))
@@ -165,11 +165,11 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
         match args with
         | x :: xs -> genExport (Core.App(call, Core.App(Core.Var(Core.F intConstr), Core.Var (Core.F x)))) xs rhs
         | [] ->
-            let resultVar = {v=None; typ=Types.ValueT}, genName()
-            let returnVar = {v=None; typ=Types.IntT}, genName()
+            let resultVar = genName(), {v=None; typ=Types.ValueT}
+            let returnVar = genName(), {v=None; typ=Types.IntT}
             Core.caseE
                 (call, resultVar,
-                     ([Core.DataAlt(Core.IntDestr), [ returnVar ], Core.Var(Core.F (snd returnVar))]))
+                     ([Core.DataAlt(Core.IntDestr), [ returnVar ], Core.Var(Core.F (returnVar))]))
 
     let rec genDeclarations fresh topConstrs topExprs  =
         function
@@ -180,11 +180,11 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
         | Ast.ExportDecl((exportName, exportArgs), (lhs, args), rhs)::xs ->
             let exportTyp =
                 Types.createFuncT Types.SatFunc (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
-            let exportVar = {v=None; typ=exportTyp}, genName()
-            let exportArgs = exportArgs |> List.mapi (fun i arg -> {v=None; typ=Types.IntT}, Core.integer2Name (i+fresh)) 
+            let exportVar = genName(), {v=None; typ=exportTyp}
+            let exportArgs = exportArgs |> List.mapi (fun i arg -> Core.integer2Name (i+fresh), {v=None; typ=Types.IntT}) 
             genDeclarations (fresh+1+exportArgs.Length) topConstrs (
                 (b lhs, (Core.NoExport, (genRhs (genExpr rhs) (args |> List.map (b)))))::
-                (exportVar, (Core.Export exportName, ((genRhs (genExport (Core.Var (var lhs)) (exportArgs |> List.map snd) rhs) (exportArgs)))))::
+                (exportVar, (Core.Export exportName, ((genRhs (genExport (Core.Var (var lhs)) (exportArgs) rhs) (exportArgs)))))::
                 topExprs) xs   
         | Ast.TypeDecl(Ast.AssignFunc(v, vs))::xs -> 
             genDeclarations fresh ((b v, (getConstr v, vs |> List.map(function Ast.AssignVar v -> v.text, {v=Some v; typ=Types.ValueT})))::topConstrs) topExprs xs

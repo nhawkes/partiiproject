@@ -294,7 +294,7 @@ and genAAlts tenv env depth atom def =
           [ Wasm.I32Load
               { align = 0u
                 offset = 8u }
-            Wasm.I32Const(int c)
+            Wasm.I32Const(constrIndex)
             Wasm.I32Eq
             Wasm.IfElse
                 ([ Wasm.I32 ],
