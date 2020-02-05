@@ -28,7 +28,6 @@ let main argv =
     printfn "%A" coreModule
     match fv |> Set.toList with
     |(x,_)::_ ->failwithf "Not defined %s" x
-    |x::_ -> failwithf "Internal error - not defined: %A" x
     |_ ->
 
     printfn "%s" (printProgram coreModule)         

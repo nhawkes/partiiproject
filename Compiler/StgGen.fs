@@ -335,7 +335,7 @@ let rec getManifestArity = function
 
 
 let rec uniqueifyExpr : Core.Expr<'a> -> Core.Expr<Stg.Var> = function
-    | Core.VarE(v) -> Core.varS (v)
+    | Core.VarS(v) -> Core.varS (v)
     | Core.Lit(l) -> Core.Lit(l)
     | Core.LamE(x, e) -> Core.lamE(wrapBinder x, uniqueifyExpr e) 
     | Core.LetE(l, bs, e) ->  Core.letE(l, uniqueifyBinds bs, uniqueifyExpr e)

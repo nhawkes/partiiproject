@@ -4,10 +4,10 @@ open Types
 
 
 
-type Var = {v:Ast.Var option; typ:Types.Typ}
-let intConstr = (Core.s2n "Int", {v=None; typ=FuncT(IntT, ValueT)})
-let addOp = (Core.s2n "add", {v=None; typ=FuncT(ValueT, FuncT(ValueT, ValueT))})
-let subOp = (Core.s2n "sub", {v=None; typ=FuncT(ValueT, FuncT(ValueT, ValueT))})
+type Var = {v:Ast.Var option; hintInline:bool; typ:Types.Typ}
+let intConstr = (Core.s2n "Int", {v=None; hintInline=true; typ=FuncT(IntT, ValueT)})
+let addOp = (Core.s2n "add", {v=None; hintInline=true; typ=FuncT(ValueT, FuncT(ValueT, ValueT))})
+let subOp = (Core.s2n "sub", {v=None; hintInline=true; typ=FuncT(ValueT, FuncT(ValueT, ValueT))})
 
 (*
 type BuiltIn =
