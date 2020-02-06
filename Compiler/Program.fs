@@ -31,8 +31,7 @@ let main argv =
     |_ ->
 
     printfn "%s" (printProgram coreModule)         
-    // let coreModule = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
-
+    let coreModule = coreModule |> Transform.transform
     
     let stgModule = 
         coreModule

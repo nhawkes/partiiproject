@@ -189,6 +189,7 @@ let (|VarE|_|) = function
     |_ -> None
 let (|VarS|_|) = function
     |Var(F (name, b)) -> Some (name)
+    |Var(S (name)) -> Some (name)
     |_ -> None
 
 let (|LamE|_|) = function
@@ -220,14 +221,19 @@ let (|CaseE|_|) = function
 
 let closeProgram program = 
     let bs = List.concat [program.constrs |> List.map fst; program.exprs |> List.map fst]
-    {
-        closedConstrs=
-            program.constrs |> 
-            List.map (fun (((s, i), b), (c, x)) -> (s, b), (c, x))
-        closedExprs=
-            program.exprs |> 
-            List.map (fun (((s, i), b), (export, e)) -> (s, b), (export, closeE (bs |> List.map fst) e))
-    }
+    let program = 
+        {
+            closedConstrs=
+                program.constrs |> 
+                List.map (fun (((s, i), b), (c, x)) -> (s, b), (c, x))
+            closedExprs=
+                program.exprs |> 
+                List.map (fun (((s, i), b), (export, e)) -> (s, b), (export, closeE (bs |> List.map fst) e))
+        }
+    if fvProgram program |> Set.isEmpty then
+        program
+    else
+        failwith "Program has free variables"
 
 let (|Program|) (program:ClosedProgram<'a>) =
     let constrs = 
@@ -259,7 +265,7 @@ let rec printExpr indent : Expr<'a> -> string = function
     | LetE(l, bs, e) -> sprintf "%s %s in %s%s" (printLet l)  (printBinds (indent+1) bs) (newline (indent+1))  (printExpr (indent+1) e)
     | CaseE(e, b, alts) -> sprintf "case %s as %s of {%s%s}" (printExpr indent e) (printBinder b) (printAlts (indent+1) alts) (newline indent)
     | App(a, b) -> sprintf "%s (%s)" (printExpr indent a) (printExpr indent b)
-    | Prim(p, es) -> sprintf "{%% %A %s %%}" p (printExprs indent es)
+    | Prim(p, es) -> sprintf "{%% %A | %s %%}" p (printExprs indent es)
     | Unreachable -> "_|_"
 
 and printExprs indent exprs =
@@ -306,7 +312,7 @@ and printLit = function
 
 
 and printFree ((s, i)) = 
-    sprintf "$%i%s" i s 
+    sprintf "$%s.%i" s i
 and printBinder ((x : UniqueName, _)) = printFree x
 and printBinders bs = bs |> List.map fst |> printFrees
 and printFrees fs = fs |> List.map fst |> List.map printFree |> String.concat ", " 
@@ -314,7 +320,7 @@ and printFrees fs = fs |> List.map fst |> List.map printFree |> String.concat ",
 and printProgram (Program program) = 
     List.concat[
         program.constrs
-            |> List.map(fun (v, (c, vs)) -> sprintf "data %s = %s(%s)" (printBinder b) (printConstr c) (bs |> List.map fst |> String.concat ", "))
+            |> List.map(fun (v, (c, vs)) -> sprintf "data %s = %s(%s)" (printBinder v) (printConstr c) (vs |> List.map fst |> String.concat ", "))
         program.exprs
             |> List.map(fun (b, (export, e)) -> sprintf "%s = %s%s\n" (printBinder b) (newline 1) (printExpr 1 e))
     ] |> String.concat "\n" 

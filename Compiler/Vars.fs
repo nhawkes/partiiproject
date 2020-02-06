@@ -4,6 +4,7 @@ open Types
 
 
 
+[<StructuredFormatDisplay("{v} ")>]
 type Var = {v:Ast.Var option; hintInline:bool; typ:Types.Typ}
 let intConstr = (Core.s2n "Int", {v=None; hintInline=true; typ=FuncT(IntT, ValueT)})
 let addOp = (Core.s2n "add", {v=None; hintInline=true; typ=FuncT(ValueT, FuncT(ValueT, ValueT))})

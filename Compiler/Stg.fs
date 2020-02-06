@@ -1,6 +1,7 @@
 module Stg
 
 type Constr = int
+[<StructuredFormatDisplay("{name}.{unique}")>]
 type Var = {name:string; info:System.IComparable; unique:int}
 type Args = Var list
 type Free = Var list

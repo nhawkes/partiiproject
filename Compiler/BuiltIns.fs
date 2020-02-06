@@ -3,8 +3,8 @@ open Vars
 open Types
 open Core
 
-let v s = F (s2n s, {v=None; typ=ValueT})
-let inline b<'a> s :Binder<Vars.Var> = s2n s, {v=None; typ=ValueT}
+let v s = F (s2n s, {v=None; typ=ValueT; hintInline=false})
+let inline b<'a> s :Binder<Vars.Var> = s2n s, {v=None; typ=ValueT; hintInline=false}
 let builtInOp<'a when 'a:comparison> (builtInVar) w = 
     (builtInVar:Core.Binder<_>), (NoExport,
         (lamE(b "x_boxed",
@@ -31,7 +31,7 @@ let builtInOp<'a when 'a:comparison> (builtInVar) w =
 
 let builtInConstrs<'a> =
     [
-        intConstr, ((IntDestr), ["x", {v=None; typ=IntT}])
+        intConstr, ((IntDestr), ["x", {v=None; typ=IntT; hintInline=false}])
     ]
 
 let builtInExprs<'a when 'a:comparison> =

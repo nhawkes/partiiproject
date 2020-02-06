@@ -168,7 +168,7 @@ and genLetJoin topEnv (j, eJ) e =
             lets = List.concat [lf.lets; lfJ.lets]
             locals = List.concat [args; lf.locals; lfJ.locals]
             args = []
-            stdConstrs = []
+            stdConstrs = lfJ.stdConstrs
             frees = frees
             expr = expr
     }
@@ -316,16 +316,18 @@ let rec genTopLam topEnv x args = function
         if frees.Length <> 0 then failwith "Cannot have frees"
         args|>List.rev, {lf with frees=frees} 
 
-let genTopLevel topEnv =
+let genTopLevelExpr topEnv =
     function
-    | b, Core.TopExpr (_, e) -> 
+    | b, (_, e) -> 
         match topEnv |> Map.tryFind (snd b) with
         |Some IsCaf -> snd b, Stg.TopCaf(genExpr topEnv e)
         |Some (IsExport (name, arity)) -> 
             let args, lf = genTopLam topEnv arity [] e
             snd b, Stg.TopExport(name, args, lf)
         |Some (IsLam arity) -> snd b, Stg.TopLam(genTopLam topEnv arity [] e)
-    | b, Core.TopConstr(c, vs) -> snd b, Stg.TopConstr (genConstr topEnv c, vs |> List.map snd)
+let genTopLevelConstr topEnv =
+    function
+    | b, (c, vs) -> snd b, Stg.TopConstr (genConstr topEnv c, vs |> List.map snd)
 
 let rec getManifestArity = function
     |Core.LamE(a, b) -> 1 + getManifestArity b
@@ -351,22 +353,35 @@ and uniqueifyBinds = function
     |(b, e)::xs -> (wrapBinder b, uniqueifyExpr e)::uniqueifyBinds xs
     |[] -> []
     
-and uniquifyProgram program : Core.ClosedProgram<Stg.Var> =
-    let unique = 
-        program |> List.map(function
-            | b, Core.TopConstr (c, vs) -> wrapBinder b, Core.TopConstr (c, vs |> List.map (fun (s, x) -> (s, wrapVar x)))
-            | b, Core.TopExpr (export, e) -> wrapBinder b, Core.TopExpr (export, uniqueifyExpr e)
+and uniquifyProgram (program:Core.Program<_>) : Core.ClosedProgram<Stg.Var> =
+    let uniqueConstrs =
+        program.constrs |> List.map(function
+            | b, (c, vs) -> wrapBinder b, (c, vs |> List.map (fun (s, x) -> (s, wrapVar x)))
         ) 
-    Core.closeProgram unique
+    let uniqueExprs = 
+        program.exprs |> List.map(function
+            | b, (export, e) -> wrapBinder b, (export, uniqueifyExpr e)
+        ) 
+    Core.closeProgram {constrs=uniqueConstrs; exprs=uniqueExprs}
 
 let genProgram (Core.Program core): Stg.Program =
     let (Core.Program unique) = uniquifyProgram core
     
-    let topEnv = unique |> List.map(function
-        | b, Core.TopConstr (c, vs) -> snd b, IsConstr (vs.Length)
-        | b, Core.TopExpr (Core.NoExport, e) when getManifestArity e > 0 -> snd b, IsLam (getManifestArity e)
-        | b, Core.TopExpr (Core.NoExport, e) -> snd b, IsCaf
-        | b, Core.TopExpr (Core.Export s, e) -> snd b, IsExport (s, getManifestArity e)
-    ) 
-    let program = unique |> List.map (genTopLevel (topEnv |> Map.ofList))
+    let topEnv =
+        List.concat[
+            unique.constrs |> List.map(function
+                | b, (c, vs) -> snd b, IsConstr (vs.Length)
+            ) 
+            unique.exprs |> List.map(function
+                | b, (Core.NoExport, e) when getManifestArity e > 0 -> snd b, IsLam (getManifestArity e)
+                | b, (Core.NoExport, e) -> snd b, IsCaf
+                | b, (Core.Export s, e) -> snd b, IsExport (s, getManifestArity e)
+            ) 
+
+        ]
+    let program =
+        List.concat[
+            unique.constrs |> List.map (genTopLevelConstr (topEnv |> Map.ofList))
+            unique.exprs |> List.map (genTopLevelExpr (topEnv |> Map.ofList))
+        ] 
     program
