@@ -55,6 +55,7 @@ let rec getResultSpecialization (constrs:TopConstr<_> list) recCall = function
         match constrs |> List.tryPick(fun ((name2, _), (c, ts)) -> if name=name2 then ts |> List.map (fun (_,x) -> x.var.typ) |> Some else None) with
             |Some t -> ResultSpec (name, t)
             |None -> TopResultSpec
+    |Core.App(a, b) -> TopResultSpec
     | Core.Unreachable -> BotResultSpec
 
 
@@ -67,7 +68,7 @@ let rec makeWrapper constrs call vs = function
             |[] -> Map.empty, []
             |(name, v)::_ ->
                 match toSpecialize |> Map.tryFind name with
-                |Some([(c), [value]]) ->
+                |Some([(c), [value]]) when vs.Length=1 ->
                     let specCall = freshen fvExpr [e] "spec_call"
                     let specResult = getResultSpecialization constrs call e
                     let resultT = match specResult with ResultSpec(_, [t]) -> t |_ -> ValueT

@@ -55,6 +55,8 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
         function
         | Ast.Add -> genCall (Core.Var (Core.F(addOp))) [ x; y ]
         | Ast.Sub -> genCall (Core.Var (Core.F(subOp))) [ x; y ]
+        | Ast.Mul -> genCall (Core.Var (Core.F(mulOp))) [ x; y ]
+        | Ast.Div -> genCall (Core.Var (Core.F(divOp))) [ x; y ]
         | Ast.Equals -> genCall (Core.Var (Core.F(equalsOp))) [ x; y ]
         | Ast.LessThan -> genCall (Core.Var (Core.F(lessThanOp))) [ x; y ]
 
@@ -152,7 +154,11 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
 
 
     and genRhsAssignVars rhs vars =
-        genRhs rhs (vars |> List.map(function Ast.AssignVar v ->b v))
+        genRhs rhs (vars |> List.map(function
+            | Ast.AssignFunc (f, xs) ->
+                let name, x = b f
+                name, {x with typ = Types.createFuncT (xs |> List.map (fun _ -> Types.ValueT)) Types.ValueT}
+            | Ast.AssignVar v ->b v))
 
     and genRhs (rhs: Core.Expr<_>) =
         function
@@ -197,7 +203,7 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
             genDeclarations fresh topConstrs (((b lhs), (Core.NoExport, (genRhsAssignVars (genExpr rhs) args)))::topExprs) xs
         | Ast.ExportDecl((exportName, exportArgs), (lhs, args), rhs)::xs ->
             let exportTyp =
-                Types.createFuncT Types.SatFunc (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
+                Types.createFuncT (List.replicate (args |> List.length) Types.IntT) (Types.IntT)
             let exportVar = genName(), {v=None; typ=exportTyp; hintInline=false}
             let exportArgs = exportArgs |> List.mapi (fun i arg -> Core.integer2Name (i+fresh), {v=None; typ=Types.IntT; hintInline=false}) 
             genDeclarations (fresh+1+exportArgs.Length) topConstrs (

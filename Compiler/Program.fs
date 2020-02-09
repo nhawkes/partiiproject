@@ -49,6 +49,7 @@ let main argv =
             printfn "Successfully compiled %s" file.Name
         with
         |e -> 
+            raise e
             printfn "Failed to compile %s with error\n%A" file.Name e
     
     0

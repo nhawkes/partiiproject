@@ -69,7 +69,7 @@ let pswitch =
     | (e, block) -> Match((e, ValueT), block)
 
 
-let pif = ps "if" >>. pexpr .>>. (ps "then" >>. pexpr .>> ps "else" .>>. pexpr) |>> If
+let pif = ps "if" >>. pexpr .>>. (ps "then" >>. pexpr .>> spaces .>> ps "else" .>>. pexpr) |>> If
 
 
 let pterm = choice [ pif; pswitch; pbracketed; pbraced; pliteral; pcall ]
@@ -79,6 +79,8 @@ let operatorPrecedenceParser = OperatorPrecedenceParser<Expr, unit, unit>()
 
 operatorPrecedenceParser.AddOperator(InfixOperator("+", ws, 5, Associativity.Left, pbinop Add))
 operatorPrecedenceParser.AddOperator(InfixOperator("-", ws, 5, Associativity.Left, pbinop Sub))
+operatorPrecedenceParser.AddOperator(InfixOperator("*", ws, 5, Associativity.Left, pbinop Mul))
+operatorPrecedenceParser.AddOperator(InfixOperator("/", ws, 5, Associativity.Left, pbinop Div))
 operatorPrecedenceParser.AddOperator(InfixOperator("=", ws, 5, Associativity.Left, pbinop Equals))
 operatorPrecedenceParser.AddOperator(InfixOperator("<", ws, 5, Associativity.Left, pbinop LessThan))
 operatorPrecedenceParser.TermParser <- pterm

@@ -1,0 +1,44 @@
+data Cons(head, tail)
+data Empty()
+take(i, list) = {
+    return switch(list){
+        | Cons(head, tail) =>
+            {
+                return switch(i){
+                    | 0 => head
+                    | _ => take(i-1, tail)
+                }
+            }
+    }
+}
+from(x) = {
+    return Cons(x, from(x+1))
+}
+
+sieve(list) = {
+    return switch(list){
+        | Cons(prime, tail) => {
+            return Cons(prime, sieve(filter(nonMultiple(prime), tail)))
+        }
+        |Empty() => Empty()
+    }
+}
+filter(predicate(x), list) = {
+    return switch(list){
+        | Cons(head, tail) => {
+            rest = filter(predicate, tail)
+            return if(predicate(head)) then Cons(head, rest) else rest
+        }
+        |Empty() => Empty()
+    }  
+}
+nonMultiple(p, n) = {
+    return if ((n/p)*p) = n then
+        false
+    else
+        true
+    
+}  
+export prime(x) = {
+    return take(x, sieve(from(2)))
+}

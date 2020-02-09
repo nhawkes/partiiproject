@@ -20,6 +20,8 @@ type Pattern =
 type Op =
     | Add
     | Sub
+    | Mul
+    | Div
     | Equals
     | LessThan
 type Expr =

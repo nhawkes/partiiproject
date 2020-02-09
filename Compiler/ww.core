@@ -1,23 +1,34 @@
+data $Empty.0 = 1()
+data $Cons.0 = 0(head, tail)
 data $Int.0 = Int(x)
 data $Bool.0 = Bool(x)
-$worker_gcd.0 = 
-    \<$a.0> -> \<$b.0> -> case ($a.0) as $x_boxed.0 of {
-        Int($x.0) -> case ($b.0) as $y_boxed.0 of {
-            Int($y.0) -> case ({% I32Eq | $y.0, $x.0 %}) as $r.0 of {
-                _ -> case ($r.0) as $.0 of {
-                    _ -> $a.0
-                    0 -> case ($a.0) as $x_boxed.0 of {
-                        Int($x.0) -> case ($b.0) as $y_boxed.0 of {
-                            Int($y.0) -> case ({% I32LtS | $y.0, $x.0 %}) as $r.0 of {
+$worker_prime.0 = 
+    \<$x.0> -> $take.0 ($x.0) ($sieve.0 ($from.0 ($Int.0 (2))))
+
+$prime.0 = 
+    \<$x.0> -> case ($x.0) as $var.0 of {
+        _ -> $worker_prime.0 ($var.0)
+    }
+
+$worker_.0 = 
+    \<$.0> -> case ($prime.0 ($Int.0 ($.0))) as $.0 of {
+        Int($.0) -> $.0
+    }
+
+$.0 = 
+    \<$.0> -> $worker_.0 ($.0)
+
+$worker_nonMultiple.0 = 
+    \<$p.0> -> \<$n.0> -> case ($n.0) as $x_boxed.0 of {
+        Int($x.0) -> case ($p.0) as $y_boxed.0 of {
+            Int($y.0) -> case ({% I32DivS | $y.0, $x.0 %}) as $r.0 of {
+                _ -> case ($p.0) as $y_boxed.0 of {
+                    Int($y.0) -> case ({% I32Mul | $y.0, $r.0 %}) as $r.0 of {
+                        _ -> case ($n.0) as $y_boxed.0 of {
+                            Int($y.0) -> case ({% I32Eq | $y.0, $r.0 %}) as $r.0 of {
                                 _ -> case ($r.0) as $.0 of {
-                                    _ -> $gcd.0 ($b.0) ($a.0)
-                                    0 -> $gcd.0 ($b.0) (case ($a.0) as $x_boxed.0 of {
-                                        Int($x.0) -> case ($b.0) as $y_boxed.0 of {
-                                            Int($y.0) -> case ({% I32Sub | $y.0, $x.0 %}) as $r.0 of {
-                                                _ -> $Int.0 ($r.0)
-                                            }
-                                        }
-                                    })
+                                    _ -> $Bool.0 (0)
+                                    0 -> $Bool.0 (1)
                                 }
                             }
                         }
@@ -27,16 +38,85 @@ $worker_gcd.0 =
         }
     }
 
-$gcd.0 = 
-    \<$a.0> -> \<$b.0> -> $worker_gcd.0 ($a.0) ($b.0)
+$nonMultiple.0 = 
+    \<$p.0> -> \<$n.0> -> $worker_nonMultiple.0 ($p.0) ($n.0)
 
-$worker_.0 = 
-    \<$.0> -> \<$.1> -> case ($gcd.0 ($Int.0 ($.0)) ($Int.0 ($.1))) as $.0 of {
-        Int($.0) -> $.0
+$worker_filter.0 = 
+    \<$predicate.0> -> \<$list.0> -> case ($list.0) as $.0 of {
+        _ -> _|_
+        0($head.0, $tail.0) -> let rec 
+            $rest.0 = $filter.0 ($predicate.0) ($tail.0) in 
+            case ($predicate.0 ($head.0)) as $.0 of {
+                Bool($.0) -> case ($.0) as $.0 of {
+                    _ -> $Cons.0 ($head.0) ($rest.0)
+                    0 -> $rest.0
+                }
+            }
+        1() -> $Empty.0
     }
 
-$.0 = 
-    \<$.0> -> \<$.1> -> $worker_.0 ($.0) ($.1)
+$filter.0 = 
+    \<$predicate.0> -> \<$list.0> -> case ($list.0) as $var.0 of {
+        _ -> $worker_filter.0 ($predicate.0) ($var.0)
+    }
+
+$worker_sieve.0 = 
+    \<$list.0> -> case ($list.0) as $.0 of {
+        _ -> _|_
+        0($prime.0, $tail.0) -> $Cons.0 ($prime.0) ($sieve.0 ($filter.0 ($nonMultiple.0 ($prime.0)) ($tail.0)))
+        1() -> $Empty.0
+    }
+
+$sieve.0 = 
+    \<$list.0> -> case ($list.0) as $var.0 of {
+        _ -> $worker_sieve.0 ($var.0)
+    }
+
+$worker_from.0 = 
+    \<$x.0> -> case ($x.0) as $x_boxed.0 of {
+        Int($x.0) -> case ({% I32Add | 1, $x.0 %}) as $r.0 of {
+            _ -> $Cons.0 ($x.0) ($from.0 ($Int.0 ($r.0)))
+        }
+    }
+
+$from.0 = 
+    \<$x.0> -> $worker_from.0 ($x.0)
+
+$spec_call.0 = 
+    \<$lam.0> -> case ($Int.0 ($lam.0)) as $x.0 of {
+        _ -> case ($x.0) as $x_boxed.0 of {
+            Int($x.0) -> case ({% I32Add | 1, $x.0 %}) as $r.0 of {
+                _ -> $Cons.0 ($x.0) ($from.0 ($Int.0 ($r.0)))
+            }
+        }
+    }
+
+$worker_take.0 = 
+    \<$i.0> -> \<$list.0> -> case ($list.0) as $.0 of {
+        _ -> _|_
+        0($head.0, $tail.0) -> case ($i.0) as $_.0 of {
+            _ -> case ($i.0) as $x_boxed.0 of {
+                Int($x.0) -> case ({% I32Sub | 1, $x.0 %}) as $r.0 of {
+                    _ -> $take.0 ($Int.0 ($r.0)) ($tail.0)
+                }
+            }
+            Int($.0) -> case ($.0) as $.0 of {
+                _ -> case ($i.0) as $x_boxed.0 of {
+                    Int($x.0) -> case ({% I32Sub | 1, $x.0 %}) as $r.0 of {
+                        _ -> $take.0 ($Int.0 ($r.0)) ($tail.0)
+                    }
+                }
+                0 -> $head.0
+            }
+        }
+    }
+
+$take.0 = 
+    \<$i.0> -> \<$list.0> -> case ($i.0) as $var.0 of {
+        _ -> case ($list.0) as $var.1 of {
+            _ -> $worker_take.0 ($var.0) ($var.1)
+        }
+    }
 
 $add.0 = 
     \<$x_boxed.0> -> \<$y_boxed.0> -> case ($x_boxed.0) as $x_boxed.0 of {
@@ -51,6 +131,24 @@ $sub.0 =
     \<$x_boxed.0> -> \<$y_boxed.0> -> case ($x_boxed.0) as $x_boxed.0 of {
         Int($x.0) -> case ($y_boxed.0) as $y_boxed.0 of {
             Int($y.0) -> case ({% I32Sub | $y.0, $x.0 %}) as $r.0 of {
+                _ -> $Int.0 ($r.0)
+            }
+        }
+    }
+
+$mul.0 = 
+    \<$x_boxed.0> -> \<$y_boxed.0> -> case ($x_boxed.0) as $x_boxed.0 of {
+        Int($x.0) -> case ($y_boxed.0) as $y_boxed.0 of {
+            Int($y.0) -> case ({% I32Mul | $y.0, $x.0 %}) as $r.0 of {
+                _ -> $Int.0 ($r.0)
+            }
+        }
+    }
+
+$div.0 = 
+    \<$x_boxed.0> -> \<$y_boxed.0> -> case ($x_boxed.0) as $x_boxed.0 of {
+        Int($x.0) -> case ($y_boxed.0) as $y_boxed.0 of {
+            Int($y.0) -> case ({% I32DivS | $y.0, $x.0 %}) as $r.0 of {
                 _ -> $Int.0 ($r.0)
             }
         }
@@ -73,3 +171,9 @@ $lessThan.0 =
             }
         }
     }
+
+$false.0 = 
+    $Bool.0 (0)
+
+$true.0 = 
+    $Bool.0 (1)

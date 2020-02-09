@@ -1,9 +1,5 @@
 module Types
 
-type FuncKind =
-    |SatFunc
-    |UnSatFunc
-
 type Typ =
     |FuncT of Typ * Typ
     |IntT    
@@ -15,7 +11,7 @@ let rec applyArgs f args =
     |FuncT(a1, b), a2::xs when a1=a2 -> applyArgs b xs
     |_ -> failwith "Incorrect types"
     
-let rec createFuncT funcKind args ret =
+let rec createFuncT args ret =
     match args with
-    |a::args -> FuncT(a, createFuncT funcKind args ret)
+    |a::args -> FuncT(a, createFuncT args ret)
     |[] -> ret   

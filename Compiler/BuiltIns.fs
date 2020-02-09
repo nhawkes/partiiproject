@@ -63,6 +63,10 @@ let builtInExprs<'a when 'a:comparison> =
     [    
         builtInIntOp<'a> (addOp) Wasm.I32Add
         builtInIntOp (subOp) Wasm.I32Sub
+        builtInIntOp (mulOp) Wasm.I32Mul
+        builtInIntOp (divOp) Wasm.I32DivS
         builtInBoolOp (equalsOp) Wasm.I32Eq
         builtInBoolOp (lessThanOp) Wasm.I32LtS
+        (falseConst), (NoExport, Core.App(Core.varE boolConstr, Core.Lit(Core.I32 0)))
+        (trueConst), (NoExport, Core.App(Core.varE boolConstr, Core.Lit(Core.I32 1)))
     ]
