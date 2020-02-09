@@ -2,400 +2,321 @@ module Transform
 
 open Analysis
 open Vars
+open Core
+open Types
+
 let isBuiltIn b =
-    match b.var.unique with
-    |BuiltIn _ -> true
-    |_ -> false
-    
+    match b.var with
+    |var -> var.hintInline
+
 let rec getArgSpecializations args = function
     | Core.Var v -> Map.empty
     | Core.Lit l -> Map.empty
-    | Core.Lam(v, e) -> getArgSpecializations args e
-    | Core.Let(bs, e) -> 
+    | Core.LamE(v, e) -> getArgSpecializations args e
+    | Core.LetE(l, bs, e) -> 
         getArgSpecializations args e
-    | Core.Case(Core.Var(v), _, (alts, def)) when args |> List.contains v ->
-        Map.ofList[v, alts |> List.map(fun (p, e) -> p)]
-    | Core.Case(_, b, ([_, e], Core.Unreachable)) -> 
-        getArgSpecializations args e
-    | Core.Case(_, b, (_, e)) -> 
+    | Core.CaseE(Core.VarS(v), _, alts) when args |> List.contains v ->
+        Map.ofList[v, alts |> List.choose(function |(DataAlt p, xs, _) -> Some(p, xs) |_ -> None)]
+    | Core.CaseE(_, b, ([_, _, e])) -> 
         getArgSpecializations args e
     | Core.App(a, b) -> 
         getArgSpecializations args b    
 
 type ResultSpec =
     |TopResultSpec
-    |ResultSpec of Vars.Var
+    |ResultSpec of UniqueName * Typ list
     |BotResultSpec
     
-let rec getResultSpecialization recCall = function
+let rec getResultSpecialization (constrs:TopConstr<_> list) recCall = function
     | Core.Var v -> TopResultSpec
     | Core.Lit l -> TopResultSpec
-    | Core.Lam(v, e) -> getResultSpecialization recCall e
-    | Core.Let(bs, e) -> 
-        getResultSpecialization recCall e
-    | Core.Case(_, b, (alts, def)) -> 
-        let altsE = alts |> List.map snd
+    | Core.LamE(v, e) -> getResultSpecialization constrs recCall e
+    | Core.LetE(l, bs, e) -> 
+        getResultSpecialization constrs recCall e
+    | Core.CaseE(_, b, (alts)) -> 
+        let altsE = alts |> List.map (fun (_,_,e) -> e)
         let result = 
-            def::altsE |> 
-            List.map (getResultSpecialization recCall) |> 
+            altsE |> 
+            List.map (getResultSpecialization constrs recCall) |> 
             List.fold (fun x y ->
                 match x,y with
                 |TopResultSpec, _ -> TopResultSpec
                 |_, TopResultSpec -> TopResultSpec
-                |ResultSpec v, ResultSpec v2 when v=v2 -> ResultSpec v
+                |ResultSpec (v, t), ResultSpec (v2,t2) when v=v2 -> ResultSpec (v,t)
                 |BotResultSpec, x -> x
                 |x, BotResultSpec -> x
                 |_ -> TopResultSpec
             ) BotResultSpec
         result        
-    | Core.App(Core.Var v, b) -> 
-        if v.unique = recCall.var.unique || Worker(v.unique) = recCall.var.unique then
-            BotResultSpec
-        else if v.callType = Some ConstrCall then
-            ResultSpec v
-        else
-            TopResultSpec
+    | Core.App(Core.VarS (name), b) -> 
+        if name = recCall then
+            BotResultSpec      
+        else 
+        match constrs |> List.tryPick(fun ((name2, _), (c, ts)) -> if name=name2 then ts |> List.map (fun (_,x) -> x.var.typ) |> Some else None) with
+            |Some t -> ResultSpec (name, t)
+            |None -> TopResultSpec
     | Core.Unreachable -> BotResultSpec
 
 
-let rec makeWrapper call vs = function
-    |Core.Lam(v, e) -> makeWrapper call (v::vs) e
+let rec makeWrapper constrs call vs = function
+    |Core.LamE(v, e) -> makeWrapper constrs call (v::vs) e
     |e ->
-        let toSpecialize = getArgSpecializations (vs |> List.map (fun v -> v.var)) e
+        let toSpecialize = getArgSpecializations (vs |> List.map (fun (name, _) -> name)) e
         let specializations, extraProgram =
             match vs with
             |[] -> Map.empty, []
-            |v::_ ->
-                match toSpecialize |> Map.tryFind v.var with
-                |Some([Core.DataAlt(c), [value]]) ->
-                    let specCall = {var=specializeVar() call.var; analysis=call.analysis} 
-                    let specResult = getResultSpecialization call e
-                    Map.ofList [v, [c, value, specCall.var, specResult]], [(specCall, Core.TopExpr (makeSpecialization specResult e [v,c, value]))]
+            |(name, v)::_ ->
+                match toSpecialize |> Map.tryFind name with
+                |Some([(c), [value]]) ->
+                    let specCall = freshen fvExpr [e] "spec_call"
+                    let specResult = getResultSpecialization constrs call e
+                    let resultT = match specResult with ResultSpec(_, [t]) -> t |_ -> ValueT
+                    Map.ofList [(name), [c, value, specCall, specResult]], [((specCall, unanalysed (FuncT((snd value).var.typ, resultT))), (makeSpecialization constrs specResult e [(name, v),c, value]))]
                 |_ -> Map.empty, []
         makeWrapperLambda call specializations [] (vs |> List.rev), extraProgram
 
-and makeSpecialization specResult e = function
-    |[v, c, value] ->
-        let newUnique = (generateVar value.var.typ).unique
-        let lam = {var={value.var with unique=newUnique}; analysis=value.analysis}          
+and makeSpecialization (constrs:TopConstr<_> list) specResult e = function
+    |[v:Binder<_>, c, (valueName, value)] ->
+        let lam = Core.freshen Core.fvExpr [e] "lam"     
+        let ((constrVar, _), _) = constrs |> List.find(fun (_, (c2, _)) -> c=c2)
         match specResult with
-        |ResultSpec res ->
-            let bindVar = {var=(generateVar value.var.typ); analysis=Analysis.Strict 0}
-            let resultVar = {var=(generateVar Types.IntT); analysis=Analysis.Strict 0}
-            Core.Lam(lam, 
-                Core.Case(Core.App(Core.Var(c), Core.Var(lam.var)), v, ([], 
-                Core.Case(e, bindVar,
-                ([(Core.DataAlt res, [resultVar]),  Core.Var(resultVar.var)],
-                    Core.Unreachable)))                
-            ))
-        |_ -> Core.Lam(lam, Core.Case(Core.App(Core.Var(c), Core.Var(lam.var)), v, ([], e)))
+        |ResultSpec (res, [t]) ->
+            let (_, (resConstr, _)) = constrs |> List.find(fun ((res2, _), (_, _)) -> res=res2)
+            let bindVar = Core.freshen Core.fvExpr [e] "bind"   
+            let resultVar = Core.freshen Core.fvExpr [e] "result"
+            NoExport, Core.lamE((lam, value), 
+                Core.caseE(Core.App(Core.varS(constrVar), Core.varS(lam)), v, 
+                  ([Core.DefAlt, [], 
+                    Core.caseE(e, (bindVar, unanalysed ValueT),
+                         [Core.DataAlt resConstr, [resultVar, unanalysed t],  Core.varS(resultVar)])])                
+             ))
+        |_ -> 
+            NoExport,  Core.lamE((lam, unanalysed ValueT), Core.caseE(Core.App(Core.varS(constrVar), Core.varS(lam)), v, ([DefAlt, [], e])))
 
 
 and makeWrapperLambda call specializations lams = function
-    |v::vs -> Core.Lam(v, makeWrapperLambda call specializations (v::lams) vs)
+    |v::vs -> Core.lamE(v, makeWrapperLambda call specializations (v::lams) vs)
     |[] ->
         makeWrapperBind call specializations [] (lams |> List.rev)
 
 and makeWrapperBind call specializations binds = function
-    |v::vs -> 
-        match v.analysis with
-        |Lazy ->
-            makeWrapperBind call specializations (v::binds) vs
+    |(name, v)::vs -> 
+        match v.analysis.strictness with
+        |Strictness.Lazy ->
+            makeWrapperBind call specializations (name::binds) vs
         |Strict _ ->
-            let newUnique = (generateVar v.var.typ).unique
-            let var = {var={v.var with unique=newUnique}; analysis=v.analysis} 
-            let alts = specializations |> Map.tryFind v |> Option.defaultValue [] |> specializationAlts
-            Core.Case(Core.Var(v.var), var, (alts, makeWrapperBind call specializations (var::binds) vs))
+            let specAlts = 
+                specializations |> Map.tryFind name |> Option.defaultValue [] |> specializationAlts
+
+            let var = freshen fvAlts [] "var"
+            let altsA = 
+                List.concat [
+                    [DefAlt, [], makeWrapperBind call specializations (var::binds) vs]
+                    specAlts
+                ]
+            
+            Core.caseE(Core.varE((name, v)), (var, unanalysed v.var.typ), altsA)
         |HyperStrict ->
-            let newUnique = (generateVar v.var.typ).unique
-            let var = {var={v.var with unique=newUnique}; analysis=v.analysis} 
-            Core.Case(Core.Var(v.var), var, ([], makeWrapperBind call specializations (var::binds) vs))
+            let var = freshen fvAlts [] "var"
+            Core.caseE(Core.varS(var), (var, unanalysed v.var.typ), 
+                [DefAlt, [], makeWrapperBind call specializations (var::binds) vs])
     |[] ->
         makeWrapperCall call (binds)
 
-and specializationAlts = function
-    |(c, value, specCall, specResult)::specs ->
-        let alts = specializationAlts specs
-        let v = {var=specializeVar() value.var; analysis=value.analysis} 
-        let eval = {var=specializeVar() value.var; analysis=value.analysis} 
+and specializationAlts : _ -> ((_*_*Expr<_>) list)  = function
+    |(c, (_, value), specCall, specResult)::specs ->
+        let (alts:(_*_*Expr<_>) list) = specializationAlts specs
+        let v = freshen fvExpr [] "v"
+        let eval = freshen fvExpr [] "eval"
         match specResult with
-        |ResultSpec res  ->
-            ((Core.DataAlt(c), [v]), 
-                Core.Case(Core.App(Core.Var(specCall), Core.Var(v.var)), eval, ([], 
-                    Core.App(Core.Var res, Core.Var(eval.var))
-                ))
-            
-            )::alts
+        |ResultSpec (res, [t])  ->
+            (Core.DataAlt(c), [(v:UniqueName), unanalysed t], 
+                Core.caseE(Core.App(Core.varS(specCall), Core.varS(v)), (eval, unanalysed ValueT), [                    
+                    DefAlt, [], Core.App(Core.varS res, Core.varS(eval))
+                ] 
+                
+            ))           
+            ::alts
         |_ ->
-            ((Core.DataAlt(c), [v]), Core.App(Core.Var(specCall), Core.Var(v.var)))::alts
-    |[] -> []     
+            (Core.DataAlt(c), [v, unanalysed value.var.typ], Core.App(Core.varS(specCall), Core.varS(v)))::alts
+    |[] -> ([]:(_*_*Expr<_>) list)  
 
 
 
 
-and makeWrapperCall call : List<_> -> Core.Expr<Var, AnalysedVar<_>> = function
+and makeWrapperCall call : List<_> -> Core.Expr<_> = function
     |v::vs ->
-        Core.App(makeWrapperCall call vs, Core.Var v.var)
-    |[] -> Core.Var (call.var)
+        Core.App(makeWrapperCall call vs, Core.varS v)
+    |[] -> Core.varS (call)
 
-
+let nameFrom s (name, x) = sprintf "%s_%s" s name
         
-let rec wwTransform  = function
-    |(b, Core.TopExpr e)::xs when isBuiltIn b ->
-        (b, Core.TopExpr e)::wwTransform xs
-    |(b, Core.TopExpr (e:Core.Expr<Var, AnalysedVar<_>>))::xs -> 
-        let workerVar = {b with var = {b.var with Vars.unique = Worker b.var.unique}}
-        let wrapperE, extraProgram = makeWrapper workerVar [] e
-        let wrapper = b, Core.TopExpr(wrapperE)
-        let worker = workerVar, Core.TopExpr e
-        List.concat[[worker;wrapper]; extraProgram; wwTransform xs]
-    |(v, Core.TopConstr vs)::xs -> 
-        (v, Core.TopConstr vs)::wwTransform xs
+let rec wwTransform constrs source = function
+    |((name, b), (export, e))::xs when isBuiltIn b ->
+        ((name, b), (export, e))::wwTransform constrs source xs
+    |((name, b), (export, e))::xs -> 
+        let workerVar = source.next (nameFrom "worker" name)
+        let wrapperE, extraProgram = makeWrapper constrs workerVar [] e
+        let wrapper = (name, {b with flags={b.flags with isWrapper=true}}), (export, wrapperE)
+        let worker = (workerVar, unanalysed b.var.typ) , (NoExport, e)
+        List.concat[[worker;wrapper]; extraProgram; wwTransform constrs source xs]
     |[] -> 
         []
 
 
-
-
-
-
-let rec renameBoundVarsInExpr env f : Core.Expr<Var, AnalysedVar<_>> -> Core.Expr<Var, AnalysedVar<_>> =
-    function
-    | Core.Var v -> 
-        match env |> Map.tryFind v with
-        |Some v2 -> Core.Var v2
-        |None -> Core.Var v
-    | Core.Lit l -> Core.Lit l
-    | Core.Lam(b, e) -> 
-        let newB = {b with var=f b.var}
-        let newEnv = env |> Map.add b.var newB.var
-        Core.Lam(newB, renameBoundVarsInExpr newEnv f e)
-    | Core.Let(bs, e) -> 
-        let newEnv, newBs = renameBoundVarsInBinds env f bs
-        Core.Let(newBs, renameBoundVarsInExpr newEnv f e)
-    | Core.Case(e, b, alts) -> 
-        let newB = {b with var=f b.var}
-        let newEnv = env |> Map.add b.var newB.var
-        Core.Case(renameBoundVarsInExpr env f e, newB, renameBoundVarsInAlts newEnv f alts)
-    | Core.App(a, b) -> Core.App(renameBoundVarsInExpr env f a, renameBoundVarsInExpr env f b)
-    | Core.Prim (w, es) -> Core.Prim(w, es |> List.map (renameBoundVarsInExpr env f))
-    | Core.Unreachable -> Core.Unreachable
-
-and renameBoundVarsInBinds env f =
-    function
-    | Core.Rec bs ->                
-        let bsMapping = bs |> List.map (fun (b, e) -> b, {b with var=f b.var}) |> Map.ofList
-        let newEnv = 
-            bs |> 
-            List.fold(
-                    fun env (b, _) -> 
-                    env |> Map.add b.var (bsMapping |> Map.find b).var
-            ) env
-        let newBs = bs |> List.map (fun (b,e) -> (bsMapping |> Map.find b, renameBoundVarsInExpr env f e))
-        newEnv, Core.Rec(newBs)
-    | Core.NonRec(b, e) ->         
-        let newB = {b with var=f b.var}
-        let newEnv = env |> Map.add b.var newB.var
-        newEnv, Core.NonRec(newB, renameBoundVarsInExpr env f e)
-    | Core.Join(b, e) ->        
-        let newB = {b with var=f b.var}
-        let newEnv = env |> Map.add b.var newB.var
-        newEnv, Core.Join(newB, renameBoundVarsInExpr env f e)
-
-
-and renameBoundVarsInAlts env f = function
-    | (cases, def) -> cases |> List.map (renameBoundVarsInAlt env f), renameBoundVarsInExpr env f def
-
-and renameBoundVarsInAlt env f = function
-    | (p, vs), e -> 
-        let vsMapping = vs |> List.map (fun v -> v, {v with var=f v.var}) |> Map.ofList
-        let newEnv = 
-            vs |> 
-            List.fold(
-                    fun env (v) -> 
-                    env |> Map.add v.var (vsMapping |> Map.find v).var
-            ) env
-        let newVs = vs |> List.map (fun v -> (vsMapping |> Map.find v))
-        (renameBoundVarsInPat newEnv f p, newVs), renameBoundVarsInExpr newEnv f e
-
-and renameBoundVarsInPat env f = function
-    | Core.DataAlt v -> Core.DataAlt v
-    | Core.LitAlt l -> Core.LitAlt l
-    
-and renameBoundVarsInPrim env f =
-    function
-    | Core.AVar v ->         
-        match env |> Map.tryFind v with
-        |Some v2 -> Core.AVar(v2)
-        |None ->Core.AVar(v)        
-    | Core.ALit l -> Core.ALit l
-    | Core.AWasm l -> Core.AWasm l
-
-let rec isSmall = function
+let rec isSmall constrs = function
     |Core.Unreachable
     |Core.Var _ -> true
-    |Core.Lam(_, Core.Unreachable) -> true
+    |Core.LamE(_, Core.Unreachable) -> true
     |Core.Lit _ -> true
+    |Core.App (VarS name, b) when constrs |> Map.containsKey name ->  true
     |_ -> false
 
-let rec simplifyExpr (inlineMap:Map<Vars.Var, Core.Expr<Vars.Var, AnalysedVar<_>>>) = function    
-    | Core.Var v -> 
-        match inlineMap |> Map.tryFind v with
-        |Some e -> 
-            let inliner = inlineVar()
-            let newE = e |> renameBoundVarsInExpr Map.empty inliner
-            newE
-        |None ->
-            Core.Var v
+let rec simplifyExpr constrs = function
+    | Core.VarS v -> Core.varS v
     | Core.Lit l -> Core.Lit l
-    | Core.Lam(v, e) -> Core.Lam(v, simplifyExpr inlineMap e)
-    | Core.Let(bs, e) -> 
-        simplifyBinds inlineMap e bs 
-    | Core.Case(e, b, alts) -> 
-        simplifyCase inlineMap ((e, b, alts) |> caseOfCase)
+    | Core.LamE(v, e) -> Core.lamE(v, simplifyExpr constrs e)
+    | Core.LetE(l, bs, e) -> 
+        simplifyBinds constrs e (l, bs) 
+    | Core.CaseE(e, b, alts) -> 
+        let (newE, newB, newAlts) = (simplifyExpr constrs e, b, simplifyAlts constrs alts)
+        let after = simplifyCase constrs (((newE, newB, newAlts))|> caseOfCase)
+        after
     | Core.App(a, b) -> 
-        let newA = simplifyExpr inlineMap a
-        let newB = simplifyExpr inlineMap b
+        let newA = simplifyExpr constrs a
+        let newB = simplifyExpr constrs b
         match newA with
-        |Core.Lam(v, e) -> 
-            simplifyExpr (Map.ofList [v.var, newB]) e
-        |Core.Lam(v, e) when false ->
-            Core.Let(Core.NonRec(v, b), e) |> simplifyExpr inlineMap 
-        |Core.Let(bs, e) when false ->
-            Core.Let(bs, Core.App(e, b)) |> simplifyExpr inlineMap
-        |Core.Case(e, v, ([], def)) when false ->
-            Core.Case(e, v, ([], Core.App(def, b))) |> simplifyExpr inlineMap
+        |Core.LamE((name, v), e) -> 
+            let sub =  (substExpr name newB e)
+            let res = simplifyExpr constrs sub
+            res    
+        |Core.LamE(v, e) when false ->
+            Core.letE(Core.NonRec, [v, b], e) |> simplifyExpr constrs 
+        |Core.LetE(l, bs, e) when false ->
+            Core.letE(l, bs, Core.App(e, b)) |> simplifyExpr constrs
+        |Core.CaseE(e, v, ([Core.DefAlt, [], def])) when false ->
+            Core.caseE(e, v, [Core.DefAlt, [], Core.App(def, b)]) |> simplifyExpr constrs
         |_ ->
-        Core.App(newA, newB) |> factorApp
+            Core.App(newA, newB)  |> factorApp constrs
     | Core.Prim (p, es) -> 
-        Core.Prim(p, es |> List.map (simplifyExpr inlineMap))
+        Core.Prim(p, es |> List.map (simplifyExpr constrs))
     | Core.Unreachable -> Core.Unreachable
 
-and factorApp = function
-    |Core.App(f, Core.Case(e, b, ([p, pe], Core.Unreachable))) when f |> isSmall ->
-        Core.Case(e, b, ([p, Core.App(f, pe) |> factorApp], Core.Unreachable))
-    |Core.App(f, Core.Case(e, b, ([], def))) when f |> isSmall ->
-        Core.Case(e, b, ([], Core.App(f, def) |> factorApp))
+and factorApp constrs = function
+    |Core.App(f, Core.CaseE(e, b, ([p, xs, pe]))) when f |> isSmall constrs ->
+        let before = Core.App(f, Core.caseE(e, b, ([p, xs, pe])))
+        let after = Core.caseE(e, b, ([p, xs, Core.App(f, pe) |> factorApp constrs]))
+        after
+        
     |x -> x
 
 
 
-and simplifyAlts inlineMap (alts, def) = 
-    let newAlts = alts |> List.map(fun (p,e) -> (p, simplifyExpr inlineMap e))
-    let newDef = simplifyExpr inlineMap def    
-    (newAlts, newDef)
+and simplifyAlts constrs (alts) = 
+    let newAlts = alts |> List.map(fun (p:Pat, ps:Binder<AnalysedVar<_>> list,e : Expr<_>) -> (p, ps, simplifyExpr constrs e))
+    (newAlts)
 
 
 
-and simplifyBinds inlineMap e = function
-    |Core.NonRec (v, rhs) ->
-        let newRhs = simplifyExpr inlineMap rhs 
+and simplifyBinds constrs e = function
+    |Core.NonRec, [((name, v), rhs)] ->
+        let newRhs = simplifyExpr constrs rhs 
         // Inline small values
-        if false && isSmall newRhs then
+        if false && isSmall constrs newRhs then
             printfn "Inlining: %A" newRhs
-            let newsimplifyMap = inlineMap |> Map.add v.var newRhs
-            simplifyExpr newsimplifyMap e
-        else if false && v.analysis <> Lazy then
+            simplifyExpr constrs (substExpr name newRhs e)
+        else if false && v.analysis.strictness <> Lazy then
             printfn "Let-to-case: %A" newRhs            
             // Change strict expressions into a case
-            Core.Case(newRhs, v, ([], simplifyExpr inlineMap e))
+            Core.caseE(newRhs, (name, v), [Core.DefAlt, [], simplifyExpr constrs e])
         else
-            Core.Let(Core.NonRec (v, newRhs), (simplifyExpr inlineMap e))
-    |Core.Join (b1, rhs) -> 
+            Core.letE(Core.NonRec, [(name, v), newRhs], (simplifyExpr constrs e))
+    |Core.Join, [((name, b1), rhs)] -> 
         let safeToInline = 
             match e with
-            |Core.Case(e, b2, (alts, def)) ->
-                match alts, def with
-                |[], Core.Case(_) -> false
-                |[x], Core.Case(_) -> false
+            |Core.Case(e, b2, (alts)) ->
+                match alts with
+                |[x] -> false
                 |_ -> true
             |_ -> 
                 false
-        let newRhs = simplifyExpr inlineMap rhs 
+        let newRhs = simplifyExpr constrs rhs 
         // Inline small values
-        if safeToInline || isSmall newRhs then
-            let newInlineMap = inlineMap |> Map.add b1.var newRhs
-            simplifyExpr newInlineMap e
+        if (safeToInline || isSmall constrs newRhs) then
+            simplifyExpr constrs (substExpr name rhs e)
         else
-            Core.Let(Core.Join (b1, newRhs), (simplifyExpr inlineMap e))
-    |Core.Rec [] -> simplifyExpr inlineMap e
-    |Core.Rec bs -> 
-        Core.Let(Core.Rec (bs |> List.map (fun (v,rhs) -> v, simplifyExpr inlineMap rhs)), (simplifyExpr inlineMap e))
+            Core.letE(Core.Join, [(name, b1), newRhs], (simplifyExpr constrs e))
+    |Core.Rec, [] -> simplifyExpr constrs e
+    |Core.Rec, bs -> 
+        Core.letE(Core.Rec, (bs |> List.map (fun (v,rhs) -> v, simplifyExpr constrs rhs)), (simplifyExpr constrs e))
 
-and simplifyCase inlineMap (e, b, (alts, def)) =
-    let newE = simplifyExpr inlineMap e
-    let (newAlts, newDef) = simplifyAlts inlineMap (alts, def)
-    match newE, b, (newAlts, newDef) with
-    |Core.App(Core.Var(v), value), b, (alts, def) when v.callType=Some ConstrCall ->        
-        match alts |> List.tryPick(function ((Core.DataAlt v2, [bs1]), e) when v = v2 -> Some(bs1, e) |_ -> None) with
-        |Some(bs1, altE)  -> 
-            if value |> isSmall then
-                simplifyExpr (Map.ofList [bs1.var, value; b.var, Core.App(Core.Var(v), value)]) altE
-            else
-                Core.Case(newE, b, ([((Core.DataAlt v, [bs1]), altE)], Core.Unreachable))
-        |None ->  
-            if value |> isSmall then
-                simplifyExpr (Map.ofList [b.var, Core.App(Core.Var(v), value)]) def
-            else
-                Core.Case(newE, b, ([], def))
-    |value, v, ([], _) when value |> isSmall ->
+and simplifyCase constrs (e, (name, b), (alts)) =
+    let newE = simplifyExpr constrs e
+    let (newAlts) = simplifyAlts constrs (alts)
+    match newE, b, (newAlts) with
+    |value, b, ([DefAlt, [], def]) when value |> isSmall constrs ->
         match def with
         |Core.Prim _ ->
             // The case around prim is needed 
-            Core.Case(value, v, (alts, newDef))
-        |_ -> simplifyExpr (Map.ofList [v.var, value]) newDef
-    |_  -> Core.Case(newE, b, (newAlts, newDef))
+            Core.caseE(value, (name, b), (alts))
+        |_ -> simplifyExpr constrs (substExpr name value def)
+    |Core.App(Core.VarS(v), value), b, (alts) when constrs |> Map.containsKey v ->  
+        let c = constrs |> Map.find v      
+        match alts |> List.tryPick(function (Core.DataAlt c2, [bs1], e) when c = c2 -> Some(bs1, e) |_ -> None) with
+        |Some((name1, bs1), altE)  -> 
+            if value |> isSmall constrs then
+                simplifyExpr constrs (altE |> substExpr name1 value |> substExpr (name) (App (varS v, value)))
+            else
+                Core.caseE(newE, (name, b), ([(Core.DataAlt c, [(name1, bs1)], altE)]))
+        |None ->  
+                Core.caseE(newE, (name, b), newAlts)
+    |_  -> 
+        Core.caseE(newE, (name, b), (newAlts))
 
 and caseOfCase = function
-    |(Core.Case(e2, b2, (alts2, def2)), b, (alts, def)) ->
-        let newAlts2 = alts2 |> List.map (fun (p, e) -> (p, Core.Case(e, b, (alts, def))))
-        let newDef2 = (Core.Case(def2, b, (alts, def)))
-        (e2, b2, (newAlts2, newDef2)) |> caseOfCase
-    |x -> x
+    |(Core.CaseE(e2, (name2, b2), (alts2)), b, (alts)) as before ->
+        let freshB2 = freshen fvExpr (List.concat [alts |> List.map (fun (p, ps, e) -> e); alts2 |> List.map (fun (p, ps, e) -> e)]) (name2 |> fst)
+        let newAlts2 = alts2 |> List.map (fun (p, ps, e) -> (p, ps, Core.caseE(substExpr (name2) (varS freshB2) e, b, (alts))))        
+        let after = (e2, (freshB2, b2), (newAlts2))
+        after |> caseOfCase
+    |x ->
+        x
 
-and isConstr = function
-    |Core.Var{callType=Some ConstrCall} -> true
-    |_ -> false
-    
     
 
-let rec simplify inlineMap = function
-    |(b, Core.TopExpr e)::xs -> 
-        (b, Core.TopExpr (simplifyExpr inlineMap e))::simplify inlineMap xs
-    |(v, Core.TopConstr vs)::xs -> 
-        (v, Core.TopConstr vs)::simplify inlineMap xs
+let rec simplify constrs  = function
+    |((name, b), (export, e))::xs -> 
+        ((name, b), (export, simplifyExpr constrs e))::simplify constrs xs
     |[] -> 
         []
-
-let isWrapper b =
-    match b.var.unique with
-    |BuiltIn _ -> false
-    |Worker (BuiltIn _) -> false
-    |Worker (_) -> false
-    |Specialized(_) -> false
-    |_ -> true
 
 
 
 let rec getTopInlineMap shouldInline = function
-    |(v, Core.TopExpr e)::xs ->
+    |((name, v), (export, e))::xs ->
         if shouldInline v then
-            getTopInlineMap shouldInline xs |> Map.add v.var e
+            getTopInlineMap shouldInline xs |> Map.add name e
         else
             getTopInlineMap shouldInline xs
-    |(v, Core.TopConstr vs)::xs -> getTopInlineMap shouldInline xs
     |[] -> Map.empty
 
+let isWrapper {flags=flags} = flags.isWrapper
 
 
-
-let transform program =     
-    let analysis = program |> Analysis.analyse
-    let builtinInlineMap = getTopInlineMap isBuiltIn analysis
-    let simplified = simplify builtinInlineMap analysis
-    let ww = simplified |> wwTransform
+let transform (program:ClosedProgram<Var>) =     
+    let (Program analysis) = program |> Analysis.analyse
+    let builtinInlineMap = getTopInlineMap isBuiltIn analysis.exprs
+    let constrs = analysis.constrs |> List.map (fun ((name,b), (c,_)) -> name, c) |> Map.ofList 
+    let inlined = builtinInlineMap |> Map.toList |> List.fold (fun expr (x,v) -> substTopExprs x v expr) analysis.exprs
+    let simplified = simplify constrs inlined
+    let freshSource = (freshSource fvProgram [closeProgram analysis])
+    let ww = simplified |> wwTransform analysis.constrs freshSource
     let wrapperInlineMap = getTopInlineMap isWrapper ww
-    let result = simplify wrapperInlineMap ww
-    System.IO.File.WriteAllText("./Compiler/input.core", sprintf "%A" ww)
-    System.IO.File.WriteAllText("./Compiler/output.core", sprintf "%A" result)
-    result
+    let wrapperInlined = wrapperInlineMap |> Map.toList |> List.fold (fun expr (x,v) -> substTopExprs x v expr) ww
+    let result = simplify constrs wrapperInlined
+    System.IO.File.WriteAllText("./Compiler/input.core", (printProgram (closeProgram analysis)))
+    System.IO.File.WriteAllText("./Compiler/inlined.core", (printProgram (closeProgram {analysis with exprs=inlined})))
+    System.IO.File.WriteAllText("./Compiler/simplified.core", (printProgram (closeProgram {analysis with exprs=simplified})))
+    System.IO.File.WriteAllText("./Compiler/ww.core", (printProgram (closeProgram {analysis with exprs=ww})))
+    System.IO.File.WriteAllText("./Compiler/output.core", (printProgram (closeProgram {analysis with exprs=result})))
+    closeProgram {analysis with exprs=result}

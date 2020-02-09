@@ -6,8 +6,8 @@
   <ItemGroup>
     <Compile Include="Wasm.fs" />
     <Compile Include="Stg.fs" />
-    <Compile Include="Core.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Core.fs" />
     <Compile Include="Ast.fs" />
     <Compile Include="Vars.fs" />
     <Compile Include="Parser.fs" />

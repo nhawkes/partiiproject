@@ -1,52 +1,41 @@
 module BuiltIns
-open Ast
 open Vars
 open Types
+open Core
 
-let rec fieldsForType i = function
-    |FuncT(_, t, b) -> 
-        AssignVar ({unique=InternalField i;  name=""; typ=t; callType=None})::fieldsForType (i+1) b
-    |ValueT -> []
-
-
-let builtInConstr builtInVar =
-    TypeDecl(AssignFunc(builtInVar, fieldsForType 0 builtInVar.typ))
-
-let builtInOp builtInVar w : Declaration<Var> = 
-    GlobalDecl(AssignFunc(builtInVar, [AssignVar xValue; AssignVar yValue]),
-            Block [
-                Return(
-                    Match(
-                        (Var((xValue)), ValueT),
-                        [
-                            PatConstr(integerConstr, [PatBind xInt]),
-                            Match(
-                                (Var((yValue)), ValueT),
-                                [
-                                    PatConstr(integerConstr, [PatBind yInt]),
-                                    Match(
-                                        (Prim (w, [yInt; xInt]), IntT),
-                                        [
-                                            PatBind(rInt), (Call (integerConstr, [Var (rInt)]))
-                                        ]
-                                    )
-                                ]
-                            )
-                        ]
-                    )
+let v s = F (s2n s, {v=None; typ=ValueT; hintInline=false})
+let inline b<'a> s :Binder<Vars.Var> = s2n s, {v=None; typ=ValueT; hintInline=false}
+let builtInOp<'a when 'a:comparison> (builtInVar) w = 
+    (builtInVar:Core.Binder<_>), (NoExport,
+        (lamE(b "x_boxed",
+            lamE(b "y_boxed",
+                caseE(Var(v "x_boxed"), b "x_boxed", 
+                    [
+                        DataAlt IntDestr, [b "x"],
+                        caseE(Var(v "y_boxed"), b "y_boxed", 
+                            [
+                                DataAlt IntDestr, [b "y"],
+                                caseE(Prim(w, [Var(v "y"); Var(v "x")]), b "r", 
+                                    [
+                                        DefAlt, [], App(Var(F (intConstr)), Var <| v "r")
+                                    ]
+                                
+                                )
+                            ]
+                        )
+                    ]
                 )
-            ]
-        )  
+            )    
+        ):Expr<_>)
+    )
 
-let builtIns =
+let builtInConstrs<'a> =
     [
-        builtInConstr integerConstr
-        builtInOp addOp Wasm.I32Add
-        builtInOp subOp Wasm.I32Sub
+        intConstr, ((IntDestr), [("x", {v=None; typ=IntT; hintInline=false})])
     ]
 
-let builtInsEnv =
-    [
-        "Int", integerConstr
-    ] |> Map.ofList
-
+let builtInExprs<'a when 'a:comparison> =
+    [    
+        builtInOp<'a> (addOp) Wasm.I32Add
+        builtInOp (subOp) Wasm.I32Sub
+    ]

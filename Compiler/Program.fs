@@ -6,7 +6,14 @@ open StgGen
 open Ast
 
 let program = """
-
+export fibonacci(x) = {
+    return switch(x){
+        | 0 => 1
+        | 1 => 1
+        | _ => fibonacci(x-1)+fibonacci(x-2)
+    }
+}
+"""
 
 [<EntryPoint>] 
 let main argv =
@@ -15,16 +22,26 @@ let main argv =
     |Ok astModule ->
     let coreModule =
         astModule 
-         |> Renamer.renameProgram
          |> CoreGen.genProgram
-    // let coreModule = coreModule |> Transform.transform |> Core.mapProgram (fun v -> v.var)
+
+    let fv = coreModule |> fvProgram
+    printfn "%A" coreModule
+    match fv |> Set.toList with
+    |(x,_)::_ ->failwithf "Not defined %s" x
+    |_ ->
+
+    printfn "%s" (printProgram coreModule)         
+    let coreModule = coreModule |> Transform.transform
+    
     let stgModule = 
         coreModule
          |> StgGen.genProgram   
+    printfn "%A" stgModule
     let wasmModule =
         stgModule          
          |> WasmGen.genProgram
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
+    
     
     0

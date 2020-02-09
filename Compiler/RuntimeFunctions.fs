@@ -1,7 +1,7 @@
 module RuntimeFunctions 
 
 type Var =
-    | StgVar of Vars.Var
+    | StgVar of Stg.Var
     | Identity
     | Indirection
     | WhnfEval

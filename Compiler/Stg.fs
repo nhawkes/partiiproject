@@ -1,56 +1,58 @@
 module Stg
 
-type Constr<'b> = 'b
+type Constr = int
+[<StructuredFormatDisplay("{name}.{unique}")>]
+type Var = {name:string; info:System.IComparable; unique:int; prim:bool}
+type Args = Var list
+type Free = Var list
+type Locals = Var list
 
-type Args<'b> = 'b list
-type Free<'b> = 'b list
-type Locals<'b> = 'b list
-
-type Atom<'b> =
-    | AVar of 'b
+type Atom =
+    | AVar of Var
     | ALit of Wasm.Instr
 
-type Expr<'b> =
-    | Let of Binds<'b> * Expr<'b>
-    | Case of Expr<'b> * 'b * Alts<'b>
-    | App of 'b * Atom<'b> list
-    | Call of 'b * Atom<'b> list
-    | Constr of 'b * Atom<'b> list
-    | Jump of 'b * Atom<'b> list
-    | Prim of Atom<'b> list
+type Expr =
+    | Let of Binds * Expr
+    | Case of Expr * Var * Alts
+    | App of Var * Atom list
+    | Call of Var * Atom list
+    | Constr of Var * Atom list
+    | Jump of Var * Atom list
+    | Prim of Atom list
 
-and Binds<'b> =
-    | Rec of 'b list
-    | NonRec of 'b
-    | Join of 'b * 'b list * Expr<'b>
+and Binds =
+    | Rec of Var list
+    | NonRec of Var
+    | Join of Var * Var list * Expr
 
-and Bind<'b> = 'b * LambdaForm<'b>
+and Bind = Var * LambdaForm
 
-and Default<'b> = Expr<'b>
+and Default = Expr
 
-and Alts<'b> =
-    | AAlts of AAlts<'b> * Default<'b>
-    | PAlts of PAlts<'b> * Default<'b>
-and AAlts<'b> = ((Constr<'b> * 'b list) * Expr<'b>) list
-and PAlts<'b> = (Wasm.Instr * Expr<'b>) list
-and Lifted<'b> = Lifted of Bind<'b>
-and Lets<'b> = Lifted<'b> list
+and Alts =
+    | AAlts of AAlts * Default
+    | PAlts of PAlts * Default
+and AAlts = ((Constr * Var list) * Expr) list
+and PAlts = (Wasm.Instr * Expr) list
+and Lifted = Lifted of Bind
+and Lets = Lifted list
 
-and LambdaForm<'b> =
-    { args: 'b list
-      frees: 'b list
-      locals: 'b list
-      lets: ('b * LambdaForm<'b>) list
-      stdConstrs: ('b * 'b * Atom<'b> list) list
-      expr: Expr<'b> }
+and LambdaForm =
+    { args: Var list
+      frees: Var list
+      locals: Var list
+      lets: (Var * LambdaForm) list
+      stdConstrs: (Var * Var * Atom list) list
+      expr: Expr }
 
-type TopLevel<'b> =
-    |TopCaf of LambdaForm<'b>
-    |TopLam of LambdaForm<'b>
-    |TopConstr of 'b list      
+type TopLevel =
+    |TopCaf of LambdaForm
+    |TopLam of Args * LambdaForm
+    |TopExport of string * Args * LambdaForm
+    |TopConstr of Constr * Var list
 
-type TopBind<'b> = 'b * TopLevel<'b>
-type Program<'b> = TopBind<'b> list
+type TopBind = Var * TopLevel
+type Program = TopBind list
 
 
 let lambdaForm e =
