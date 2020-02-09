@@ -19,15 +19,15 @@ let genName =
 
 let genProgram (ast: Ast.Program): Core.ClosedProgram<_> = 
     let constr = ast |> List.choose(function 
-        | Ast.TypeDecl (Ast.AssignVar v) -> Some v
-        | Ast.TypeDecl (Ast.AssignFunc (v,[])) -> Some v
+        | Ast.TypeDecl (Ast.AssignVar v) -> Some v.text
+        | Ast.TypeDecl (Ast.AssignFunc (v,_)) -> Some v.text
         |_ -> None
     )
-    let (env:Map<Ast.Var, Core.Constr>) = constr |> List.mapi(fun i x -> x, Core.Constr i) |> Map.ofList
-    let getConstr v =
-        match env |> Map.tryFind v with
+    let (env:Map<string, Core.Constr>) = constr |> List.mapi(fun i x -> x, Core.Constr i) |> Map.ofList
+    let getConstr (v:Ast.Var) =
+        match env |> Map.tryFind v.text with
         |Some(c) -> c
-        |None -> failwithf "Not a constr: %A" v
+        |None -> failwithf "Not a constr: %A" v.text
         
 
     let rec genExpr : Ast.Expr -> Core.Expr<Var> =
@@ -39,6 +39,7 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
         | Ast.Match(e, cases) -> genMatch e cases
         | Ast.Block(block) -> genBlock None [] block
         | Ast.Prim (w, es) -> genPrim w es
+        | Ast.If (cond, (ifTrue, ifFalse)) -> genIf cond ifTrue ifFalse
 
     and genLit =
         function
@@ -54,6 +55,8 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
         function
         | Ast.Add -> genCall (Core.Var (Core.F(addOp))) [ x; y ]
         | Ast.Sub -> genCall (Core.Var (Core.F(subOp))) [ x; y ]
+        | Ast.Equals -> genCall (Core.Var (Core.F(equalsOp))) [ x; y ]
+        | Ast.LessThan -> genCall (Core.Var (Core.F(lessThanOp))) [ x; y ]
 
     and genMatchExpr = function
         |MatchExpr e -> genExpr e
@@ -160,6 +163,21 @@ let genProgram (ast: Ast.Program): Core.ClosedProgram<_> =
 
     and genPrim w es : Core.Expr<_> =
         Core.Prim(w, es |> List.map (fun v -> var v |> Core.Var))
+
+    and genIf cond ifTrue ifFalse =
+        let caseVar1 = genName(), {v=None; typ=Types.ValueT; hintInline=false}
+        let caseVar2 = genName(), {v=None; typ=Types.ValueT; hintInline=false}
+        let (boolName, boolVar) = genName(), {v=None; typ=Types.IntT; hintInline=false}
+        Core.caseE(genExpr cond, caseVar1, [
+            Core.DataAlt Core.BoolDestr, [(boolName, boolVar)], Core.caseE(
+                Core.varS boolName,
+                caseVar2, 
+                [
+                    Core.DefAlt, [], genExpr ifTrue
+                    Core.LitAlt (Core.I32 0), [], genExpr ifFalse
+                ]
+            )
+        ])
 
     let rec genExport call args rhs =
         match args with

@@ -168,7 +168,7 @@ and genLetJoin topEnv (j, eJ) e =
             lets = List.concat [lf.lets; lfJ.lets]
             locals = List.concat [args; lf.locals; lfJ.locals]
             args = []
-            stdConstrs = lfJ.stdConstrs
+            stdConstrs = List.concat [lf.stdConstrs; lfJ.stdConstrs]
             frees = frees
             expr = expr
     }
@@ -235,7 +235,8 @@ and genAAlts topEnv lfAcc def aalts =
 
 and genConstr topEnv = function
 | Core.IntDestr -> 1
-| Core.Constr i -> 2 + i
+| Core.BoolDestr -> 2
+| Core.Constr i -> 3 + i
 
 and genPAlt topEnv lfAcc def palts l e xs =
     let lfE = genExpr topEnv e

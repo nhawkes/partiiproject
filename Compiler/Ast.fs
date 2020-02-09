@@ -20,12 +20,15 @@ type Pattern =
 type Op =
     | Add
     | Sub
+    | Equals
+    | LessThan
 type Expr =
     | Lit of Lit
     | Var of Var
     | BinOp of Expr * Op * Expr
     | Call of Var * Expr list
     | Match of (Expr * Types.Typ) * Case list
+    | If of Expr * (Expr * Expr)
     | Block of Block
     | Prim of Wasm.Instr * Var list
 

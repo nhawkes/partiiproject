@@ -1,23 +1,15 @@
 ﻿// Learn more about F# at http://fsharp.org
 
 open System
+open System.IO
 open Core
 open StgGen
 open Ast
 
-let program = """
-export fibonacci(x) = {
-    return switch(x){
-        | 0 => 1
-        | 1 => 1
-        | _ => fibonacci(x-1)+fibonacci(x-2)
-    }
-}
-"""
 
-[<EntryPoint>] 
-let main argv =
-    match Parser.parse program with
+
+let compile file =
+    match Parser.parse file with
     |Error err -> failwith err
     |Ok astModule ->
     let coreModule =
@@ -25,23 +17,38 @@ let main argv =
          |> CoreGen.genProgram
 
     let fv = coreModule |> fvProgram
-    printfn "%A" coreModule
     match fv |> Set.toList with
     |(x,_)::_ ->failwithf "Not defined %s" x
     |_ ->
-
-    printfn "%s" (printProgram coreModule)         
+   
     let coreModule = coreModule |> Transform.transform
     
     let stgModule = 
         coreModule
          |> StgGen.genProgram   
-    printfn "%A" stgModule
+         
     let wasmModule =
         stgModule          
          |> WasmGen.genProgram
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
-    IO.File.WriteAllBytes("./Compiler.Benchmark/out/wasm/fibonacci.wasm", bytes)
+    bytes
     
+    
+    
+
+[<EntryPoint>] 
+let main argv =
+    let directory = "Examples"    
+    let outdir = DirectoryInfo("./Compiler.Benchmark/out/wasm/")
+    
+    for file in DirectoryInfo(directory).GetFiles() do
+        try
+            let compiled = compile file.FullName
+            let outfile = Path.Join(outdir.FullName, Path.GetFileNameWithoutExtension(file.Name)+".wasm")        
+            IO.File.WriteAllBytes(outfile, compiled)
+            printfn "Successfully compiled %s" file.Name
+        with
+        |e -> 
+            printfn "Failed to compile %s with error\n%A" file.Name e
     
     0

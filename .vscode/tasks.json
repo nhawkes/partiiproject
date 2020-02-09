@@ -37,18 +37,29 @@
             "type": "npm",
             "script": "start",
             "path": "Compiler.Benchmark/",
-            "problemMatcher": [],
+            "problemMatcher": []
         },
         {
             "type": "npm",
             "script": "test",
             "path": "Compiler.Benchmark/",
             "problemMatcher": [],
-            "dependsOn":["run"]
+            "dependsOn": [
+                "run",
+                "build:js"
+            ]
         },
         {
             "type": "npm",
             "script": "build:wat",
+            "path": "Compiler.Benchmark/",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "build:js",
+            "type": "npm",
+            "script": "build:js",
             "path": "Compiler.Benchmark/",
             "group": "build",
             "problemMatcher": []

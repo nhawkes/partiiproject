@@ -69,13 +69,18 @@ let pswitch =
     | (e, block) -> Match((e, ValueT), block)
 
 
-let pterm = choice [ pswitch; pbracketed; pbraced; pliteral; pcall ]
+let pif = ps "if" >>. pexpr .>>. (ps "then" >>. pexpr .>> ps "else" .>>. pexpr) |>> If
+
+
+let pterm = choice [ pif; pswitch; pbracketed; pbraced; pliteral; pcall ]
 
 let pbinop o x y = BinOp(x, o, y)
 let operatorPrecedenceParser = OperatorPrecedenceParser<Expr, unit, unit>()
 
 operatorPrecedenceParser.AddOperator(InfixOperator("+", ws, 5, Associativity.Left, pbinop Add))
 operatorPrecedenceParser.AddOperator(InfixOperator("-", ws, 5, Associativity.Left, pbinop Sub))
+operatorPrecedenceParser.AddOperator(InfixOperator("=", ws, 5, Associativity.Left, pbinop Equals))
+operatorPrecedenceParser.AddOperator(InfixOperator("<", ws, 5, Associativity.Left, pbinop LessThan))
 operatorPrecedenceParser.TermParser <- pterm
 
 pexprImpl := operatorPrecedenceParser.ExpressionParser
@@ -119,6 +124,6 @@ let pdecl = choice [ pdata; pexportDecl; pglobalDecl ]
 let pprogram = spaces >>. many (pdecl .>> spaces) .>> eof
 
 let parse s =
-    match runParserOnString pprogram () "Program" s with
+    match runParserOnFile pprogram () s System.Text.Encoding.Default with
     | Success(result, _, _) -> Result.Ok result
     | Failure(s, _, _) -> Result.Error s

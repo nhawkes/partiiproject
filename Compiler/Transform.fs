@@ -97,37 +97,37 @@ and makeSpecialization (constrs:TopConstr<_> list) specResult e = function
 and makeWrapperLambda call specializations lams = function
     |v::vs -> Core.lamE(v, makeWrapperLambda call specializations (v::lams) vs)
     |[] ->
-        makeWrapperBind call specializations [] (lams |> List.rev)
+        makeWrapperBind (freshSource fvExpr []) call specializations [] (lams |> List.rev)
 
-and makeWrapperBind call specializations binds = function
+and makeWrapperBind (freshSource:FreshSource) call specializations binds = function
     |(name, v)::vs -> 
         match v.analysis.strictness with
         |Strictness.Lazy ->
-            makeWrapperBind call specializations (name::binds) vs
+            makeWrapperBind freshSource call specializations (name::binds) vs
         |Strict _ ->
             let specAlts = 
-                specializations |> Map.tryFind name |> Option.defaultValue [] |> specializationAlts
+                specializations |> Map.tryFind name |> Option.defaultValue [] |> specializationAlts freshSource
 
-            let var = freshen fvAlts [] "var"
+            let var = freshSource.next "var"
             let altsA = 
                 List.concat [
-                    [DefAlt, [], makeWrapperBind call specializations (var::binds) vs]
+                    [DefAlt, [], makeWrapperBind freshSource call specializations (var::binds) vs]
                     specAlts
                 ]
             
-            Core.caseE(Core.varE((name, v)), (var, unanalysed v.var.typ), altsA)
+            Core.caseE(Core.varE(name, v), (var, unanalysed v.var.typ), altsA)
         |HyperStrict ->
-            let var = freshen fvAlts [] "var"
-            Core.caseE(Core.varS(var), (var, unanalysed v.var.typ), 
-                [DefAlt, [], makeWrapperBind call specializations (var::binds) vs])
+            let var = freshSource.next "var"
+            Core.caseE(Core.varE(name, v), (var, unanalysed v.var.typ), 
+                [DefAlt, [], makeWrapperBind freshSource call specializations (var::binds) vs])
     |[] ->
         makeWrapperCall call (binds)
 
-and specializationAlts : _ -> ((_*_*Expr<_>) list)  = function
+and specializationAlts (freshSource:FreshSource) : _ -> ((_*_*Expr<_>) list)  = function
     |(c, (_, value), specCall, specResult)::specs ->
-        let (alts:(_*_*Expr<_>) list) = specializationAlts specs
-        let v = freshen fvExpr [] "v"
-        let eval = freshen fvExpr [] "eval"
+        let (alts:(_*_*Expr<_>) list) = specializationAlts freshSource specs
+        let v = freshSource.next "v"
+        let eval = freshSource.next "eval"
         match specResult with
         |ResultSpec (res, [t])  ->
             (Core.DataAlt(c), [(v:UniqueName), unanalysed t], 
@@ -194,8 +194,8 @@ let rec simplifyExpr constrs = function
             Core.letE(Core.NonRec, [v, b], e) |> simplifyExpr constrs 
         |Core.LetE(l, bs, e) when false ->
             Core.letE(l, bs, Core.App(e, b)) |> simplifyExpr constrs
-        |Core.CaseE(e, v, ([Core.DefAlt, [], def])) when false ->
-            Core.caseE(e, v, [Core.DefAlt, [], Core.App(def, b)]) |> simplifyExpr constrs
+        |Core.CaseE(e, v, ([p, ps, def])) ->
+            Core.caseE(e, v, [p, ps, Core.App(def, b)]) |> simplifyExpr constrs
         |_ ->
             Core.App(newA, newB)  |> factorApp constrs
     | Core.Prim (p, es) -> 
@@ -204,7 +204,6 @@ let rec simplifyExpr constrs = function
 
 and factorApp constrs = function
     |Core.App(f, Core.CaseE(e, b, ([p, xs, pe]))) when f |> isSmall constrs ->
-        let before = Core.App(f, Core.caseE(e, b, ([p, xs, pe])))
         let after = Core.caseE(e, b, ([p, xs, Core.App(f, pe) |> factorApp constrs]))
         after
         
@@ -236,7 +235,7 @@ and simplifyBinds constrs e = function
             match e with
             |Core.Case(e, b2, (alts)) ->
                 match alts with
-                |[x] -> false
+                |[x] -> true
                 |_ -> true
             |_ -> 
                 false

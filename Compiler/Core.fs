@@ -15,6 +15,7 @@ type Lit = I32 of int32
 
 type Constr =
     | IntDestr
+    | BoolDestr
     | Constr of int
 
 type Var<'b> =
@@ -220,21 +221,7 @@ let (|CaseE|_|) = function
         Some(e, (freshMap |> Map.find (fst b)), newAlts)
     |_ -> None
 
-let closeProgram program = 
-    let bs = List.concat [program.constrs |> List.map fst; program.exprs |> List.map fst]
-    let program = 
-        {
-            closedConstrs=
-                program.constrs |> 
-                List.map (fun (((s, i), b), (c, x)) -> (s, b), (c, x))
-            closedExprs=
-                program.exprs |> 
-                List.map (fun (((s, i), b), (export, e)) -> (s, b), (export, closeE (bs |> List.map fst) e))
-        }
-    if fvProgram program |> Set.isEmpty then
-        program
-    else
-        failwith "Program has free variables"
+
 
 let (|Program|) (program:ClosedProgram<'a>) =
     let constrs = 
@@ -331,6 +318,7 @@ and printAlt indent = function
 and printConstr = function
     |Constr i -> string(i)
     |IntDestr -> "Int"
+    |BoolDestr -> "Bool"
 
 and printLit = function
     |I32 i -> string(i)    
@@ -373,3 +361,18 @@ and mapAlts f = function
 and mapAlt f = function
     | ev, vs, e -> ev, vs |> List.map (fun (x, b) -> (x,f b)), mapExpr f e
 
+let closeProgram program = 
+    let bs = List.concat [program.constrs |> List.map fst; program.exprs |> List.map fst]
+    let program = 
+        {
+            closedConstrs=
+                program.constrs |> 
+                List.map (fun (((s, i), b), (c, x)) -> (s, b), (c, x))
+            closedExprs=
+                program.exprs |> 
+                List.map (fun (((s, i), b), (export, e)) -> (s, b), (export, closeE (bs |> List.map fst) e))
+        }
+    if fvProgram program |> Set.isEmpty then
+        program
+    else
+        failwithf "Program has free variables: %A \nin \n%s" (fvProgram program) (printProgram program)

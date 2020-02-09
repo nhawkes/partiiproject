@@ -1,44 +1,34 @@
 data $Int.0 = Int(x)
-$fibonacci.0 = 
-    \<$x.0> -> case ($x.0) as $_.0 of {
-        _ -> case ($x.0) as $x_boxed.0 of {
-            Int($x.1) -> case ({% I32Sub | 1, $x.1 %}) as $r.0 of {
-                _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $x_boxed.0 of {
-                    Int($x.1) -> case ($x.0) as $x_boxed.0 of {
-                        Int($x.2) -> case ({% I32Sub | 2, $x.2 %}) as $r.0 of {
-                            _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $y_boxed.0 of {
-                                Int($y.0) -> case ({% I32Add | $y.0, $x.1 %}) as $r.0 of {
-                                    _ -> $Int.0 ($r.0)
+data $Bool.0 = Bool(x)
+$gcd.0 = 
+    \<$a.0> -> \<$b.0> -> case ($a.0) as $x_boxed.0 of {
+        Int($x.0) -> case ($b.0) as $y_boxed.0 of {
+            Int($y.0) -> case ({% I32Eq | $y.0, $x.0 %}) as $r.0 of {
+                _ -> case ($r.0) as $.0 of {
+                    _ -> $a.0
+                    0 -> case ($a.0) as $x_boxed.0 of {
+                        Int($x.0) -> case ($b.0) as $y_boxed.0 of {
+                            Int($y.0) -> case ({% I32LtS | $y.0, $x.0 %}) as $r.0 of {
+                                _ -> case ($r.0) as $.0 of {
+                                    _ -> $gcd.0 ($b.0) ($a.0)
+                                    0 -> $gcd.0 ($b.0) (case ($a.0) as $x_boxed.0 of {
+                                        Int($x.0) -> case ($b.0) as $y_boxed.0 of {
+                                            Int($y.0) -> case ({% I32Sub | $y.0, $x.0 %}) as $r.0 of {
+                                                _ -> $Int.0 ($r.0)
+                                            }
+                                        }
+                                    })
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-        Int($.0) -> case ($.0) as $.0 of {
-            _ -> case ($x.0) as $x_boxed.0 of {
-                Int($x.1) -> case ({% I32Sub | 1, $x.1 %}) as $r.0 of {
-                    _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $x_boxed.0 of {
-                        Int($x.1) -> case ($x.0) as $x_boxed.0 of {
-                            Int($x.2) -> case ({% I32Sub | 2, $x.2 %}) as $r.0 of {
-                                _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $y_boxed.0 of {
-                                    Int($y.0) -> case ({% I32Add | $y.0, $x.1 %}) as $r.0 of {
-                                        _ -> $Int.0 ($r.0)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            0 -> $Int.0 (1)
-            1 -> $Int.0 (1)
         }
     }
 
 $.0 = 
-    \<$.0> -> case ($fibonacci.0 ($Int.0 ($.0))) as $.0 of {
+    \<$.0> -> \<$.1> -> case ($gcd.0 ($Int.0 ($.0)) ($Int.0 ($.1))) as $.0 of {
         Int($.0) -> $.0
     }
 
@@ -56,6 +46,24 @@ $sub.0 =
         Int($x.0) -> case ($y_boxed.0) as $y_boxed.0 of {
             Int($y.0) -> case ({% I32Sub | $y.0, $x.0 %}) as $r.0 of {
                 _ -> $Int.0 ($r.0)
+            }
+        }
+    }
+
+$equals.0 = 
+    \<$x_boxed.0> -> \<$y_boxed.0> -> case ($x_boxed.0) as $x_boxed.0 of {
+        Int($x.0) -> case ($y_boxed.0) as $y_boxed.0 of {
+            Int($y.0) -> case ({% I32Eq | $y.0, $x.0 %}) as $r.0 of {
+                _ -> $Bool.0 ($r.0)
+            }
+        }
+    }
+
+$lessThan.0 = 
+    \<$x_boxed.0> -> \<$y_boxed.0> -> case ($x_boxed.0) as $x_boxed.0 of {
+        Int($x.0) -> case ($y_boxed.0) as $y_boxed.0 of {
+            Int($y.0) -> case ({% I32LtS | $y.0, $x.0 %}) as $r.0 of {
+                _ -> $Bool.0 ($r.0)
             }
         }
     }

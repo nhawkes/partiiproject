@@ -1,0 +1,5 @@
+export gcd(a, b) = {
+    return if(a=b) then a else{
+        return if(a<b) then gcd(b, a) else gcd(b, (a-b))
+    }
+}
