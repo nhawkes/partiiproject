@@ -1,54 +1,60 @@
 data $Int.0 = Int(x)
 $fibonacci.0 = 
-    \<$x.0> -> let join 
-        $.0 = \<$.0> -> case case $.0 as $x_boxed.0 of {
-            Int($x.0) -> case $Int.0 (1) as $y_boxed.0 of {
-                Int($y.0) -> case {% I32Sub | $y.0, $x.0 %} as $r.0 of {
-                    _ -> $fibonacci.0 ($Int.0 ($r.0))
-                }
-            }
-        } as $x_boxed.0 of {
-            Int($x.0) -> case case $.0 as $x_boxed.0 of {
-                Int($x.0) -> case $Int.0 (2) as $y_boxed.0 of {
-                    Int($y.0) -> case {% I32Sub | $y.0, $x.0 %} as $r.0 of {
-                        _ -> $fibonacci.0 ($Int.0 ($r.0))
+    \<$x.0> -> case ($x.0) as $_.0 of {
+        _ -> case ($x.0) as $x_boxed.0 of {
+            Int($x.1) -> case ({% I32Sub | 1, $x.1 %}) as $r.0 of {
+                _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $x_boxed.0 of {
+                    Int($x.1) -> case ($x.0) as $x_boxed.0 of {
+                        Int($x.2) -> case ({% I32Sub | 2, $x.2 %}) as $r.0 of {
+                            _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $y_boxed.0 of {
+                                Int($y.0) -> case ({% I32Add | $y.0, $x.1 %}) as $r.0 of {
+                                    _ -> $Int.0 ($r.0)
+                                }
+                            }
+                        }
                     }
                 }
-            } as $y_boxed.0 of {
-                Int($y.0) -> case {% I32Add | $y.0, $x.0 %} as $r.0 of {
-                    _ -> $Int.0 ($r.0)
+            }
+        }
+        Int($.0) -> case ($.0) as $.0 of {
+            _ -> case ($x.0) as $x_boxed.0 of {
+                Int($x.1) -> case ({% I32Sub | 1, $x.1 %}) as $r.0 of {
+                    _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $x_boxed.0 of {
+                        Int($x.1) -> case ($x.0) as $x_boxed.0 of {
+                            Int($x.2) -> case ({% I32Sub | 2, $x.2 %}) as $r.0 of {
+                                _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $y_boxed.0 of {
+                                    Int($y.0) -> case ({% I32Add | $y.0, $x.1 %}) as $r.0 of {
+                                        _ -> $Int.0 ($r.0)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        } in 
-        case $x.0 as $x.0 of {
-            _ -> $.0 ($x.0)
-            Int($.1) -> let join 
-                $.2 = \<$.1> -> $.0 ($x.0) in 
-                case $.1 as $.3 of {
-                    _ -> $.2 ($.3)
-                    0 -> $Int.0 (1)
-                    1 -> $Int.0 (1)
-                }
+            0 -> $Int.0 (1)
+            1 -> $Int.0 (1)
         }
+    }
 
 $.0 = 
-    \<$.0> -> case $fibonacci.0 ($Int.0 ($.0)) as $.0 of {
+    \<$.0> -> case ($fibonacci.0 ($Int.0 ($.0))) as $.0 of {
         Int($.0) -> $.0
     }
 
 $add.0 = 
-    \<$x_boxed.0> -> \<$y_boxed.0> -> case $x_boxed.0 as $x_boxed.0 of {
-        Int($x.0) -> case $y_boxed.0 as $y_boxed.0 of {
-            Int($y.0) -> case {% I32Add | $y.0, $x.0 %} as $r.0 of {
+    \<$x_boxed.0> -> \<$y_boxed.0> -> case ($x_boxed.0) as $x_boxed.0 of {
+        Int($x.0) -> case ($y_boxed.0) as $y_boxed.0 of {
+            Int($y.0) -> case ({% I32Add | $y.0, $x.0 %}) as $r.0 of {
                 _ -> $Int.0 ($r.0)
             }
         }
     }
 
 $sub.0 = 
-    \<$x_boxed.0> -> \<$y_boxed.0> -> case $x_boxed.0 as $x_boxed.0 of {
-        Int($x.0) -> case $y_boxed.0 as $y_boxed.0 of {
-            Int($y.0) -> case {% I32Sub | $y.0, $x.0 %} as $r.0 of {
+    \<$x_boxed.0> -> \<$y_boxed.0> -> case ($x_boxed.0) as $x_boxed.0 of {
+        Int($x.0) -> case ($y_boxed.0) as $y_boxed.0 of {
+            Int($y.0) -> case ({% I32Sub | $y.0, $x.0 %}) as $r.0 of {
                 _ -> $Int.0 ($r.0)
             }
         }

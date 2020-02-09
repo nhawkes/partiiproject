@@ -10,7 +10,7 @@ export fibonacci(x) = {
     return switch(x){
         | 0 => 1
         | 1 => 1
-        | x => fibonacci(x-1)+fibonacci(x-2)
+        | _ => fibonacci(x-1)+fibonacci(x-2)
     }
 }
 """

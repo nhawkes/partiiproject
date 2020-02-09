@@ -69,6 +69,7 @@ type ClosedProgram<'b when 'b: comparison> = {
 
 let rec fvExpr = function
     | Var(F (v, _)) -> Set.singleton v
+    | Var(S (v)) -> Set.singleton v
     | Var(_) -> Set.empty
     | Lit(l) -> Set.empty
     | Lam(xs, e) -> fvClosed e
@@ -174,8 +175,8 @@ let lamE (((s, i), b):Binder<_>, e) =
     let closed = closeE [(s, i)] e
     Lam((s, b), closed) 
 
-let caseE (e, ((s, i), b):Binder<'a>, alts) =   
-    let closed = alts |> List.map (fun (alt, bs, e) -> (alt, bs|>List.map (fun ((s, i), b) -> (s, b)), closeE ((s, i)::(bs|>List.map fst)) e))   
+let caseE (e:Expr<_>, ((s, i), b):Binder<'a>, alts) =   
+    let closed = alts |> List.map (fun (alt, bs, e) -> (alt, bs|>List.map (fun ((s2, i2), b) -> (s2, b)), closeE ((s, i)::(bs|>List.map fst)) e))   
     Case(e, (s, b), closed)
     
 let letE (l, binds:((Binder<_>*_) list), e) =
@@ -210,7 +211,7 @@ let (|CaseE|_|) = function
     |Case(e, b, alts) -> 
         let bs = b::(alts|>List.collect(fun (_, bs, _) -> bs))
         let es = alts |> List.map(fun (_,_,e) -> e)
-        let newBs = bs |> List.map (fun x -> fst x, freshenBinder fvClosed es x)
+        let newBs = bs |> List.map (fun x -> fst x, freshenBinder fvClosed (es) x)
         let freshMap = newBs |> Map.ofList
         let newAlts = alts |> List.map(fun (alt, bs, closed) -> 
             let e = openE (newBs|>List.map(fun k -> Map.find (fst k) freshMap)) closed
@@ -254,7 +255,30 @@ let (|Program|) (program:ClosedProgram<'a>) =
     
 
 
+let rec substClosed x1 e1 (Closed(e)) =
+    Closed(substExpr x1 e1 e)
+    
+and substExpr x1 e1 =
+    function
+    |(Var (B (i,j)):Expr<'a>) -> Var (B (i,j))
+    | Var(F (v,_) as f) when x1=v -> e1
+    | Var(S (v) as f) when x1=v -> e1    
+    | Var(F (v,x) as f) -> Var f
+    | Var(S (v) as f)  -> Var f
+    | Lit l -> Lit l
+    | Lam(xs, e) -> Lam(xs, substClosed x1 e1 e)
+    | Let(l, binds, e) -> Let(l, binds |> List.map(fun (b,e) -> (b, substClosed x1 e1 e)), substClosed x1 e1 e)
+    | Case(e, b, alts) -> Case(substExpr x1 e1 e, b, substAlts x1 e1 alts)
+    | App(a, b) -> App(substExpr x1 e1 a, substExpr x1 e1 b)
+    | Prim(p, es) -> Prim(p, es |> List.map (substExpr x1 e1))
+    | Unreachable -> Unreachable:Expr<'a>
 
+and substAlts x1 e1 alts =
+    alts |> List.map(fun (alt, binds, e) -> (alt, binds, substClosed x1 e1 e))
+
+let rec substTopExprs x v = function
+    |(b, (export, expr))::xs -> (b, (export, substExpr x v expr))::substTopExprs x v xs
+    |[]->[]
 
 let newline indent = "\n" + String.replicate (indent*4) " "
 
@@ -263,7 +287,7 @@ let rec printExpr indent : Expr<'a> -> string = function
     | Lit(I32 i) -> sprintf "%i" i
     | LamE(xs, e) -> sprintf "\<%s> -> %s" (xs |> printBinder) (printExpr indent e)
     | LetE(l, bs, e) -> sprintf "%s %s in %s%s" (printLet l)  (printBinds (indent+1) bs) (newline (indent+1))  (printExpr (indent+1) e)
-    | CaseE(e, b, alts) -> sprintf "case %s as %s of {%s%s}" (printExpr indent e) (printBinder b) (printAlts (indent+1) alts) (newline indent)
+    | CaseE(e, b, alts) -> sprintf "case (%s) as %s of {%s%s}" (printExpr indent e) (printBinder b) (printAlts (indent+1) alts) (newline indent)
     | App(a, b) -> sprintf "%s (%s)" (printExpr indent a) (printExpr indent b)
     | Prim(p, es) -> sprintf "{%% %A | %s %%}" p (printExprs indent es)
     | Unreachable -> "_|_"
@@ -273,7 +297,8 @@ and printExprs indent exprs =
 
 and printVar = function
     |B _ -> failwithf "Still bound"
-    |F (s, x) -> printFrees [s, x]        
+    |F (s, x) -> printFrees [s]     
+    |S s -> printFrees [s]     
 
 and printVars vs = 
     String.concat ", " (vs |> List.map printVar) 
@@ -314,8 +339,8 @@ and printLit = function
 and printFree ((s, i)) = 
     sprintf "$%s.%i" s i
 and printBinder ((x : UniqueName, _)) = printFree x
-and printBinders bs = bs |> List.map fst |> printFrees
-and printFrees fs = fs |> List.map fst |> List.map printFree |> String.concat ", " 
+and printBinders bs = bs |> List.map fst |> List.map fst |> printFrees
+and printFrees fs = fs |> List.map printFree |> String.concat ", " 
 
 and printProgram (Program program) = 
     List.concat[
