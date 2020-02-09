@@ -33,9 +33,9 @@ let noFlags = {isWrapper=false}
 
 [<StructuredFormatDisplay("{AsString}")>]
 type AnalysedVar<'v when 'v: comparison> = 
-    {var:'v option; analysis:Analysis; flags:VarFlags} 
+    {var:'v; analysis:Analysis; flags:VarFlags} 
     member m.AsString = ""
-let unanalysed = {var=None; analysis=noAnalysis; flags=noFlags}
+let unanalysed typ = {var={Vars.v=None;Vars.typ=typ;Vars.hintInline=false}; analysis=noAnalysis; flags=noFlags}
     
 
 let rec normalizeArgStrictness = function
@@ -54,7 +54,7 @@ let lookup k (d, map) =
     | Some v -> v
 
 let lookupAnalysis name k map =
-    {var=Some k; analysis={strictness=lookup name map}; flags=noFlags}
+    {var=k; analysis={strictness=lookup name map}; flags=noFlags}
 
 let update k v (d, map) = 
     if v=d then
@@ -170,7 +170,7 @@ let rec analyseExpr (env: Map<Core.UniqueName, _>) incomingArity :
     | Core.LamE((name, x), e) ->
         let innerResult, innerExpr =
             match incomingArity with
-            | 0 -> defaultStrictness, Core.mapExpr (fun v -> {var=Some v; analysis=noAnalysis; flags=noFlags}) e
+            | 0 -> defaultStrictness, Core.mapExpr (fun v -> {var=v; analysis=noAnalysis; flags=noFlags}) e
             | _ -> analyseExpr env (incomingArity - 1) e
 
         let argStrictness = innerResult.frees |> lookup name
@@ -205,7 +205,7 @@ let rec analyseExpr (env: Map<Core.UniqueName, _>) incomingArity :
 
         let bResult, bExpr =
             match argStrictness with
-            | Lazy -> defaultStrictness, Core.mapExpr (fun v -> {var=Some v; analysis=noAnalysis; flags=noFlags}) b
+            | Lazy -> defaultStrictness, Core.mapExpr (fun v -> {var=v; analysis=noAnalysis; flags=noFlags}) b
             | Strict n -> analyseExpr env n b
             | HyperStrict -> analyseExpr env System.Int32.MaxValue b
 
@@ -311,8 +311,8 @@ and analysePrims env =
 let rec analyseTopConstrs constrs = function
     |((name, v), (c, vs))::xs -> 
         let program = analyseTopConstrs ((v,vs)::constrs) xs
-        let analysedVars = vs |> List.map (fun (name, v) -> name, {var=Some v; analysis=noAnalysis; flags=noFlags})
-        ((name, {var=Some v; analysis=noAnalysis; flags=noFlags}), (c, analysedVars))::program
+        let analysedVars = vs |> List.map (fun (name, v) -> name, {var=v; analysis=noAnalysis; flags=noFlags})
+        ((name, {var=v; analysis=noAnalysis; flags=noFlags}), (c, analysedVars))::program
     |[] -> 
         []
 
@@ -321,7 +321,7 @@ let rec analyseTopExprs binds = function
         let env, program = analyseTopExprs (((name, b), e)::binds) xs
         let _, innerRhs = analyseRhs env (e:Core.Expr<_>) 
         env,
-        ((name, {var=Some b; analysis=noAnalysis; flags=noFlags}), (export, innerRhs))::program
+        ((name, {var=b; analysis=noAnalysis; flags=noFlags}), (export, innerRhs))::program
     |[] -> 
         getRecEnv Map.empty binds,
         []

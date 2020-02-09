@@ -31,7 +31,7 @@ let builtInOp<'a when 'a:comparison> (builtInVar) w =
 
 let builtInConstrs<'a> =
     [
-        intConstr, ((IntDestr), ["x", {v=None; typ=IntT; hintInline=false}])
+        intConstr, ((IntDestr), [("x", {v=None; typ=IntT; hintInline=false})])
     ]
 
 let builtInExprs<'a when 'a:comparison> =

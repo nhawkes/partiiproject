@@ -7,13 +7,13 @@ let genVar =
     fun () ->
         let next = !i
         i := !i - 1
-        {Stg.name="gen"; Stg.info=None; Stg.unique=next}
+        {Stg.name="gen"; Stg.info=None; Stg.unique=next; Stg.prim=false}
 let i = ref (1)
-let wrapVar<'a when 'a: comparison> : 'a -> Stg.Var =
+let wrapVar : Analysis.AnalysedVar<Vars.Var> -> Stg.Var =
     fun (v) ->
         let next = !i
         i := !i + 1
-        {Stg.name="anon"; Stg.info=Some (v:>obj); Stg.unique=next}
+        {Stg.name="anon"; Stg.info=Some (v:>obj); Stg.unique=next; prim=v.var.typ=Types.IntT}
 
 let wrapBinder (((s, i), x):Core.Binder<_>) = (s, i), {wrapVar x with name = sprintf "%s_%i" s i }
 
@@ -280,6 +280,9 @@ and genAppWithAtoms topEnv (f:Stg.Var) atoms =
     { lf with frees = lf.frees |> addFree topEnv f }
 
 and genCallWithAtoms topEnv (f:Stg.Var) atoms =   
+    match f with
+    |{prim=true} -> Stg.Prim(Stg.AVar f::atoms)
+    |_ ->
     match topEnv |> Map.tryFind f with
     |Some (IsJoinPoint _) -> Stg.Jump(f, atoms)
     |Some (IsLam _) -> Stg.Call(f, atoms)
@@ -356,7 +359,7 @@ and uniqueifyBinds = function
 and uniquifyProgram (program:Core.Program<_>) : Core.ClosedProgram<Stg.Var> =
     let uniqueConstrs =
         program.constrs |> List.map(function
-            | b, (c, vs) -> wrapBinder b, (c, vs |> List.map (fun (s, x) -> (s, wrapVar x)))
+            | b, (c, vs) -> wrapBinder b, (c, vs |> List.map (fun ((s, x)) -> (s, wrapVar x)))
         ) 
     let uniqueExprs = 
         program.exprs |> List.map(function

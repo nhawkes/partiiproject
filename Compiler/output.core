@@ -3,11 +3,11 @@ $worker_fibonacci.0 =
     \<$x.0> -> case ($x.0) as $_.0 of {
         _ -> case ($x.0) as $x_boxed.0 of {
             Int($x.1) -> case ({% I32Sub | 1, $x.1 %}) as $r.0 of {
-                _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $x_boxed.0 of {
-                    Int($x.1) -> case ($x.0) as $x_boxed.0 of {
-                        Int($x.2) -> case ({% I32Sub | 2, $x.2 %}) as $r.0 of {
-                            _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $y_boxed.0 of {
-                                Int($y.0) -> case ({% I32Add | $y.0, $x.1 %}) as $r.0 of {
+                _ -> case ($spec_call.0 ($r.0)) as $eval.0 of {
+                    _ -> case ($x.0) as $x_boxed.0 of {
+                        Int($x.0) -> case ({% I32Sub | 2, $x.0 %}) as $r.0 of {
+                            _ -> case ($spec_call.0 ($r.0)) as $eval.1 of {
+                                _ -> case ({% I32Add | $eval.1, $eval.0 %}) as $r.0 of {
                                     _ -> $Int.0 ($r.0)
                                 }
                             }
@@ -19,11 +19,11 @@ $worker_fibonacci.0 =
         Int($.0) -> case ($.0) as $.0 of {
             _ -> case ($x.0) as $x_boxed.0 of {
                 Int($x.1) -> case ({% I32Sub | 1, $x.1 %}) as $r.0 of {
-                    _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $x_boxed.0 of {
-                        Int($x.1) -> case ($x.0) as $x_boxed.0 of {
-                            Int($x.2) -> case ({% I32Sub | 2, $x.2 %}) as $r.0 of {
-                                _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $y_boxed.0 of {
-                                    Int($y.0) -> case ({% I32Add | $y.0, $x.1 %}) as $r.0 of {
+                    _ -> case ($spec_call.0 ($r.0)) as $eval.0 of {
+                        _ -> case ($x.0) as $x_boxed.0 of {
+                            Int($x.0) -> case ({% I32Sub | 2, $x.0 %}) as $r.0 of {
+                                _ -> case ($spec_call.0 ($r.0)) as $eval.1 of {
+                                    _ -> case ({% I32Add | $eval.1, $eval.0 %}) as $r.0 of {
                                         _ -> $Int.0 ($r.0)
                                     }
                                 }
@@ -46,48 +46,25 @@ $fibonacci.0 =
     }
 
 $spec_call.0 = 
-    \<$lam.0> -> case ($Int.0 ($lam.0)) as $x.0 of {
-        _ -> case ($x.0) as $_.0 of {
-            _ -> case ($x.0) as $x_boxed.0 of {
-                Int($x.1) -> case ({% I32Sub | 1, $x.1 %}) as $r.0 of {
-                    _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $x_boxed.0 of {
-                        Int($x.1) -> case ($x.0) as $x_boxed.0 of {
-                            Int($x.2) -> case ({% I32Sub | 2, $x.2 %}) as $r.0 of {
-                                _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $y_boxed.0 of {
-                                    Int($y.0) -> case ({% I32Add | $y.0, $x.1 %}) as $r.0 of {
-                                        _ -> $r.0
-                                    }
-                                }
-                            }
+    \<$lam.0> -> case ($lam.0) as $.0 of {
+        _ -> case ({% I32Sub | 1, $lam.0 %}) as $r.0 of {
+            _ -> case ($spec_call.0 ($r.0)) as $eval.0 of {
+                _ -> case ({% I32Sub | 2, $lam.0 %}) as $r.0 of {
+                    _ -> case ($spec_call.0 ($r.0)) as $eval.1 of {
+                        _ -> case ({% I32Add | $eval.1, $eval.0 %}) as $r.0 of {
+                            _ -> $r.0
                         }
                     }
                 }
-            }
-            Int($.0) -> case ($.0) as $.0 of {
-                _ -> case ($x.0) as $x_boxed.0 of {
-                    Int($x.1) -> case ({% I32Sub | 1, $x.1 %}) as $r.0 of {
-                        _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $x_boxed.0 of {
-                            Int($x.1) -> case ($x.0) as $x_boxed.0 of {
-                                Int($x.2) -> case ({% I32Sub | 2, $x.2 %}) as $r.0 of {
-                                    _ -> case ($fibonacci.0 ($Int.0 ($r.0))) as $y_boxed.0 of {
-                                        Int($y.0) -> case ({% I32Add | $y.0, $x.1 %}) as $r.0 of {
-                                            _ -> $r.0
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                0 -> 1
-                1 -> 1
             }
         }
+        0 -> 1
+        1 -> 1
     }
 
 $worker_.0 = 
-    \<$.0> -> case ($fibonacci.0 ($Int.0 ($.0))) as $.0 of {
-        Int($.0) -> $.0
+    \<$.0> -> case ($spec_call.0 ($.0)) as $eval.0 of {
+        _ -> $eval.0
     }
 
 $.0 = 

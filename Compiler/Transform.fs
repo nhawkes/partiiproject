@@ -3,11 +3,11 @@ module Transform
 open Analysis
 open Vars
 open Core
+open Types
 
 let isBuiltIn b =
     match b.var with
-    |Some var -> var.hintInline
-    |_ -> false
+    |var -> var.hintInline
 
 let rec getArgSpecializations args = function
     | Core.Var v -> Map.empty
@@ -24,7 +24,7 @@ let rec getArgSpecializations args = function
 
 type ResultSpec =
     |TopResultSpec
-    |ResultSpec of UniqueName
+    |ResultSpec of UniqueName * Typ list
     |BotResultSpec
     
 let rec getResultSpecialization (constrs:TopConstr<_> list) recCall = function
@@ -42,7 +42,7 @@ let rec getResultSpecialization (constrs:TopConstr<_> list) recCall = function
                 match x,y with
                 |TopResultSpec, _ -> TopResultSpec
                 |_, TopResultSpec -> TopResultSpec
-                |ResultSpec v, ResultSpec v2 when v=v2 -> ResultSpec v
+                |ResultSpec (v, t), ResultSpec (v2,t2) when v=v2 -> ResultSpec (v,t)
                 |BotResultSpec, x -> x
                 |x, BotResultSpec -> x
                 |_ -> TopResultSpec
@@ -52,9 +52,9 @@ let rec getResultSpecialization (constrs:TopConstr<_> list) recCall = function
         if name = recCall then
             BotResultSpec      
         else 
-        match constrs |> List.exists(fun ((name2, _), (c, _)) -> name=name2) with
-            |true -> ResultSpec name
-            |false -> TopResultSpec
+        match constrs |> List.tryPick(fun ((name2, _), (c, ts)) -> if name=name2 then ts |> List.map (fun (_,x) -> x.var.typ) |> Some else None) with
+            |Some t -> ResultSpec (name, t)
+            |None -> TopResultSpec
     | Core.Unreachable -> BotResultSpec
 
 
@@ -70,7 +70,8 @@ let rec makeWrapper constrs call vs = function
                 |Some([(c), [value]]) ->
                     let specCall = freshen fvExpr [e] "spec_call"
                     let specResult = getResultSpecialization constrs call e
-                    Map.ofList [(name), [c, value, specCall, specResult]], [((specCall, unanalysed), (makeSpecialization constrs specResult e [(name, v),c, value]))]
+                    let resultT = match specResult with ResultSpec(_, [t]) -> t |_ -> ValueT
+                    Map.ofList [(name), [c, value, specCall, specResult]], [((specCall, unanalysed (FuncT((snd value).var.typ, resultT))), (makeSpecialization constrs specResult e [(name, v),c, value]))]
                 |_ -> Map.empty, []
         makeWrapperLambda call specializations [] (vs |> List.rev), extraProgram
 
@@ -79,18 +80,18 @@ and makeSpecialization (constrs:TopConstr<_> list) specResult e = function
         let lam = Core.freshen Core.fvExpr [e] "lam"     
         let ((constrVar, _), _) = constrs |> List.find(fun (_, (c2, _)) -> c=c2)
         match specResult with
-        |ResultSpec res ->
+        |ResultSpec (res, [t]) ->
             let (_, (resConstr, _)) = constrs |> List.find(fun ((res2, _), (_, _)) -> res=res2)
             let bindVar = Core.freshen Core.fvExpr [e] "bind"   
             let resultVar = Core.freshen Core.fvExpr [e] "result"
             NoExport, Core.lamE((lam, value), 
                 Core.caseE(Core.App(Core.varS(constrVar), Core.varS(lam)), v, 
                   ([Core.DefAlt, [], 
-                    Core.caseE(e, (bindVar, unanalysed),
-                         [Core.DataAlt resConstr, [resultVar, unanalysed],  Core.varS(resultVar)])])                
+                    Core.caseE(e, (bindVar, unanalysed ValueT),
+                         [Core.DataAlt resConstr, [resultVar, unanalysed t],  Core.varS(resultVar)])])                
              ))
         |_ -> 
-            NoExport,  Core.lamE((lam, unanalysed), Core.caseE(Core.App(Core.varS(constrVar), Core.varS(lam)), v, ([DefAlt, [], e])))
+            NoExport,  Core.lamE((lam, unanalysed ValueT), Core.caseE(Core.App(Core.varS(constrVar), Core.varS(lam)), v, ([DefAlt, [], e])))
 
 
 and makeWrapperLambda call specializations lams = function
@@ -114,30 +115,30 @@ and makeWrapperBind call specializations binds = function
                     specAlts
                 ]
             
-            Core.caseE(Core.varE((name, v)), (var, unanalysed), altsA)
+            Core.caseE(Core.varE((name, v)), (var, unanalysed v.var.typ), altsA)
         |HyperStrict ->
             let var = freshen fvAlts [] "var"
-            Core.caseE(Core.varS(var), (var, unanalysed), 
+            Core.caseE(Core.varS(var), (var, unanalysed v.var.typ), 
                 [DefAlt, [], makeWrapperBind call specializations (var::binds) vs])
     |[] ->
         makeWrapperCall call (binds)
 
 and specializationAlts : _ -> ((_*_*Expr<_>) list)  = function
-    |(c, value, specCall, specResult)::specs ->
+    |(c, (_, value), specCall, specResult)::specs ->
         let (alts:(_*_*Expr<_>) list) = specializationAlts specs
         let v = freshen fvExpr [] "v"
         let eval = freshen fvExpr [] "eval"
         match specResult with
-        |ResultSpec res  ->
-            (Core.DataAlt(c), [(v:UniqueName), unanalysed], 
-                Core.caseE(Core.App(Core.varS(specCall), Core.varS(v)), (eval, unanalysed), [                    
+        |ResultSpec (res, [t])  ->
+            (Core.DataAlt(c), [(v:UniqueName), unanalysed t], 
+                Core.caseE(Core.App(Core.varS(specCall), Core.varS(v)), (eval, unanalysed ValueT), [                    
                     DefAlt, [], Core.App(Core.varS res, Core.varS(eval))
                 ] 
                 
             ))           
             ::alts
         |_ ->
-            (Core.DataAlt(c), [v, unanalysed], Core.App(Core.varS(specCall), Core.varS(v)))::alts
+            (Core.DataAlt(c), [v, unanalysed value.var.typ], Core.App(Core.varS(specCall), Core.varS(v)))::alts
     |[] -> ([]:(_*_*Expr<_>) list)  
 
 
@@ -156,8 +157,8 @@ let rec wwTransform constrs source = function
     |((name, b), (export, e))::xs -> 
         let workerVar = source.next (nameFrom "worker" name)
         let wrapperE, extraProgram = makeWrapper constrs workerVar [] e
-        let wrapper = (name, b), (export, wrapperE)
-        let worker = (workerVar, unanalysed), (NoExport, e)
+        let wrapper = (name, {b with flags={b.flags with isWrapper=true}}), (export, wrapperE)
+        let worker = (workerVar, unanalysed b.var.typ) , (NoExport, e)
         List.concat[[worker;wrapper]; extraProgram; wwTransform constrs source xs]
     |[] -> 
         []
@@ -253,6 +254,12 @@ and simplifyCase constrs (e, (name, b), (alts)) =
     let newE = simplifyExpr constrs e
     let (newAlts) = simplifyAlts constrs (alts)
     match newE, b, (newAlts) with
+    |value, b, ([DefAlt, [], def]) when value |> isSmall constrs ->
+        match def with
+        |Core.Prim _ ->
+            // The case around prim is needed 
+            Core.caseE(value, (name, b), (alts))
+        |_ -> simplifyExpr constrs (substExpr name value def)
     |Core.App(Core.VarS(v), value), b, (alts) when constrs |> Map.containsKey v ->  
         let c = constrs |> Map.find v      
         match alts |> List.tryPick(function (Core.DataAlt c2, [bs1], e) when c = c2 -> Some(bs1, e) |_ -> None) with
@@ -263,12 +270,6 @@ and simplifyCase constrs (e, (name, b), (alts)) =
                 Core.caseE(newE, (name, b), ([(Core.DataAlt c, [(name1, bs1)], altE)]))
         |None ->  
                 Core.caseE(newE, (name, b), newAlts)
-    |value, b, ([DefAlt, [], def]) when value |> isSmall constrs ->
-        match def with
-        |Core.Prim _ ->
-            // The case around prim is needed 
-            Core.caseE(value, (name, b), (alts))
-        |_ -> simplifyExpr constrs (substExpr name value def)
     |_  -> 
         Core.caseE(newE, (name, b), (newAlts))
 
@@ -302,7 +303,7 @@ let rec getTopInlineMap shouldInline = function
 let isWrapper {flags=flags} = flags.isWrapper
 
 
-let transform program =     
+let transform (program:ClosedProgram<Var>) =     
     let (Program analysis) = program |> Analysis.analyse
     let builtinInlineMap = getTopInlineMap isBuiltIn analysis.exprs
     let constrs = analysis.constrs |> List.map (fun ((name,b), (c,_)) -> name, c) |> Map.ofList 
@@ -311,7 +312,7 @@ let transform program =
     let freshSource = (freshSource fvProgram [closeProgram analysis])
     let ww = simplified |> wwTransform analysis.constrs freshSource
     let wrapperInlineMap = getTopInlineMap isWrapper ww
-    let wrapperInlined = builtinInlineMap |> Map.toList |> List.fold (fun expr (x,v) -> substTopExprs x v expr) ww
+    let wrapperInlined = wrapperInlineMap |> Map.toList |> List.fold (fun expr (x,v) -> substTopExprs x v expr) ww
     let result = simplify constrs wrapperInlined
     System.IO.File.WriteAllText("./Compiler/input.core", (printProgram (closeProgram analysis)))
     System.IO.File.WriteAllText("./Compiler/inlined.core", (printProgram (closeProgram {analysis with exprs=inlined})))
