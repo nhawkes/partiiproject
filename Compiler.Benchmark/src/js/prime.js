@@ -1,6 +1,8 @@
 function *from(n){
-    yield n
-    yield* from(n+1)
+    while(true){
+        yield n;
+        n++;
+    }
 }
 function *sieve(xs){
     const p = xs.next()
@@ -8,11 +10,12 @@ function *sieve(xs){
     yield* sieve(filter(n => nonMultiple(p.value, n), xs))
 }
 function *filter(predicate, xs){
-    const x = xs.next()
-    if(predicate(x.value)){
-        yield x.value
+    while(true){
+        const x = xs.next();
+        if(predicate(x.value)){
+            yield x.value
+        }
     }
-    yield* filter(predicate, xs)
 }
 function nonMultiple(p, n){ 
     return ((~~(n/p))*p) !== n ;
@@ -23,7 +26,6 @@ function take(i, list){
     else
         list.next()
     return(take(i-1, list))
-
 }
 
 /**

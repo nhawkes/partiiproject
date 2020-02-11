@@ -37,7 +37,11 @@
             "type": "npm",
             "script": "start",
             "path": "Compiler.Benchmark/",
-            "problemMatcher": []
+            "problemMatcher": [],
+            "dependsOn": [
+                "run",
+                "build:js"
+            ]
         },
         {
             "type": "npm",

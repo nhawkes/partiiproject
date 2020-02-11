@@ -1,16 +1,19 @@
 
-function *fibonacciListFrom(a, b){
-    yield a
-    yield* fibonacciListFrom(b, a+b) 
+function* fibonacciListFrom(a, b) {
+    while (true) {
+        yield a
+        const temp = a
+        a = b
+        b = temp + b
+    }
 }
-function take(i, list){
-    if (i === 0)
-        return list.next().value
-    else
+function take(n, list) {
+    for (var i = 0; i < n; i++)
         list.next()
-    return(take(i-1, list))
+
+    return list.next().value
 
 }
-export function fibonacci(x){
+export function fibonacci(x) {
     return take(x, fibonacciListFrom(1, 1))
 }
