@@ -12,6 +12,8 @@ const jsFibList = require("./out/js/fibonacci_list").fibonacci;
 const wasmFibList = wasm("./out/wasm/fibonacci_list.wasm");
 const jsGcd = require("./out/js/gcd").gcd;
 const wasmGcd = wasm("./out/wasm/gcd.wasm");
+const jsPrime = require("./out/js/prime").prime;
+const wasmPrime = wasm("./out/wasm/prime.wasm");
 
 test("JS calculates fibonacci 7", () => {
   expect(jsFibRec(7)).toMatchInlineSnapshot(`21`);
@@ -50,4 +52,49 @@ test("JS calculates gcd(6, 10)", () => {
 test("WASM calculates gcd(6, 10)", async () => {
   const lib = await wasmGcd;
   expect(lib.instance.exports.gcd(6, 10)).toMatchInlineSnapshot(`2`);
+});
+
+test("JS calculates prime 10", () => {
+  expect(jsPrime(10)).toMatchInlineSnapshot(`31`);
+});
+
+test("WASM calculates prime 1", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(1)).toMatchInlineSnapshot(`3`);
+});
+test("WASM calculates prime 2", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(2)).toMatchInlineSnapshot(`5`);
+});
+test("WASM calculates prime 3", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(3)).toMatchInlineSnapshot(`7`);
+});
+test("WASM calculates prime 4", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(4)).toMatchInlineSnapshot(`11`);
+});
+test("WASM calculates prime 5", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(5)).toMatchInlineSnapshot(`13`);
+});
+test("WASM calculates prime 6", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(6)).toMatchInlineSnapshot(`17`);
+});
+test("WASM calculates prime 7", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(7)).toMatchInlineSnapshot(`19`);
+});
+test("WASM calculates prime 8", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(8)).toMatchInlineSnapshot(`23`);
+});
+test("WASM calculates prime 9", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(9)).toMatchInlineSnapshot(`29`);
+});
+test("WASM calculates prime 10", async () => {
+  const lib = await wasmPrime;
+  expect(lib.instance.exports.prime(10)).toMatchInlineSnapshot(`31`);
 });

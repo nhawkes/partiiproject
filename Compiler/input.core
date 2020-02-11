@@ -4,8 +4,8 @@ data $Int.0 = Int(x)
 data $Bool.0 = Bool(x)
 $prime.0 = 
     \<$x.0> -> let rec 
-         in 
-        $take.0 ($x.0) ($sieve.0 ($from.0 ($Int.0 (2))))
+        $filteredList.0 = $sieve.0 ($list.0)and$list.0 = $from.0 ($Int.0 (2)) in 
+        $take.0 ($x.0) ($filteredList.0)
 
 $.0 = 
     \<$.0> -> case ($prime.0 ($Int.0 ($.0))) as $.0 of {
@@ -71,8 +71,8 @@ $sieve.0 =
 
 $from.0 = 
     \<$x.0> -> let rec 
-         in 
-        $Cons.0 ($x.0) ($from.0 ($add.0 ($x.0) ($Int.0 (1))))
+        $next.0 = $add.0 ($x.0) ($Int.0 (1)) in 
+        $Cons.0 ($x.0) ($from.0 ($next.0))
 
 $take.0 = 
     \<$i.0> -> \<$list.0> -> let rec 

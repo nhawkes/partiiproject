@@ -19,6 +19,8 @@ let rec getArgSpecializations args = function
         Map.ofList[v, alts |> List.choose(function |(DataAlt p, xs, _) -> Some(p, xs) |_ -> None)]
     | Core.CaseE(_, b, ([_, _, e])) -> 
         getArgSpecializations args e
+    | Core.CaseE(_, b, _) -> 
+        Map.empty
     | Core.App(a, b) -> 
         getArgSpecializations args b    
 

@@ -12,7 +12,8 @@ take(i, list) = {
     }
 }
 from(x) = {
-    return Cons(x, from(x+1))
+    next = x+1
+    return Cons(x, from(next))
 }
 
 sieve(list) = {
@@ -37,8 +38,9 @@ nonMultiple(p, n) = {
         false
     else
         true
-    
 }  
 export prime(x) = {
-    return take(x, sieve(from(2)))
+    list = from(2)
+    filteredList = sieve(list)
+    return take(x, filteredList)
 }

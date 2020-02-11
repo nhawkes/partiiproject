@@ -26,6 +26,7 @@ let compile file =
     let stgModule = 
         coreModule
          |> StgGen.genProgram   
+    printfn "%A" stgModule
          
     let wasmModule =
         stgModule          

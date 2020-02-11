@@ -99,7 +99,7 @@ and genRec topEnv (vs, expr) =
         
 and genBindings topEnv mapExpr (lfEs:(_*Stg.LambdaForm) list) lf =
     let newStdConstrs, newLets = lfEs |> List.partition(fun (_, lfE) -> match lfE.expr with Stg.Constr(_)->true|_ -> false )
-    let vs = newLets |> List.map fst
+    let vs = List.concat[newLets |> List.map fst]
 
     let innerFrees =
         List.concat [
@@ -117,7 +117,9 @@ and genBindings topEnv mapExpr (lfEs:(_*Stg.LambdaForm) list) lf =
 
     let stdConstrs = 
         List.concat [
-            newStdConstrs |> List.map(function (v, {expr=Stg.Constr(f, vs)}) -> (v, f, vs))
+            newStdConstrs |> List.collect(function 
+                (v, ({expr=Stg.Constr(f, vs)} as lfStdConstrs)) -> 
+                    (v, f, vs)::lfStdConstrs.stdConstrs)
             lf.stdConstrs
         ]
 
@@ -129,7 +131,9 @@ and genBindings topEnv mapExpr (lfEs:(_*Stg.LambdaForm) list) lf =
     let frees =
         lf.frees
         |> List.append innerFrees
-        |> List.filter (fun v -> not(vs |> List.contains v))
+        |> List.filter (fun v -> not(newStdConstrs |> List.map fst |> List.contains v))
+        |> List.filter (fun v -> not(newLets |> List.map fst |> List.contains v))
+
 
     { lf with
           stdConstrs = stdConstrs
