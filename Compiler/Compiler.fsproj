@@ -12,7 +12,6 @@
     <Compile Include="Vars.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="BuiltIns.fs" />
-    <Compile Include="Renamer.fs" />
     <Compile Include="CoreGen.fs" />
     <Compile Include="Analysis.fs" />
     <Compile Include="Transform.fs" />

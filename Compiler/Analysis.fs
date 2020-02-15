@@ -282,9 +282,9 @@ and analyseRhs env rhs :StrictnessValue<_> * Core.Expr<AnalysedVar<_>> =
 and analyseCase env incomingArity e name b (alts) =
     let innerResult, innerExpr = analyseExpr env 0 e
     let altsResult, newAlts = analyseAlts env incomingArity alts
-    let analysisVar = innerResult.frees |> lookupAnalysis name b
-    let frees = innerResult.frees |> remove name
-    altsResult |> andResult {innerResult with frees=frees},
+    let analysisVar = altsResult.frees |> lookupAnalysis name b
+    let frees = altsResult.frees |> remove name
+    {altsResult with frees=frees} |> andResult innerResult,
     Core.caseE(innerExpr, (name, analysisVar), (newAlts))
 
 and analyseAlts env incomingArity =
