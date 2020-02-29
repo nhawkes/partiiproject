@@ -165,7 +165,7 @@ and specializationAlts (freshSource:FreshSource) call vs binds specCall specResu
     |(_, Some(c, (_, value)))::argSpecializations ->
         let v = freshSource.next "v"
         let innerCall = 
-            if argSpecializations = [] then
+            if argSpecializations |> List.isEmpty then
                 makeWrapperBind (freshSource:FreshSource) specCall (Some(argSpecializations,  specCall, TopResultSpec, v::specBinds)) (v::specBinds) vs
             else                
                 makeWrapperBind (freshSource:FreshSource) call (Some(argSpecializations,  specCall, TopResultSpec, v::specBinds)) binds vs
@@ -232,9 +232,9 @@ let rec simplifyExpr constrs = function
             let sub =  (substExpr name newB e)
             let res = simplifyExpr constrs sub
             res    
-        |Core.LamE(v, e) when false ->
+        |Core.LamE(v, e) ->
             Core.letE(Core.NonRec, [v, b], e) |> simplifyExpr constrs 
-        |Core.LetE(l, bs, e) when false ->
+        |Core.LetE(l, bs, e) ->
             Core.letE(l, bs, Core.App(e, b)) |> simplifyExpr constrs
         |Core.CaseE(e, v, ([p, ps, def])) ->
             Core.caseE(e, v, [p, ps, Core.App(def, b)]) |> simplifyExpr constrs
@@ -263,11 +263,9 @@ and simplifyBinds constrs e = function
     |Core.NonRec, [((name, v), rhs)] ->
         let newRhs = simplifyExpr constrs rhs 
         // Inline small values
-        if false && isSmall constrs newRhs then
-            printfn "Inlining: %A" newRhs
+        if isSmall constrs newRhs then
             simplifyExpr constrs (substExpr name newRhs e)
-        else if false && v.analysis.strictness <> Lazy then
-            printfn "Let-to-case: %A" newRhs            
+        else if v.analysis.strictness <> Lazy then  
             // Change strict expressions into a case
             Core.caseE(newRhs, (name, v), [Core.DefAlt, [], simplifyExpr constrs e])
         else

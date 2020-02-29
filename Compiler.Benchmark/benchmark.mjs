@@ -44,10 +44,10 @@ new Benchmark.Suite("Fibonacci List")
 
 new Benchmark.Suite("GCD")   
     .add('JS', function () {
-        gcdJs.gcd(624129, 2061517)
+        gcdJs.gcd(1134903170,1836311903)
     })
     .add('Compiler', function () {
-        gcdWasm.gcd(624129, 2061517)
+        gcdWasm.gcd(1134903170,1836311903)
     })
     .on('cycle', function (event) {
         console.log(`${this.name}#${String(event.target)}`);
