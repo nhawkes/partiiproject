@@ -1,4 +1,5 @@
-import * as libBaseline from './out/wasm/baseline.wasm'
+import * as libBaselineFib from './out/wasm/fib-baseline.wasm'
+import * as libBaselineGcd from './out/wasm/gcd-baseline.wasm'
 import fibonacciJs from './out/js/fibonacci.js'
 import * as fibonacciWasm from './out/wasm/fibonacci.wasm'
 import fibonacciListJs from './out/js/fibonacci_list.js'
@@ -10,8 +11,8 @@ import * as primeWasm from './out/wasm/prime.wasm'
 import Benchmark from 'benchmark';
 
 new Benchmark.Suite("Fibonacci")
-    .add('Wasm', function () {
-        libBaseline.fibonacci(20)
+    .add('Baseline', function () {
+        libBaselineFib.fibonacci(20)
     })
     .add('JS', function () {
         fibonacciJs.fibonacci(20)
@@ -45,6 +46,9 @@ new Benchmark.Suite("Fibonacci List")
 new Benchmark.Suite("GCD")   
     .add('JS', function () {
         gcdJs.gcd(1134903170,1836311903)
+    })
+    .add('Baseline', function () {
+        libBaselineGcd.gcd(1134903170,1836311903)
     })
     .add('Compiler', function () {
         gcdWasm.gcd(1134903170,1836311903)

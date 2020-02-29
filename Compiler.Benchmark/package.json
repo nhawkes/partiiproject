@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node --experimental-modules --experimental-wasm-modules benchmark.mjs",
     "build:js": "babel src -d out",
-    "build:wat": "wat2wasm src/wat/fibonacci.wat -o out/wasm/baseline.wasm",
+    "build:watfib": "wat2wasm src/wat/fibonacci.wat -o out/wasm/fib-baseline.wasm",
+    "build:watgcd": "wat2wasm src/wat/gcd.wat -o out/wasm/gcd-baseline.wasm",
     "test": "jest"
   },
   "license": "MIT",

@@ -8,10 +8,12 @@ function wasm(source) {
 
 const jsFibRec = require("./out/js/fibonacci").fibonacci;
 const wasmFibRec = wasm("./out/wasm/fibonacci.wasm");
+const wasmFibRecBaseline = wasm("./out/wasm/fib-baseline.wasm");
 const jsFibList = require("./out/js/fibonacci_list").fibonacci;
 const wasmFibList = wasm("./out/wasm/fibonacci_list.wasm");
 const jsGcd = require("./out/js/gcd").gcd;
 const wasmGcd = wasm("./out/wasm/gcd.wasm");
+const wasmGcdRecBaseline = wasm("./out/wasm/gcd-baseline.wasm");
 const jsPrime = require("./out/js/prime").prime;
 const wasmPrime = wasm("./out/wasm/prime.wasm");
 
@@ -35,6 +37,10 @@ test("WASM calculates fibonacci 7", async () => {
   const lib = await wasmFibRec;
   expect(lib.instance.exports.fibonacci(7)).toMatchInlineSnapshot(`21`);
 });
+test("WASM Baseline calculates fibonacci 7", async () => {
+  const lib = await wasmFibRecBaseline;
+  expect(lib.instance.exports.fibonacci(7)).toMatchInlineSnapshot(`21`);
+});
 
 test("JS calculates fibonacci 7 using lists", () => {
   expect(jsFibList(7)).toMatchInlineSnapshot(`21`);
@@ -51,6 +57,10 @@ test("JS calculates gcd(6, 10)", () => {
 
 test("WASM calculates gcd(6, 10)", async () => {
   const lib = await wasmGcd;
+  expect(lib.instance.exports.gcd(6, 10)).toMatchInlineSnapshot(`2`);
+});
+test("WASM Baseline calculates gcd(6, 10)", async () => {
+  const lib = await wasmGcdRecBaseline;
   expect(lib.instance.exports.gcd(6, 10)).toMatchInlineSnapshot(`2`);
 });
 test("JS calculates gcd(624129, 2061517)", () => {
