@@ -9,13 +9,13 @@ let genVar =
         i := !i - 1
         {Stg.name="gen"; Stg.info=None; Stg.unique=next; Stg.prim=false}
 let i = ref (1)
-let wrapVar : Analysis.AnalysedVar<Vars.Var> -> Stg.Var =
+let wrapVar s : Analysis.AnalysedVar<Vars.Var> -> Stg.Var =
     fun (v) ->
         let next = !i
         i := !i + 1
-        {Stg.name="anon"; Stg.info=Some (v:>obj); Stg.unique=next; prim=v.var.typ=Types.IntT}
+        {Stg.name=s; Stg.info=Some (v:>obj); Stg.unique=next; Stg.prim=v.var.typ=Types.IntT}
 
-let wrapBinder (((s, i), x):Core.Binder<_>) = (s, i), {wrapVar x with name = sprintf "%s_%i" s i }
+let wrapBinder (((s, i), x):Core.Binder<_>) = (s, i), wrapVar (sprintf "%s_%i" s i) x
 
 
 type TopEnv =
@@ -364,7 +364,7 @@ and uniqueifyBinds = function
 and uniquifyProgram (program:Core.Program<_>) : Core.ClosedProgram<Stg.Var> =
     let uniqueConstrs =
         program.constrs |> List.map(function
-            | b, (c, vs) -> wrapBinder b, (c, vs |> List.map (fun ((s, x)) -> (s, wrapVar x)))
+            | b, (c, vs) -> wrapBinder b, (c, vs |> List.map (fun ((s, x)) -> (s, wrapVar s x)))
         ) 
     let uniqueExprs = 
         program.exprs |> List.map(function

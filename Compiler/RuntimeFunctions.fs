@@ -14,6 +14,8 @@ type Var =
 
 type RuntimeFunction =
     { name: Var
+      debugName: Wasm.Name
+      debugLocalNames: Wasm.Name list
       functype: Wasm.FuncType
       indirect: bool
       func: Wasm.Func
@@ -24,12 +26,16 @@ let heapTop = 0u
 
 let identity =
     { name = Identity
+      debugName = "identity"
+      debugLocalNames= ["x"]
       functype = stdFuncType
       indirect = true
       func = [], [ Wasm.LocalGet 0u ] }
 
 let indirection = 
     { name = Indirection
+      debugName = "indirection"
+      debugLocalNames= ["thunk"]
       functype = stdFuncType
       indirect = true
       func = [], [ 
@@ -40,7 +46,9 @@ let indirection =
       ] }
 
 let malloc =
-    { name = Malloc
+    { name = Malloc    
+      debugName = "malloc"
+      debugLocalNames= ["size"]
       functype = [ Wasm.I32 ], [ Wasm.I32 ]
       indirect = false
       func =
@@ -99,6 +107,8 @@ let clone mallocIdx =
     let i = 2u
     let cloned = 3u
     { name = Clone
+      debugName = "clone"
+      debugLocalNames= ["this"; "size"; "i"; "cloned"]
       functype = [ Wasm.I32 ], [ Wasm.I32 ]
       indirect = false
       func =
@@ -172,6 +182,8 @@ let apply stdFuncTypeIdx =
     let arg = 1u
     let argsRemaining = 2u
     { name = Apply
+      debugName = "apply"
+      debugLocalNames= ["f"; "arg"; "argsRemaining"]
       functype = [ Wasm.I32; Wasm.I32 ], [ Wasm.I32 ]
       indirect = false
       func =
@@ -230,6 +242,8 @@ let whnfEval stdFuncTypeIdx (indirectionIdx:uint32) =
     let evaluated = 1u
     { name = WhnfEval
       functype = stdFuncType
+      debugName = "whnfEval"
+      debugLocalNames= ["thunk"]
       indirect = false
       func = [ Wasm.I32 ], [ 
             // Check if thunk and call if so

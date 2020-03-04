@@ -237,7 +237,25 @@ type Expr = Instr list
 
 type Custom = Name * byte list
 
-type CustomSec = Custom
+type NameAssoc<'idx> = 'idx * Name
+type NameMap<'idx> = NameAssoc<'idx> list
+type IndirectNameAssoc<'idx1, 'idx2> = 'idx1 * NameMap<'idx2>
+type IndirectNameMap<'idx1, 'idx2> = IndirectNameAssoc<'idx1, 'idx2> list
+type ModuleNameSubsec = Name
+type FuncNameSubsec = NameMap<FuncIdx>
+type LocalNameSubsec = IndirectNameMap<FuncIdx, LocalIdx>
+
+type NameData = {
+    moduleNameSubsec:ModuleNameSubsec
+    funcNameSubsec:FuncNameSubsec
+    localNameSubsec:LocalNameSubsec
+}
+
+type NameSec =  NameData
+
+type CustomSec = 
+    |Custom of Custom
+    |NameSec of NameSec
 
 type TypeSec = FuncType list
 
@@ -308,6 +326,8 @@ type Data =
       init: byte array }
 
 type DataSec = Data list
+
+
 
 type Section =
     | CustomSec of CustomSec

@@ -26,10 +26,10 @@ let compile file =
     let stgModule = 
         coreModule
          |> StgGen.genProgram   
-         
+    let moduleName = Path.GetFileNameWithoutExtension file
     let wasmModule =
         stgModule          
-         |> WasmGen.genProgram
+         |> WasmGen.genProgram moduleName
     let bytes = Emit.emitWasmModule wasmModule |> List.toArray
     bytes
     

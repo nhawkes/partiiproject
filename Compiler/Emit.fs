@@ -310,11 +310,37 @@ let emitSec n f x =
         b
     ] |> List.concat
 
-let emitCustom (name, bytes) = 
+let emitNameSubSection i f x =
+    let bytes = f x
+    let size = bytes |> List.length |> uint32 |> emitInt32U
     [
-        emitName name
-        emitVec List.singleton bytes 
+        [i]
+        size
+        bytes
     ] |> List.concat
+
+let emitNameAssoc (idx, name) = [emitInt32U idx; emitName name] |> List.concat
+let emitNameMap = emitVec emitNameAssoc
+let emitIndirectNameAssoc(idx, namemap) = [emitInt32U idx; emitNameMap namemap] |> List.concat
+let emitIndirectNameMap = emitVec emitIndirectNameAssoc
+let emitModuleNameSubsec = emitNameSubSection 0x00uy emitName
+let emitFuncNameSubsec = emitNameSubSection 0x01uy emitNameMap
+let emitLocalNameSubsec = emitNameSubSection 0x02uy emitIndirectNameMap
+
+let emitCustom = function
+    |Custom(name, bytes) ->
+        [
+            emitName name
+            emitVec List.singleton bytes 
+        ] |> List.concat
+    |NameSec{moduleNameSubsec=moduleNameSubsec;funcNameSubsec=funcNameSubsec;localNameSubsec=localNameSubsec} ->
+        [
+            emitName "name"
+            emitModuleNameSubsec moduleNameSubsec
+            emitFuncNameSubsec funcNameSubsec
+            emitLocalNameSubsec localNameSubsec
+
+        ] |> List.concat
 
 let emitCustomSec = 
     emitCustom |> emitSec 0x00uy

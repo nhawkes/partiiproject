@@ -47,7 +47,7 @@ type Func =
       export: string option      
     }
 
-
+type Names = (Wasm.Name) list * ((Wasm.Name) list) list
 
 
 let getLocal env v =
@@ -475,6 +475,71 @@ let genTopLevelCode tenv env depth =
     | b, TopCaf lam -> genTopBindCode false tenv env depth b [] lam
     | b, TopConstr(c, vs) -> [ genTopConstrCode tenv env depth b c vs ]
 
+let rec genLetName tenv env depth = function
+    | (b:Stg.Var, lf: LambdaForm) ->
+        let args = ["this"]
+        let locals = lf.locals |> List.map(fun x -> x.name)
+        let lets = lf.lets|> List.map(fun x -> (fst x).name)
+        let funcLocalNames = List.concat[args;locals;lets]
+
+        let funcName = b.name
+        let funcNames, localNames = genLetsNames tenv env depth lf.lets        
+        ([
+            [funcName]
+            funcNames
+        ] |> List.concat,
+        [
+            [funcLocalNames]
+            localNames
+        ] |> List.concat) : Names
+
+and concatNames names = 
+    names |> List.fold(fun (funcNames1, localNames1) (funcNames2, localNames2) ->    
+        [
+            funcNames1
+            funcNames2
+        ] |> List.concat,
+        [
+            localNames1
+            localNames2
+        ] |> List.concat
+    ) ([], [])
+
+and genLetsNames tenv env depth lets = 
+    lets |> List.map (genLetName tenv env depth) |> concatNames
+    
+
+let genTopBindNames export tenv env depth (b:Stg.Var) args (lf: LambdaForm) : Names=
+    if not (List.isEmpty lf.frees) then
+        failwithf "Top level bindings cannot have free variables: %A" lf.frees
+    else
+    if not (List.isEmpty lf.args) then
+        failwithf "Top level bindings cannot have args: %A" lf.frees
+    else
+        let funcName = b.name
+        let funcLocalNames = List.concat [(lf.locals |> List.map (fun x -> x.name)); (lf.lets |> List.map (fun x -> (fst x).name))]
+        let funcNames, localNames = genLetsNames tenv env depth lf.lets
+        [
+            [funcName]
+            funcNames
+        ] |> List.concat,
+        [
+            [funcLocalNames]
+            localNames
+        ] |> List.concat
+
+let genTopConstrNames tenv env depth b c vs =   
+    let funcName = (b:Stg.Var).name
+    let funcLocalNames = vs |> List.map (fun (v:Stg.Var) -> v.name)
+    ([funcName], [funcLocalNames]) : Names
+        
+let genTopLevelNames tenv env depth =
+    function
+    | b, TopLam (args, lam) -> genTopBindNames false tenv env depth b args lam
+    | b, TopExport (_, args, lam) -> genTopBindNames true tenv env depth b args lam
+    | b, TopCaf lam -> genTopBindNames false tenv env depth b [] lam
+    | b, TopConstr(c, vs) -> genTopConstrNames tenv env depth b c vs
+
 
 let genCafData env (caf:Func) =
     let func = getIndirectFunc env caf.name
@@ -496,7 +561,7 @@ let genCafData env (caf:Func) =
 
 
 
-let genProgram (program: Program) =
+let genProgram moduleName (program: Program) =
     let runtimeFuncs = [ identity; indirection; malloc; clone 2u; apply 0u; whnfEval 0u 1u ]
 
     let topLevelFuncs =
@@ -580,7 +645,28 @@ let genProgram (program: Program) =
           program |> List.collect (genTopLevelCode tenv env 0u) ]
         |> List.concat
 
+    let funcNames, localNames = program |> List.map (genTopLevelNames tenv env 0u) |> concatNames
+    let nameSec = {
+        Wasm.NameData.moduleNameSubsec=moduleName
+        Wasm.funcNameSubsec=
+            List.concat [runtimeFuncs |> List.map (fun f -> f.debugName); funcNames]
+            |> Seq.zip (Seq.initInfinite (fun i -> uint32((i)))) |> Seq.toList
+       
 
+            
+        Wasm.localNameSubsec=
+            List.concat [
+                runtimeFuncs |> List.map(fun f -> f.debugLocalNames |> Seq.zip (Seq.initInfinite uint32) |> Seq.toList)
+                localNames |> List.map(fun locals -> locals |> Seq.zip (Seq.initInfinite uint32:Wasm.LocalIdx seq) |> Seq.toList :Wasm.NameMap<_>)
+            ]
+            |> Seq.zip ((Seq.initInfinite (fun i -> uint32(i):Wasm.FuncIdx))) 
+            |> Seq.toList   
+            |> List.map(fun x -> (x:Wasm.IndirectNameAssoc<_,_>))
+    }
+        
+       
+
+    
 
     [ Wasm.TypeSec typeSec
       Wasm.FuncSec(funcSec)
@@ -596,4 +682,5 @@ let genProgram (program: Program) =
               init = indirectElems } ]
       Wasm.CodeSec(codeSec)
       if dataInit.Length>0 then Wasm.DataSec [{data=0u; offset=[Wasm.I32Const 0]; init=dataInit}]
+      Wasm.CustomSec(Wasm.NameSec nameSec)
     ]
