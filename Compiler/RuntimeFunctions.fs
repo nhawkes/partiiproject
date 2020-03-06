@@ -11,6 +11,7 @@ type Var =
     | This
     | ThisFunction
     | ArgsRemaining
+    | HeapStart
 
 type RuntimeFunction =
     { name: Var

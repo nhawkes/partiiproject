@@ -5,18 +5,18 @@ data Empty()
 fibonacciListFrom(a, b) = {
     return Cons(a, fibonacciListFrom(b, a+b))
 }
-take(i, list) = {
+item(i, list) = {
     return switch(list){
         | Cons(head, tail) =>
             {
                 return switch(i){
                     | 0 => head
-                    | _ => take(i-1, tail)
+                    | _ => item(i-1, tail)
                 }
             }
     }
 
 }
 export fibonacci(x) = {
-    return take(x, fibonacciListFrom(1, 1))
+    return item(x, fibonacciListFrom(1, 1))
 }

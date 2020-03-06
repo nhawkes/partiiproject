@@ -35,7 +35,7 @@ type Placement =
     | IndirectFunc of Wasm.TableIdx
     | Lambda of Wasm.LocalIdx * Wasm.FuncIdx * Args * Free
     | StdConstr of Wasm.LocalIdx * Atom list
-    | Data of uint32
+    | Caf of uint32 * Wasm.FuncIdx
     | Block of uint32
     | Unreachable
 
@@ -87,7 +87,7 @@ let rec genAtom tenv env depth =
         | Some(Local i) -> [ Wasm.LocalGet i ]
         | Some(Func i) -> [ Wasm.Call i ]
         | Some(Lambda(i, _, _, _)) -> [ Wasm.LocalGet i ]
-        | Some(Data(i)) -> [ Wasm.I32Const (int i) ]
+        | Some(Caf(i,_)) -> [ Wasm.I32Const (int i) ]
         | Some(StdConstr(i, atoms)) -> 
             [ 
                 atoms |> List.collect (genStgVarAtom tenv env depth)  
@@ -399,7 +399,14 @@ and genLetsCode tenv env depth = List.collect (genLetCode tenv env depth)
 let genTopBindCode export tenv env depth b args (lf: LambdaForm) =
     let resetHeap =
         match export with
-        |true -> [Wasm.I32Const 0; Wasm.GlobalSet heapTop]
+        |true -> 
+            let (Heap heapStart) = env |> Map.find HeapStart
+            let cafs = env |> Map.toList |> List.map snd |> List.choose(function Caf(i, funcidx) -> Some(i+4u, funcidx)|_->None)
+            let cafReset = cafs |> List.collect (fun (i, funcidx) -> [Wasm.I32Const (int32 i); Wasm.I32Const (int32 funcidx); Wasm.I32Store {align=0u; offset=0u}])
+            [
+                cafReset
+                [Wasm.I32Const (int32 heapStart); Wasm.GlobalSet heapTop]
+            ] |> List.concat
         |_ -> []
     if not (List.isEmpty lf.frees) then
         failwithf "Top level bindings cannot have free variables: %A" lf.frees
@@ -623,10 +630,13 @@ let genProgram moduleName (program: Program) =
     let cafs = topLevelFuncs |> List.filter(fun x -> x.caf)
     let dataInit = cafs |> List.collect (genCafData indirectFuncEnv) |> Array.ofList
     let cafenv =
-        Seq.initInfinite (fun i -> uint32 (4+i*16) |> Data)
-        |> Seq.zip (cafs |> List.map (fun x -> x.name))
+        Seq.concat[
+            Seq.initInfinite (fun i -> uint32 (4+i*16))
+            |> Seq.zip (cafs)
+            |> Seq.map(fun (x,i) -> (x.name, Caf(i, getIndirectFunc indirectFuncEnv x.name)))
+        ]        
         |> Map.ofSeq
-    let heapStart = (cafs |> List.length) * 16
+    let heapStart = 4+ (cafs |> List.length) * 16
 
     let indirectElems = indirectFuncs |> List.map (fun x -> getFunc funcenv x.name)
 
@@ -640,6 +650,7 @@ let genProgram moduleName (program: Program) =
             [ funcenv |> Map.toSeq
               indirectFuncEnv |> Map.toSeq
               cafenv |> Map.toSeq
+              seq{HeapStart, Heap (uint32 heapStart)}
             ]
         |> Map.ofSeq
 
