@@ -7,7 +7,7 @@ let genVar =
     fun () ->
         let next = !i
         i := !i - 1
-        {Stg.name="gen"; Stg.info=None; Stg.unique=next; Stg.prim=false}
+        {Stg.name="gen"+string next; Stg.info=None; Stg.unique=next; Stg.prim=false}
 let i = ref (1)
 let wrapVar s : Analysis.AnalysedVar<Vars.Var> -> Stg.Var =
     fun (v) ->
@@ -98,7 +98,7 @@ and genRec topEnv (vs, expr) =
 
         
 and genBindings topEnv mapExpr (lfEs:(_*Stg.LambdaForm) list) lf =
-    let newStdConstrs, newLets = lfEs |> List.partition(fun (_, lfE) -> match lfE.expr with Stg.Constr(_)->true|_ -> false )
+    let newStdConstrs, newLets = lfEs |> List.partition(fun (_, lfE) -> match lfE.args, lfE.expr with [], Stg.Constr(_)->true|_ -> false )
     let vs = List.concat[newLets |> List.map fst]
 
     let innerFrees =
@@ -118,7 +118,7 @@ and genBindings topEnv mapExpr (lfEs:(_*Stg.LambdaForm) list) lf =
     let stdConstrs = 
         List.concat [
             newStdConstrs |> List.collect(function 
-                (v, ({expr=Stg.Constr(f, vs)} as lfStdConstrs)) -> 
+                (v, ({args=[]; expr=Stg.Constr(f, vs)} as lfStdConstrs)) -> 
                     (v, f, vs)::lfStdConstrs.stdConstrs)
             lf.stdConstrs
         ]
@@ -276,9 +276,12 @@ and genAppWithArgs topEnv (f:Stg.Var) args =
         let firstResult = genAppWithArgs topEnv f firstArgs
         genAtom topEnv (fun f -> genAppWithArgs topEnv (f) secondArgs) firstResult
     |Some i when i > (args |> List.length) -> 
-        // Undersaturated
-        failwith "Undersaturated"
-    
+        let etaArgs = [1..i] |> List.map(fun _ -> genVar())
+        let etaExpanded = genCallWithAtoms topEnv (f) (etaArgs |> List.map Stg.AVar)
+        let lfEta = {Stg.lambdaForm etaExpanded with args=etaArgs}
+        let var = genVar()
+        genBindings topEnv (genNonRec) [var, lfEta] (genAtoms topEnv (genAppWithAtoms topEnv var) [] args)
+     
 and genAppWithAtoms topEnv (f:Stg.Var) atoms =
     let e = genCallWithAtoms topEnv f atoms
     let lf = Stg.lambdaForm e
@@ -298,7 +301,7 @@ and genCallWithAtoms topEnv (f:Stg.Var) atoms =
 
 and genAtoms topEnv mapAtoms xs =
     function
-    | (Core.VarE arg) :: args ->
+    | (Core.VarE arg) :: args when forcedCallArity topEnv (snd arg) = None->
         let (lf:Stg.LambdaForm) = genAtoms topEnv mapAtoms (Stg.AVar (snd arg) :: xs) args
         let frees = lf.frees |> addFree topEnv (snd arg)
         { lf with frees = frees }

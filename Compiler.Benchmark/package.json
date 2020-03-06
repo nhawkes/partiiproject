@@ -7,6 +7,7 @@
     "build:js": "babel src -d out",
     "build:watfib": "wat2wasm src/wat/fibonacci.wat -o out/wasm/fib-baseline.wasm",
     "build:watgcd": "wat2wasm src/wat/gcd.wat -o out/wasm/gcd-baseline.wasm",
+    "build:wat": "yarn build:watfib&&yarn build:watgcd",
     "test": "jest"
   },
   "license": "MIT",

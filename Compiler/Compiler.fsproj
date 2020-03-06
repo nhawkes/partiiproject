@@ -22,6 +22,8 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="argu" Version="6.0.0" />
     <PackageReference Include="FParsec" Version="1.0.3" />
+    <PackageReference Include="Glob" Version="1.1.5" />
   </ItemGroup>
 </Project>

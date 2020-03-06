@@ -39,6 +39,7 @@ nonMultiple(p, n) = {
     else
         true
 }  
+yes(x) = {return true}
 export prime(x) = {
     list = from(2)
     filteredList = sieve(list)

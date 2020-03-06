@@ -15,6 +15,7 @@
       if $I1 (result i32)
         get_local $p1
         get_local $p0
+        get_local $p1
         i32.sub
         call $gcd
       else

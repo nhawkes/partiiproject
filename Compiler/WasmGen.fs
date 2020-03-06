@@ -203,16 +203,19 @@ and genRecEnd tenv env depth x =
 
 and genLetJoin tenv env depth j arg je e =
     let newEnv = env |> Map.add ( StgVar j ) (Block (2u+depth))
-    [
+    let jexpr = genExpr tenv env (depth + 1u) je
+    let expr = ( e newEnv (depth + 2u))
+    let result = [
         Wasm.Block([Wasm.I32], [
             [Wasm.Block([Wasm.I32], [
-                ( e newEnv (depth + 2u))
+                expr
                 [Wasm.Br 1u]
             ] |> List.concat)]
             [ Wasm.LocalSet (getLocal env (StgVar arg)) ]
-            genExpr tenv env (depth + 1u) je
+            jexpr
         ] |> List.concat)
     ]
+    result
 
 and genApp tenv env depth v args =
     let whnf =
@@ -478,8 +481,8 @@ let genTopLevelCode tenv env depth =
 let rec genLetName tenv env depth = function
     | (b:Stg.Var, lf: LambdaForm) ->
         let args = ["this"]
-        let locals = lf.locals |> List.map(fun x -> x.name)
-        let lets = lf.lets|> List.map(fun x -> (fst x).name)
+        let locals = lf.locals |> List.map(fun x -> sprintf "%A" x)
+        let lets = lf.lets|> List.map(fun x -> sprintf "%A" (fst x))
         let funcLocalNames = List.concat[args;locals;lets]
 
         let funcName = b.name
@@ -517,7 +520,7 @@ let genTopBindNames export tenv env depth (b:Stg.Var) args (lf: LambdaForm) : Na
         failwithf "Top level bindings cannot have args: %A" lf.frees
     else
         let funcName = b.name
-        let funcLocalNames = List.concat [(lf.locals |> List.map (fun x -> x.name)); (lf.lets |> List.map (fun x -> (fst x).name))]
+        let funcLocalNames = List.concat [(args |> List.map (fun x -> sprintf "%A" x));(lf.locals |> List.map (fun x -> sprintf "%A" x)); (lf.lets |> List.map (fun x -> sprintf "%A" (fst x)))]
         let funcNames, localNames = genLetsNames tenv env depth lf.lets
         [
             [funcName]
@@ -530,7 +533,7 @@ let genTopBindNames export tenv env depth (b:Stg.Var) args (lf: LambdaForm) : Na
 
 let genTopConstrNames tenv env depth b c vs =   
     let funcName = (b:Stg.Var).name
-    let funcLocalNames = vs |> List.map (fun (v:Stg.Var) -> v.name)
+    let funcLocalNames = vs |> List.map (fun (v:Stg.Var) -> sprintf "%A"  v)
     ([funcName], [funcLocalNames]) : Names
         
 let genTopLevelNames tenv env depth =

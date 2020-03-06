@@ -342,7 +342,7 @@ let rec getTopInlineMap shouldInline = function
 let isWrapper {flags=flags} = flags.isWrapper
 
 
-let transform (program:ClosedProgram<Var>) =     
+let transform optimise (program:ClosedProgram<Var>) =     
     let (Program analysis) = program |> Analysis.analyse
     let builtinInlineMap = getTopInlineMap isBuiltIn analysis.exprs
     let constrs = analysis.constrs |> List.map (fun ((name,b), (c,_)) -> name, c) |> Map.ofList 
@@ -353,4 +353,7 @@ let transform (program:ClosedProgram<Var>) =
     let wrapperInlineMap = getTopInlineMap isWrapper ww
     let wrapperInlined = wrapperInlineMap |> Map.toList |> List.fold (fun expr (x,v) -> substTopExprs x v expr) ww
     let result = simplify constrs wrapperInlined
-    closeProgram {analysis with exprs=result}
+    if optimise then
+        closeProgram {analysis with exprs=result}
+    else
+        closeProgram analysis

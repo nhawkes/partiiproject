@@ -26,12 +26,36 @@
             "args": [
                 "run",
                 "--project",
-                "compiler"
+                "compiler",
+                "-O0",
+                "--dumpstg"
             ],
             "presentation": {
                 "reveal": "silent"
             },
-            "problemMatcher": []
+            "problemMatcher": [],
+            "dependsOn": [
+                "build",                
+            ]
+        },
+        {
+            "label": "run optimised",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "run",  
+                "--project",
+                "compiler",
+                "-O1",
+                "--suffix=-optimised"
+            ],
+            "presentation": {
+                "reveal": "silent"
+            },
+            "problemMatcher": [],
+            "dependsOn": [
+                "build",                
+            ]
         },
         {
             "type": "npm",
@@ -40,6 +64,7 @@
             "problemMatcher": [],
             "dependsOn": [
                 "run",
+                "run optimised",
                 "build:js"
             ]
         },
@@ -49,8 +74,9 @@
             "path": "Compiler.Benchmark/",
             "problemMatcher": [],
             "dependsOn": [
+                "build:wat",
                 "run",
-                "build:js"
+                "build:js",
             ]
         },
         {
