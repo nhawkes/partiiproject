@@ -364,7 +364,7 @@ and uniqueifyBinds = function
     |(b, e)::xs -> (wrapBinder b, uniqueifyExpr e)::uniqueifyBinds xs
     |[] -> []
     
-and uniquifyProgram (program:Core.Program<_>) : Core.ClosedProgram<Stg.Var> =
+and uniquifyProgram (program:Core.Program<_>) : Core.ClosedProgram<_> =
     let uniqueConstrs =
         program.constrs |> List.map(function
             | b, (c, vs) -> wrapBinder b, (c, vs |> List.map (fun ((s, x)) -> (s, wrapVar s x)))

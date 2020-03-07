@@ -129,3 +129,8 @@ let parse s =
     match runParserOnFile pprogram () s System.Text.Encoding.Default with
     | Success(result, _, _) -> Result.Ok result
     | Failure(s, _, _) -> Result.Error s
+
+let parseString s =
+    match runParserOnString pprogram () "Program" s with
+    | Success(result, _, _) -> Result.Ok result
+    | Failure(s, _, _) -> Result.Error s

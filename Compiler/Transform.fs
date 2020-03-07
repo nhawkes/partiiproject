@@ -44,6 +44,7 @@ let rec getArgSpecializations args = function
     | Core.App(a, b) -> 
         getArgSpecializations args b    
      |Core.Unreachable -> Map.empty
+     |Core.Prim _ -> Map.empty
 
 type ResultSpec =
     |TopResultSpec
@@ -80,6 +81,7 @@ let rec getResultSpecialization (constrs:TopConstr<_> list) recCall = function
             |None -> TopResultSpec
     |Core.App(a, b) -> TopResultSpec
     | Core.Unreachable -> BotResultSpec
+     |Core.Prim _ -> TopResultSpec
 
     
 
@@ -285,9 +287,12 @@ and simplifyBinds constrs e = function
             simplifyExpr constrs (substExpr name rhs e)
         else
             Core.letE(Core.Join, [(name, b1), newRhs], (simplifyExpr constrs e))
+    |Core.NonRec, [] -> simplifyExpr constrs e
     |Core.Rec, [] -> simplifyExpr constrs e
     |Core.Rec, bs -> 
         Core.letE(Core.Rec, (bs |> List.map (fun (v,rhs) -> v, simplifyExpr constrs rhs)), (simplifyExpr constrs e))
+     |Core.Join, xs ->
+        Core.letE(Core.Join, xs, (simplifyExpr constrs e))
 
 and simplifyCase constrs (e, (name, b), (alts)) =
     let newE = simplifyExpr constrs e

@@ -1,1 +1,1 @@
-module Program = let [<EntryPoint>] main _ = Tests.StrictnessAnalysis(); 0
+module Program = let [<EntryPoint>] main _ = Analysis.StrictnessAnalysis(); 0

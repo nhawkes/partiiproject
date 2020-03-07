@@ -156,7 +156,7 @@ let rec manifestArity =
 let rec analyseExpr (env: Map<Core.UniqueName, _>) incomingArity : 
     Core.Expr<_> -> StrictnessResult * Core.Expr<AnalysedVar<_>> =
     function
-    | Core.VarE (name, v) -> 
+    | Core.VarS (name) -> 
         let innerResult = evaluate incomingArity (env |> Map.tryFind name)
         let unitResult = {
             frees=(Lazy, Map.ofList[name, Strict incomingArity])

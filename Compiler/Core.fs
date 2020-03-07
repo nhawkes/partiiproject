@@ -372,7 +372,8 @@ let closeProgram program =
                 program.exprs |> 
                 List.map (fun (((s, i), b), (export, e)) -> (s, b), (export, closeE (bs |> List.map fst) e))
         }
-    if fvProgram program |> Set.isEmpty then
+    let frees = fvProgram program
+    if frees |> Set.isEmpty then
         program
     else
-        failwithf "Program has free variables: %A \nin \n%s" (fvProgram program) (printProgram program)
+        failwithf "Program has free variables: %A \nin \n%s" (frees) (printProgram program)
