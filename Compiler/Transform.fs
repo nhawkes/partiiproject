@@ -275,10 +275,7 @@ and simplifyBinds constrs e = function
     |Core.Join, [((name, b1), rhs)] -> 
         let safeToInline = 
             match e with
-            |Core.Case(e, b2, (alts)) ->
-                match alts with
-                |[x] -> true
-                |_ -> true
+            |Core.Case(e, b2, (alts)) -> true
             |_ -> 
                 false
         let newRhs = simplifyExpr constrs rhs 
