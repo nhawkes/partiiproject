@@ -1,10 +1,12 @@
 module Ast
 
 [<StructuredFormatDisplay("{AsString}")>]
-type Var = 
-    {text:string; startPos: FParsec.Position; endPos: FParsec.Position}
-    member x.AsString = x.text 
-        
+type Var =
+    { text: string
+      startPos: FParsec.Position
+      endPos: FParsec.Position }
+    member x.AsString = x.text
+
 
 type Boxed = Integer of int32
 
@@ -24,6 +26,7 @@ type Op =
     | Div
     | Equals
     | LessThan
+
 type Expr =
     | Lit of Lit
     | Var of Var
@@ -32,12 +35,6 @@ type Expr =
     | Match of (Expr * Types.Typ) * Case list
     | If of Expr * (Expr * Expr)
     | Block of Block
-    | Prim of Wasm.Instr * Var list
-
-
-and Prim =
-    | PrimVar of Var
-    | PrimWasm of Wasm.Instr
 
 and Case = Pattern * Expr
 
@@ -48,8 +45,8 @@ and Statement =
     | Return of Expr
 
 and AssignLHS =
-    |AssignVar of Var
-    |AssignFunc of Var * AssignLHS list
+    | AssignVar of Var
+    | AssignFunc of Var * AssignLHS list
 
 type Declaration =
     | ExportDecl of (string * string list) * (Var * Var list) * Expr
@@ -57,4 +54,3 @@ type Declaration =
     | TypeDecl of AssignLHS
 
 type Program = Declaration list
-
