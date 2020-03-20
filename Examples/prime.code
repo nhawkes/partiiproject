@@ -28,7 +28,10 @@ filter(predicate(x), list) = {
     return switch(list){
         | Cons(head, tail) => {
             rest = filter(predicate, tail)
-            return if(predicate(head)) then Cons(head, rest) else rest
+            return if(predicate(head)) then 
+                    Cons(head, rest)
+                else 
+                    rest
         }
         |Empty() => Empty()
     }  
