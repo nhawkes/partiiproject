@@ -33,7 +33,7 @@ filter(predicate(x), list) = {
                 else 
                     rest
         }
-        |Empty() => Empty()
+        | Empty() => Empty()
     }  
 }
 nonMultiple(p, n) = {
