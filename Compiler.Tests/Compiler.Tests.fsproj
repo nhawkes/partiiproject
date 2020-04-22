@@ -15,7 +15,6 @@
     <Compile Include="Parser.fs" />
     <Compile Include="RuntimeFunctions.fs" />
     <Compile Include="Stg.fs" />
-    <Compile Include="Transform.fs" />
     <Compile Include="Wasm.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

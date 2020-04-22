@@ -4,17 +4,9 @@ type LocalVarId = int
 
 type GlobalVarId = int
 
-type UniqueName = string * int
 
 type DebugName = string
 
-let stringToName s = (s, 0)
-let s2n s = stringToName s
-let integer2Name i = ("gen", i)
-
-type Bound = int * int
-
-type Binder<'b> = UniqueName * 'b
 
 type InternalBinder<'b> = DebugName * 'b
 
@@ -25,36 +17,68 @@ type Constr =
     | BoolConstr
     | UserConstr of int
 
+// A generalised de bruijn index
+type Bound = int * int
+
+// A name with an integer unique for that name within the expression
+type UniqueName = string * int
+
 type Var<'b> =
+    // A bound variable
     | B of Bound
+    // A free variable with data
     | F of UniqueName * 'b
+    // A free variable without extra data
     | S of UniqueName
 
+type Binder<'b> = UniqueName * 'b
+
+let stringToName s = (s, 0)
+let s2n s = stringToName s
+let integer2Name i = ("gen", i)
+
 type Let =
-    | Rec
+    // A variable binding
     | NonRec
+    // A set of one or more variable binding that can depend on each other
+    | Rec
+    // A variable which is only tail called and does not escape meaning it does not allocate data on the heap.
     | Join
 
+// Constants
 type Const =
+    // A data constructor
     | Constr of Constr
+    // A literal
     | Lit of Lit
+    // A primitive WebAssembly instruction
     | Prim of Wasm.Instr
+    // The default case in a case expression
     | DefAlt
 
 type Expr<'b when 'b: comparison> =
+    // A loally nameless variable
     | Var of Var<'b>
-    | Lam of InternalBinder<'b> * Closed<'b>
-    | Let of Let * Binds<'b> * Closed<'b>
+    // A lambda function
+    | Lam of InternalBinder<'b> * ClosedExpr<'b>
+    // Bind a set of variables
+    | Let of Let * Binds<'b> * ClosedExpr<'b>
+    // A case expression
     | Case of Expr<'b> * InternalBinder<'b> * Alts<'b>
+    // Call a lambda function
     | App of Expr<'b> * Expr<'b>
+    // A constant
     | Const of Const
+    // The unreachable WebAssembly instruction
     | Unreachable
 
-and Closed<'b when 'b: comparison> = Closed of Expr<'b>
+// A list of bindings with variables and their expressions
+and Binds<'b when 'b: comparison> = (InternalBinder<'b> * ClosedExpr<'b>) list
 
-and Binds<'b when 'b: comparison> = (InternalBinder<'b> * Closed<'b>) list
+and ClosedExpr<'b when 'b: comparison> = Closed of Expr<'b>
 
-and Alts<'b when 'b: comparison> = (Const * InternalBinder<'b> list * Closed<'b>) list
+
+and Alts<'b when 'b: comparison> = (Const * InternalBinder<'b> list * ClosedExpr<'b>) list
 
 type Export =
     | Export of string
@@ -64,7 +88,7 @@ type TopExpr<'b when 'b: comparison> = (UniqueName * 'b) * (Export * Expr<'b>)
 
 type TopConstr<'b when 'b: comparison> = (UniqueName * 'b) * (Constr * (string * 'b) list)
 
-type TopClosedExpr<'b when 'b: comparison> = (DebugName * 'b) * (Export * Closed<'b>)
+type TopClosedExpr<'b when 'b: comparison> = (DebugName * 'b) * (Export * ClosedExpr<'b>)
 
 type TopClosedConstr<'b when 'b: comparison> = (DebugName * 'b) * (Constr * (string * 'b) list)
 

@@ -11,16 +11,16 @@ let inline b<'a> s :Binder<unit> = s2n s, ()
 [<Fact>]
 let StrictnessAnalysis() =
     let if1Expr = Core.caseE(Core.varS (s2n "a"),b "_", ([
-        Core.LitAlt(Core.I32 0), [], Core.varS (s2n "b")
-        Core.LitAlt(Core.I32 1), [], Core.varS (s2n "c")
+        Core.Lit(Core.I32 0), [], Core.varS (s2n "b")
+        Core.Lit(Core.I32 1), [], Core.varS (s2n "c")
     ]))
     let if1ExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 if1Expr
     let if2Expr = Core.caseE(Core.varS (s2n "a"),b "_", ([
-        Core.LitAlt(Core.I32 0), [], Core.varS (s2n "b")
+        Core.Lit(Core.I32 0), [], Core.varS (s2n "b")
     ]))
     let if2ExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 if2Expr
     let app1Expr = Core.caseE(Core.varS (s2n "a"),b "_", ([
-        Core.LitAlt(Core.I32 0), [], Core.App(Core.varS (s2n "f"), Core.varS (s2n "b"))        
+        Core.Lit(Core.I32 0), [], Core.App(Core.varS (s2n "f"), Core.varS (s2n "b"))        
     ]))
     let app1ExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 app1Expr
     let app2Expr = Core.App(Core.lamE (b "b", Core.varS (s2n "b")), Core.varS (s2n "a"))
@@ -34,8 +34,8 @@ let StrictnessAnalysis() =
             Core.Rec, [
                 b "f", Core.lamE (b "b", 
                     Core.caseE(Core.varS (s2n "b"),b "_", ([
-                        Core.LitAlt(Core.I32 0), [], Core.varS (s2n "c") 
-                        Core.LitAlt(Core.I32 1), [], Core.App(Core.varS (s2n "f"), Core.varS (s2n "b")) 
+                        Core.Lit(Core.I32 0), [], Core.varS (s2n "c") 
+                        Core.Lit(Core.I32 1), [], Core.App(Core.varS (s2n "f"), Core.varS (s2n "b")) 
                     ])))
             ], Core.App(Core.varS (s2n "f"), Core.varS (s2n "a")))
     let letRecExprAnalysis, _ = Analysis.analyseExpr Map.empty 0 letRecExpr

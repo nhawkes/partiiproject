@@ -10,7 +10,8 @@ let core() =
                     Gen.map (fun x -> B(x,0)) |>
                     Gen.map Var
                 Arb.from<Lit>.Generator |>
-                    Gen.map Lit
+                    Gen.map Lit |>
+                    Gen.map Const
                 Arb.from<Binds<_>>.Generator |>
                     Gen.map(fun binds -> Let(Rec, binds, Closed Core.Unreachable))    
 

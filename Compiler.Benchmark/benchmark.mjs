@@ -25,7 +25,7 @@ new Benchmark.Suite("Fibonacci")
         fibonacciWasm.fibonacci(20)
     })
     .add('CompilerOptimised', function () {
-       fibonacciWasmOpt.fibonacci(20)
+        fibonacciWasmOpt.fibonacci(20)
     })
     .on('cycle', function (event) {
         console.log(`${this.name}#${String(event.target)}`);
@@ -33,7 +33,7 @@ new Benchmark.Suite("Fibonacci")
     .on('complete', function () {
         console.log(`Fastest ${this.name} is ${this.filter('fastest').map('name')}`);
     })
-    .run({ 'async': false }) 
+    .run({ 'async': false })
 
 new Benchmark.Suite("Fibonacci List")
     .add('JS', function () {
@@ -51,20 +51,20 @@ new Benchmark.Suite("Fibonacci List")
     .on('complete', function () {
         console.log(`Fastest ${this.name} is ${this.filter('fastest').map('name')}`);
     })
-    .run({ 'async': false }) 
+    .run({ 'async': false })
 
-new Benchmark.Suite("GCD")   
+new Benchmark.Suite("GCD")
     .add('JS', function () {
-        gcdJs.gcd(1134903170,1836311903)
+        gcdJs.gcd(1134903170, 1836311903)
     })
     .add('Baseline', function () {
-        libBaselineGcd.gcd(1134903170,1836311903)
+        libBaselineGcd.gcd(1134903170, 1836311903)
     })
     .add('Compiler', function () {
-        gcdWasm.gcd(1134903170,1836311903)
+        gcdWasm.gcd(1134903170, 1836311903)
     })
     .add('CompilerOptimised', function () {
-        gcdWasmOpt.gcd(1134903170,1836311903)
+        gcdWasmOpt.gcd(1134903170, 1836311903)
     })
     .on('cycle', function (event) {
         console.log(`${this.name}#${String(event.target)}`);
@@ -72,9 +72,9 @@ new Benchmark.Suite("GCD")
     .on('complete', function () {
         console.log(`Fastest ${this.name} is ${this.filter('fastest').map('name')}`);
     })
-    .run({ 'async': false }) 
+    .run({ 'async': false })
 
-new Benchmark.Suite("Prime")       
+new Benchmark.Suite("Prime")
     .add('JS', function () {
         primeJs.prime(20)
     })
